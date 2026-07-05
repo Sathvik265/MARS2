@@ -64,7 +64,7 @@ If the automated script fails, follow these steps.
     - Name: `restaurant_billing_db`
     - Click **Save**.
 4.  Right-click the new `restaurant_billing_db` -> `Query Tool`.
-5.  Open the `Final.sql` file located in the root folder using a text editor, copy the content, paste it into the Query Tool, and hit the **Play** button (Execute).
+5.  Open the `Final_Dump_Fixed.sql` file located in the root folder using a text editor, copy the content, paste it into the Query Tool, and hit the **Play** button (Execute).
 
 ### 3. Backend Setup
 

@@ -19,8 +19,8 @@ export function generateAsciiReceipt(data, settings) {
     const clean = String(t || "").trim();
     if (clean === "`") return "I";
     if (clean === "``") return "II";
-    if (clean.toLowerCase() === "rbs1") return "R";
-    if (clean.toLowerCase() === "rbs 2" || clean.toLowerCase() === "rbs2") return "R2";
+    if (clean.toLowerCase() === "rbs") return "R";
+    if (clean.toLowerCase() === "rbs1" || clean.toLowerCase() === "rbs 1") return "R2";
     return "";
   };
   const trackLetter = getTrackLetter(trackVal);
@@ -36,7 +36,7 @@ export function generateAsciiReceipt(data, settings) {
   const printTime = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
   const printDate = createdAt ? new Date(createdAt).toLocaleDateString("en-GB") : new Date().toLocaleDateString("en-GB");
 
-  const LINE_WIDTH = 35; // 35 characters for 0.5 inch narrower receipt
+  const LINE_WIDTH = 32; // 32 characters to prevent cutoff on 58mm POS printer
 
   const padRight = (str, len) => {
     let s = String(str);
@@ -72,8 +72,8 @@ export function generateAsciiReceipt(data, settings) {
 
   ascii += separator + "\r\n";
 
-  // Items header (19, 5, 11)
-  ascii += padRight("Item", 19) + padLeft("Qty", 5) + padLeft("Total", 11) + "\r\n";
+  // Items header (16, 5, 11)
+  ascii += padRight("Item", 16) + padLeft("Qty", 5) + padLeft("Total", 11) + "\r\n";
   ascii += separator + "\r\n";
 
   if (items.length === 0) {
@@ -85,8 +85,8 @@ export function generateAsciiReceipt(data, settings) {
       const nameLines = [];
       let temp = name;
       while (temp.length > 0) {
-        nameLines.push(temp.substring(0, 19));
-        temp = temp.substring(19);
+        nameLines.push(temp.substring(0, 16));
+        temp = temp.substring(16);
       }
 
       const qty = String(item.quantity || item.qty);
@@ -94,9 +94,9 @@ export function generateAsciiReceipt(data, settings) {
 
       nameLines.forEach((line, i) => {
         if (i === 0) {
-          ascii += padRight(line, 19) + padLeft(qty, 5) + padLeft(total, 11) + "\r\n";
+          ascii += padRight(line, 16) + padLeft(qty, 5) + padLeft(total, 11) + "\r\n";
         } else {
-          ascii += padRight(line, 19) + " ".repeat(16) + "\r\n";
+          ascii += padRight(line, 16) + " ".repeat(16) + "\r\n";
         }
       });
     });
@@ -125,8 +125,8 @@ export function generateAsciiReceipt(data, settings) {
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\r\n";
   ascii += separator + "\r\n";
 
-  // 1-inch gap (approx 6 lines)
-  for (let i = 0; i < 10; i++) {
+  // Minimal gap between details and footer
+  for (let i = 0; i < 2; i++) {
     ascii += "\r\n";
   }
 
@@ -148,7 +148,7 @@ export function generateAsciiReport(title, columns, data, settings) {
   const mergedData = { ...settings };
   const hotelName = safeGet(mergedData, "hotel_name", "Udupi Anand Bhavan");
   const clerkInitials = safeGet(mergedData, "clerk_initials", "CLK");
-  const LINE_WIDTH = 35; // Standard continuous paper width
+  const LINE_WIDTH = 32; // Standard continuous paper width (32 columns)
 
   const padRight = (str, len) => {
     let s = String(str || "");
@@ -237,8 +237,8 @@ export function generateAsciiReport(title, columns, data, settings) {
   ascii += centerText(`End of Rpt | ${printTime}`, LINE_WIDTH) + "\r\n";
   ascii += separator + "\r\n";
 
-  // Mechanical feed loops
-  for (let i = 0; i < 11; i++) {
+  // Minimal mechanical feed loop
+  for (let i = 0; i < 2; i++) {
     ascii += ".\r\n";
   }
 

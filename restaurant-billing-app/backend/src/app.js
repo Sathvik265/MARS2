@@ -227,23 +227,43 @@ app.post("/api/auth/login", async (req, res) => {
 app.post("/api/auth/logout", requireAuth, async (req, res) => {
   const { mode, track } = req.auth;
 
-  // If a clerk logs out of a track, explicitly close the session.
-  // This automatically locks it and marks it CLOSED until an admin reopens it.
+  // If a clerk logs out: just lock the track (is_locked = TRUE) but keep the
+  // session OPEN. This prevents new clerk logins until an admin unlocks.
+  // The shift itself stays open — clerks logging out do NOT close the shift.
   if (mode === "clerk" && track) {
     try {
-      const openSession = await ShiftModel.getCurrentOpenSession(track);
-      if (openSession) {
-        await ShiftModel.closeSession(openSession.session_id, "LOGOUT");
-        console.log(`🔒 Track '${track}' session closed on clerk logout.`);
-      }
+      await ShiftModel.setTrackLocked(track, true);
+      console.log(`🔒 Track '${track}' locked on clerk logout (session stays OPEN).`);
     } catch (err) {
-      console.error(`Failed to close track '${track}' on logout:`, err.message);
+      console.error(`Failed to lock track '${track}' on logout:`, err.message);
       // Non-fatal — still complete the logout
     }
   }
 
   deleteSession(req.auth.token);
   res.json({ detail: "Logged out", track_locked: mode === "clerk" && !!track });
+});
+
+// POST /api/auth/close-shift-logout — closes the current shift AND logs out
+// Used by the "Close Shift & Log Out" button for both admin and clerk
+app.post("/api/auth/close-shift-logout", requireAuth, async (req, res) => {
+  const { mode, track } = req.auth;
+
+  if (track) {
+    try {
+      const openSession = await ShiftModel.getCurrentOpenSession(track);
+      if (openSession) {
+        await ShiftModel.closeSession(openSession.session_id, req.auth.staff_code || "LOGOUT");
+        console.log(`🔒 Track '${track}' shift CLOSED on close-shift-logout.`);
+      }
+    } catch (err) {
+      console.error(`Failed to close shift for '${track}':`, err.message);
+      // Non-fatal — still complete the logout
+    }
+  }
+
+  deleteSession(req.auth.token);
+  res.json({ detail: "Shift closed and logged out" });
 });
 
 // ================ MENU ROUTES (UNCHANGED) ================
@@ -482,7 +502,7 @@ app.get("/api/menu/lookup/:code", requireAuth, async (req, res) => {
     
     const result = await pool.query(
       `SELECT * FROM items 
-             WHERE (id = $2 OR UPPER(alpha_code) = $1 OR CAST(numeric_code AS TEXT) = $1 OR numeric_code = $2 OR UPPER(name) = $1) LIMIT 1`,
+             WHERE (id = $2 OR UPPER(alpha_code) = $1 OR UPPER(numeric_code) = $1 OR UPPER(name) = $1) LIMIT 1`,
       [upperCode, numericVal],
     );
 

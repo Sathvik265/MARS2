@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS orders (
     quantity INTEGER DEFAULT 1,
     unit_price DECIMAL(10,2) DEFAULT 0,
     line_total DECIMAL(10,2) DEFAULT 0,
+    is_separate BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     -- Composite FK referencing bills (Added from Update-3)

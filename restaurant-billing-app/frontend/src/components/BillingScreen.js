@@ -39,6 +39,14 @@ import {
 import { API, toast, safeGet, safeArray, safeObject } from "../utils/helpers";
 import { generateAsciiReceipt } from "../utils/receiptGenerator";
 
+export const getSectionForTable = (tableNo) => {
+  const table = parseInt(tableNo, 10);
+  if (isNaN(table)) return "G";
+  if (table === 1) return "P";
+  if (table >= 15 && table <= 30) return "AC";
+  return "G";
+};
+
 export default function Billing({
   drafts = {},
   setDrafts,
@@ -82,6 +90,7 @@ export default function Billing({
   }, [drafts]);
 
   const [showF4Popup, setShowF4Popup] = useState(false);
+  const [helpTab, setHelpTab] = useState("shortcuts");
   const [searchQuery, setSearchQuery] = useState("");
   const [menuItems, setMenuItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
@@ -90,6 +99,7 @@ export default function Billing({
   // Dynamic GST percentages
   const [sgstPercentage, setSgstPercentage] = useState(2.5);
   const [cgstPercentage, setCgstPercentage] = useState(2.5);
+  const [settingsCache, setSettingsCache] = useState(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -100,6 +110,7 @@ export default function Billing({
         if (res.data) {
           setSgstPercentage(parseFloat(res.data.sgst_percentage) || 0);
           setCgstPercentage(parseFloat(res.data.cgst_percentage) || 0);
+          setSettingsCache(res.data);
         }
       } catch (err) {
         console.error("Failed to load settings for taxes:", err);
@@ -113,7 +124,7 @@ export default function Billing({
       header: {
         table_no: currentTable || "",
         party_no: currentParty || "1",
-        section: "G",
+        section: getSectionForTable(currentTable || ""),
         track: track || "",
         bill_number: null,
       },
@@ -219,14 +230,6 @@ export default function Billing({
     }));
   };
 
-  const getSectionForTable = (tableNo) => {
-    const table = parseInt(tableNo, 10);
-    if (isNaN(table)) return "G";
-    if (table === 1) return "P";
-    if (table >= 15 && table <= 30) return "AC";
-    return "G";
-  };
-
   const setSectionByTable = (tableNo) => {
     const section = getSectionForTable(tableNo);
     // Ensure we trigger the update on the CURRENT draft if it exists
@@ -325,7 +328,10 @@ export default function Billing({
 
   // --- NAVIGATION HANDLERS ---
   const handleTableNoKeyDown = (event) => {
-    if (event.key === "PageDown") {
+    const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+    const isAlt = event.altKey;
+    // Mac alternative: Cmd+D or Alt+D instead of PageDown
+    if (event.key === "PageDown" || (isCmdOrCtrl && event.key.toLowerCase() === "d") || (isAlt && event.key.toLowerCase() === "d")) {
       event.preventDefault();
       if (itemCodeRef.current) itemCodeRef.current.focus();
     } else if (event.key === "Enter" || event.key === "Tab") {
@@ -359,7 +365,10 @@ export default function Billing({
   };
 
   const handleItemCodeKeyDown = (e) => {
-    if (e.key === "F1") {
+    const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+    const isAlt = e.altKey;
+    // Mac alternative: Cmd+1 or Alt+1 instead of F1
+    if (e.key === "F1" || (isCmdOrCtrl && (e.key === "1" || e.code === "Digit1")) || (isAlt && (e.key === "1" || e.code === "Digit1"))) {
       e.preventDefault();
       setShowF4Popup(true);
       setHelpTab("shortcuts");
@@ -387,6 +396,7 @@ export default function Billing({
           String(safeGet(i, "name", "")).trim().toLowerCase() === entryCodeStr.toLowerCase(),
       );
       if (item) {
+        // Focus quantity instead of adding directly
         if (qtyRef.current) {
           qtyRef.current.focus();
           qtyRef.current.select();
@@ -405,10 +415,12 @@ export default function Billing({
   };
 
   const handleQtyKeyDown = (e) => {
+    const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+    const isAlt = e.altKey;
     if (e.key === "Enter") {
       e.preventDefault();
       addItem();
-    } else if (e.key === "PageDown") {
+    } else if (e.key === "PageDown" || (isCmdOrCtrl && e.key.toLowerCase() === "d") || (isAlt && e.key.toLowerCase() === "d")) {
       e.preventDefault();
       if (itemQtyRefs.current[0]) {
         itemQtyRefs.current[0].focus();
@@ -439,6 +451,18 @@ export default function Billing({
         itemQtyRefs.current[index + 1]?.focus();
         itemQtyRefs.current[index + 1]?.select();
       }
+    } else if (e.key === "ArrowRight") {
+      // Increment quantity by 1
+      e.preventDefault();
+      const currentQty = parseFloat(safeArray(currentDraft.lines)[index]?.quantity || 1);
+      const newQty = Math.round((currentQty + 1) * 100) / 100;
+      updateQty(index, String(newQty));
+    } else if (e.key === "ArrowLeft") {
+      // Decrement quantity by 1 (min 0.5)
+      e.preventDefault();
+      const currentQty = parseFloat(safeArray(currentDraft.lines)[index]?.quantity || 1);
+      const newQty = Math.max(0.5, Math.round((currentQty - 1) * 100) / 100);
+      updateQty(index, String(newQty));
     } else if (e.key === "Enter") {
       e.preventDefault();
       // Move to next input or just handle confirm?
@@ -731,7 +755,7 @@ export default function Billing({
         toast.success(`Bill #${billNumber} created`);
 
         if (billId) {
-          const fullBillData = await getBillById(billId);
+          const fullBillData = createdBill;
 
           // --- SPLIT BILL PRINTING LOGIC ---
           let printPayload = fullBillData;
@@ -818,13 +842,19 @@ export default function Billing({
           }
 
           try {
-            const clerk = userInitials || activeShift?.clerk_initials || "CLK";
-            const settingsRes = await api.get(`/settings?clerk=${clerk}`);
-            const settings = settingsRes.data;
+            let settings = settingsCache;
+            if (!settings) {
+              const clerk = userInitials || activeShift?.clerk_initials || "CLK";
+              const settingsRes = await api.get(`/settings?clerk=${clerk}`);
+              settings = settingsRes.data;
+            }
 
             let rawText = "";
             if (printPayload.split && printPayload.bills) {
-              printPayload.bills.forEach((b) => {
+              printPayload.bills.forEach((b, idx) => {
+                if (idx > 0) {
+                  rawText += "\r\n"; // at most 1 line gap
+                }
                 rawText += generateAsciiReceipt(b, settings);
               });
             } else {
@@ -854,13 +884,21 @@ export default function Billing({
         }
 
         if (setCurrentTable) {
-          setCurrentTable("");
+          setCurrentTable("1");
         }
         setCurrentParty("1");
 
         // Refresh numbers
         fetchLastBillNumberRef.current?.();
         fetchActiveTablesRef.current?.();
+
+        // Return focus to table number field and select it (lands on table 1 by default)
+        setTimeout(() => {
+          if (tableNoRef.current) {
+            tableNoRef.current.focus();
+            tableNoRef.current.select();
+          }
+        }, 50);
 
         setEntryCode("");
         setQty("1");
@@ -973,7 +1011,16 @@ export default function Billing({
           unitPrice = customPrice;
         }
 
-        const quantityNum = parseFloat(qty) || 1;
+        const quantityNum = parseFloat(qty);
+        if (isNaN(quantityNum) || quantityNum <= 0) {
+          toast.error("Quantity must be greater than 0");
+          if (qtyRef.current) {
+            qtyRef.current.focus();
+            qtyRef.current.select();
+          }
+          return null;
+        }
+
         const newLine = {
           code: activeCode.toUpperCase(),
           name: itemName,
@@ -988,6 +1035,7 @@ export default function Billing({
         const payload = {
           table_no: currentTable,
           party_no: currentParty,
+          section: section,
           item_name: newLine.name,
           quantity: newLine.quantity,
           unit_price: newLine.unit_price,
@@ -1025,7 +1073,25 @@ export default function Billing({
         return newLine;
       } catch (e) {
         console.error("Add item error:", e);
-        toast.error(safeGet(e, "response.data.detail", "Item not found"));
+        const httpStatus = e?.response?.status;
+
+        if (httpStatus === 404 || !httpStatus) {
+          // Item not found — open help popup so user can search
+          toast.error(safeGet(e, "response.data.detail", "Item not found"));
+          setShowF4Popup(true);
+          setHelpTab("shortcuts");
+          if (itemCodeRef.current) {
+            itemCodeRef.current.focus();
+            itemCodeRef.current.select();
+          }
+        } else {
+          // Server error (500, etc.) — don't open help popup, just notify and refocus
+          toast.error("Server error looking up item. Please try again.");
+          if (itemCodeRef.current) {
+            itemCodeRef.current.focus();
+            itemCodeRef.current.select();
+          }
+        }
         return null;
       }
     },
@@ -1042,6 +1108,8 @@ export default function Billing({
       setEntryCode,
       setQty,
       itemCodeRef,
+      setShowF4Popup,
+      setHelpTab,
     ],
   );
 
@@ -1144,13 +1212,19 @@ export default function Billing({
         }
 
         try {
-          const clerk = userInitials || activeShift?.clerk_initials || "CLK";
-          const settingsRes = await api.get(`/settings?clerk=${clerk}`);
-          const settings = settingsRes.data;
+          let settings = settingsCache;
+          if (!settings) {
+            const clerk = userInitials || activeShift?.clerk_initials || "CLK";
+            const settingsRes = await api.get(`/settings?clerk=${clerk}`);
+            settings = settingsRes.data;
+          }
 
           let rawText = "";
           if (printPayload.split && printPayload.bills) {
-            printPayload.bills.forEach((b) => {
+            printPayload.bills.forEach((b, idx) => {
+              if (idx > 0) {
+                rawText += "\r\n"; // at most 1 line gap
+              }
               rawText += generateAsciiReceipt(b, settings);
             });
           } else {
@@ -1210,7 +1284,6 @@ export default function Billing({
   ]);
 
   // --- Active Bills Logic ---
-  const [helpTab, setHelpTab] = useState("shortcuts");
   const [activeTables, setActiveTables] = useState([]);
   const [now, setNow] = useState(new Date());
   const [lastBillNumber, setLastBillNumber] = useState(0);
@@ -1355,21 +1428,29 @@ export default function Billing({
 
   useEffect(() => {
     const handleGlobalKeyDown = (event) => {
-      if (event.key === "F1") {
+      const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+      const isAlt = event.altKey;
+
+      const code = event.code;
+
+      // F1 or Cmd+1 / Alt+1
+      if (event.key === "F1" || (isCmdOrCtrl && (event.key === "1" || code === "Digit1")) || (isAlt && (event.key === "1" || code === "Digit1"))) {
         event.preventDefault();
         setShowF4Popup((prev) => {
           if (prev && helpTab === "shortcuts") return false;
           setHelpTab("shortcuts");
           return true;
         });
-      } else if (event.key === "F2") {
+      // F2 or Cmd+2 / Alt+2
+      } else if (event.key === "F2" || (isCmdOrCtrl && (event.key === "2" || code === "Digit2")) || (isAlt && (event.key === "2" || code === "Digit2"))) {
         event.preventDefault();
         setShowF4Popup((prev) => {
           if (prev && helpTab === "active") return false;
           setHelpTab("active");
           return true;
         });
-      } else if (event.key === "F4") {
+      // F4 or Cmd+4 / Alt+4
+      } else if (event.key === "F4" || (isCmdOrCtrl && (event.key === "4" || code === "Digit4")) || (isAlt && (event.key === "4" || code === "Digit4"))) {
         event.preventDefault();
         setShowF4Popup((prev) => !prev);
       } else if (event.key === "Escape") {
@@ -1385,22 +1466,30 @@ export default function Billing({
             tableNoRef.current.select();
           }
         }, 0);
-      } else if (event.key === "End" || event.key === "Home") {
+      // End/Home or Cmd+Enter / Cmd+P / Ctrl+P
+      } else if (
+        event.key === "End" || 
+        event.key === "Home" || 
+        (isCmdOrCtrl && event.key === "Enter") || 
+        (isCmdOrCtrl && event.key.toLowerCase() === "p")
+      ) {
         event.preventDefault();
         handlePrintBill();
-      } else if (event.key === "PageDown") {
+      // PageDown or Cmd+D / Alt+D
+      } else if (event.key === "PageDown" || (isCmdOrCtrl && event.key.toLowerCase() === "d") || (isAlt && event.key.toLowerCase() === "d")) {
         event.preventDefault();
         if (itemCodeRef.current) {
           itemCodeRef.current.focus();
         }
       } else if (
-        (event.ctrlKey || event.metaKey) &&
+        isCmdOrCtrl &&
         (event.key === "f" || event.code === "KeyF")
       ) {
         event.preventDefault();
         setShowF4Popup(true);
         setHelpTab("shortcuts");
-      } else if (event.key === "F3") {
+      // F3 or Cmd+3 / Alt+3
+      } else if (event.key === "F3" || (isCmdOrCtrl && (event.key === "3" || code === "Digit3")) || (isAlt && (event.key === "3" || code === "Digit3"))) {
         event.preventDefault();
         setIsSplitBillMode((prev) => {
           const newState = !prev;
@@ -1473,13 +1562,12 @@ export default function Billing({
         const code =
           String(safeGet(selectedItem, "numeric_code", "")).trim() ||
           String(safeGet(selectedItem, "alpha_code", "")).trim();
-        setEntryCode(code);
+        
+        // Directly add the item to the bill
+        addItem(true, code);
+        
         setShowF4Popup(false);
         setSearchQuery("");
-        if (qtyRef.current) {
-          qtyRef.current.focus();
-          qtyRef.current.select();
-        }
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -1608,7 +1696,12 @@ export default function Billing({
                   const val = e.target.value;
                   setEntryCode(val);
                   if (/^\d{3}$/.test(val)) {
-                    if (qtyRef.current) {
+                    const exists = menuItems.some(
+                      (i) =>
+                        String(safeGet(i, "numeric_code", "")).trim() === val.trim() ||
+                        String(safeGet(i, "alpha_code", "")).trim().toLowerCase() === val.trim().toLowerCase()
+                    );
+                    if (exists && qtyRef.current) {
                       qtyRef.current.focus();
                       qtyRef.current.select();
                     }
@@ -1788,12 +1881,12 @@ export default function Billing({
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={handleSearchKeyDown}
                     />
-                    {searchQuery && filteredItems.length > 0 && (
+                    {filteredItems.length > 0 && (
                       <div className="f4-search-results">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>CODE</TableHead>
+                <TableHead>CODE</TableHead>
                               <TableHead>NAME</TableHead>
                               <TableHead>PRICE</TableHead>
                             </TableRow>
@@ -1802,20 +1895,26 @@ export default function Billing({
                             {filteredItems.map((item, index) => (
                               <TableRow
                                 key={safeGet(item, "id", Math.random())}
+                                ref={(el) => {
+                                  if (selectedHelpIndex === index && el) {
+                                    el.scrollIntoView({ block: "nearest" });
+                                  }
+                                }}
                                 className={`cursor-pointer hover:bg-gray-800 ${
-                                  selectedHelpIndex === index ? "bg-blue-900 text-white" : ""
+                                  selectedHelpIndex === index ? "text-white" : ""
                                 }`}
+                                style={
+                                  selectedHelpIndex === index
+                                    ? { backgroundColor: "#1d4ed8", color: "#ffffff" }
+                                    : {}
+                                }
                                 onClick={() => {
-                                  setEntryCode(
-                                    safeGet(item, "numeric_code", "") ||
-                                      safeGet(item, "alpha_code", ""),
-                                  );
+                                  const code =
+                                    String(safeGet(item, "numeric_code", "")).trim() ||
+                                    String(safeGet(item, "alpha_code", "")).trim();
+                                  addItem(true, code);
                                   setShowF4Popup(false);
                                   setSearchQuery("");
-                                  if (qtyRef.current) {
-                                    qtyRef.current.focus();
-                                    qtyRef.current.select();
-                                  }
                                 }}
                               >
                                 <TableCell>

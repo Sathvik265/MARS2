@@ -55,16 +55,30 @@ async function verify() {
     // 3. Create Order
     const today = new Date().toISOString().split("T")[0];
     const holdingBillNumber = 0;
+    const orderCreatedAt = new Date();
+
+    // First insert a provisional bill matching the FK of the order
+    await client.query(
+      `
+      INSERT INTO bills (
+        bill_number, bill_date, table_no, party_no, section, 
+        track, clerk_initials, subtotal, sgst, cgst, 
+        tax_amount, grand_total, items_json, created_at
+      )
+      VALUES (0, $1, $2, '1', 'AC', 'TRACK1', 'TEST', 0, 0, 0, 0, 0, '[]'::jsonb, $3)
+      `,
+      [today, tableNo, orderCreatedAt]
+    );
 
     await client.query(
       `
       INSERT INTO orders (
         track, clerk_initials, table_no, party_no, bill_number, bill_date,
-        item_code, numeric_item_code, item_name, quantity, unit_price, line_total
+        item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at
       )
-      VALUES ('TRACK1', 'TEST', $1, '1', $2, $3, $4, $5, 'Test Item', 2, 100, 200)
+      VALUES ('TRACK1', 'TEST', $1, '1', $2, $3, $4, $5, 'Test Item', 2, 100, 200, $6)
     `,
-      [tableNo, holdingBillNumber, today, item.alpha_code, item.numeric_code]
+      [tableNo, holdingBillNumber, today, item.alpha_code, item.numeric_code, orderCreatedAt]
     );
     console.log("✅ Created Test Order");
 
@@ -123,6 +137,7 @@ async function verify() {
 
     // Cleanup
     await client.query("DELETE FROM bills WHERE id = $1", [billId]);
+    await client.query("DELETE FROM bills WHERE table_no = $1 AND party_no = '1' AND created_at = $2", [tableNo, orderCreatedAt]);
     await client.query("DELETE FROM items WHERE id = $1", [item.id]);
     console.log("✅ Cleanup completed");
   } catch (err) {
