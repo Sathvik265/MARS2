@@ -95,6 +95,20 @@ export const logout = async () => {
   }
 };
 
+export const closeShiftAndLogout = async () => {
+  try {
+    const response = await api.post("/auth/close-shift-logout");
+    return response.data;
+  } finally {
+    clearAuthToken();
+  }
+};
+
+export const getPrinterStatus = async () => {
+  const response = await api.get("/printer/status");
+  return response.data;
+};
+
 // ==================== MENU OPERATIONS ====================
 export const fetchMenu = async () => {
   const response = await api.get("/menu");

@@ -68,7 +68,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
       setIsTrackLocked(false);
       return;
     }
-    const validTracks = ["`", "``", "RBS1", "RBS2"];
+    const validTracks = ["`", "``", "RBS", "RBS1"];
     if (!validTracks.includes(track)) {
       setIsShiftClosed(false);
       setIsTrackLocked(false);
@@ -104,7 +104,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
       setIsTrackLocked(false);
       return;
     }
-    const validTracks = ["`", "``", "RBS1", "RBS2"];
+    const validTracks = ["`", "``", "RBS", "RBS1"];
     if (!validTracks.includes(track)) {
       setIsTrackLocked(false);
       return;
@@ -143,9 +143,9 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
       return;
     }
 
-    const validTracks = ["`", "``", "RBS1", "RBS2"];
+    const validTracks = ["`", "``", "RBS", "RBS1"];
     if (!validTracks.includes(track)) {
-      toast.error("Invalid track. Valid tracks are '`', '``', 'RBS1', 'RBS2'.");
+      toast.error("Invalid track. Valid tracks are '`', '``', 'RBS', 'RBS1'.");
       return;
     }
 
@@ -350,7 +350,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
             </div>
             <div className="text-xs text-gray-600 text-center">
               Hint: Use clerk initials for clerks or 'SHI' for admin. Track:
-              '`', '``', 'RBS1', 'RBS2'
+              '`', '``', 'RBS', 'RBS1'
             </div>
           </div>
         </CardContent>

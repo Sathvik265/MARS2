@@ -23,8 +23,9 @@ function RecentBills({ billingDate }) {
     try {
       setLoading(true);
       const response = await getBillsByDate(billingDate);
-      setBills(response || []);
-      setFocusedBillIndex(response && response.length > 0 ? 0 : -1); // Set focus to first bill
+      const normalized = (response || []).map((b) => normalizeBill(b));
+      setBills(normalized);
+      setFocusedBillIndex(normalized && normalized.length > 0 ? 0 : -1); // Set focus to first bill
       setError(null);
     } catch (err) {
       console.error("Error fetching bills:", err);
@@ -137,8 +138,9 @@ function RecentBills({ billingDate }) {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
+      const isCmdOrCtrl = event.metaKey || event.ctrlKey;
       // Global shortcuts (work even if list is empty)
-      if (event.altKey && event.key.toLowerCase() === "s") {
+      if (((event.altKey || event.metaKey) && event.key.toLowerCase() === "s") || (isCmdOrCtrl && event.key.toLowerCase() === "s")) {
         event.preventDefault();
         const searchEl = document.getElementById("recent-bills-search");
         if (searchEl) searchEl.focus();
@@ -257,8 +259,8 @@ function RecentBills({ billingDate }) {
         )}
 
         {filteredBills.map((bill, index) => {
-          const isExpanded =
-            expandedBillId === bill.id && selectedBill?.id === bill.id;
+          const isSearchActive = searchTerm.trim() !== "";
+          const isExpanded = isSearchActive || expandedBillId === bill.id;
           return (
             <div
               key={bill.id}
@@ -268,23 +270,15 @@ function RecentBills({ billingDate }) {
                 focusedBillIndex === index ? "focused" : ""
               }`}
               onClick={async () => {
+                // If search is active, cards are kept expanded by default
+                if (isSearchActive) {
+                  setFocusedBillIndex(index);
+                  return;
+                }
                 if (isExpanded) {
-                  setSelectedBill(null);
                   setExpandedBillId(null);
                 } else {
-                  if (billDetailsCache[bill.id]) {
-                    setSelectedBill(billDetailsCache[bill.id]);
-                    setExpandedBillId(bill.id);
-                  } else {
-                    const raw = await getBillById(bill.id);
-                    const fullBill = normalizeBill(raw);
-                    setBillDetailsCache((prev) => ({
-                      ...prev,
-                      [bill.id]: fullBill,
-                    }));
-                    setSelectedBill(fullBill);
-                    setExpandedBillId(bill.id);
-                  }
+                  setExpandedBillId(bill.id);
                 }
                 setFocusedBillIndex(index);
               }}
@@ -307,7 +301,7 @@ function RecentBills({ billingDate }) {
                 </div>
               </div>
 
-              {isExpanded && selectedBill && selectedBill.items && (
+              {isExpanded && bill.items && bill.items.length > 0 && (
                 <div className="card-body">
                   <table className="items-table">
                     <thead>
@@ -320,7 +314,7 @@ function RecentBills({ billingDate }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedBill.items.map((it, i) => (
+                      {bill.items.map((it, i) => (
                         <tr key={i}>
                           <td>{it.code}</td>
                           <td>{it.name}</td>
@@ -338,7 +332,7 @@ function RecentBills({ billingDate }) {
                           Total Amount:
                         </td>
                         <td className="col-total">
-                          ₹{parseFloat(selectedBill.grand_total).toFixed(2)}
+                          ₹{parseFloat(bill.grand_total).toFixed(2)}
                         </td>
                       </tr>
                     </tbody>

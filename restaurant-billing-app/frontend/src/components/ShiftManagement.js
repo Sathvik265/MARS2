@@ -14,12 +14,12 @@ import { toast, safeGet, safeArray } from "../utils/helpers";
 const TRACKS = [
   { id: "`", label: "`" },
   { id: "``", label: "``" },
+  { id: "RBS", label: "RBS" },
   { id: "RBS1", label: "RBS1" },
-  { id: "RBS2", label: "RBS2" },
 ];
 
 
-export default function ShiftTab({ mode, sessionId, currentShift, currentDate }) {
+export default function ShiftTab({ mode, sessionId, currentShift, currentDate, onLogout, onCloseShiftAndLogout }) {
   const [sessionsByTrack, setSessionsByTrack] = useState({});
   const [loading, setLoading] = useState(false);
   const [actingOn, setActingOn] = useState(null); // track id currently being toggled
@@ -93,6 +93,22 @@ export default function ShiftTab({ mode, sessionId, currentShift, currentDate })
             <p style={{ color: "#3b82f6", fontSize: "0.85rem" }}>
               Date: {currentDate || "—"}
             </p>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem", justifyContent: "center" }}>
+            {onLogout && (
+              <Button variant="outline" size="sm" onClick={onLogout}>
+                Logout
+              </Button>
+            )}
+            {onCloseShiftAndLogout && (
+              <Button
+                size="sm"
+                onClick={onCloseShiftAndLogout}
+                style={{ background: "#7f1d1d", color: "#fecaca", border: "1px solid #991b1b" }}
+              >
+                Close Shift & Log Out
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

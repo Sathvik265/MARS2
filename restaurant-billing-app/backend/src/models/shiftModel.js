@@ -4,8 +4,8 @@ const BillingModel = require('./billingModel');
   const _getTrackColumn = (track) => {
     if (track === "`") return "track_morning";
     if (track === "``") return "track_afternoon";
-    if (track === "RBS1") return "track_rbs1";
-    if (track === "RBS2") return "track_rbs2";
+    if (track === "RBS") return "track_rbs1";
+    if (track === "RBS1") return "track_rbs2";
     return "track_morning"; // Fallback
   };
   
@@ -342,15 +342,15 @@ const ShiftModel = {
     } else if (hour >= 12 && hour < 18) {
       return "``"; // Afternoon shift
     } else if (hour >= 18 && hour < 22) {
-      return "RBS1"; // Evening shift
+      return "RBS"; // Evening shift
     } else {
-      return "RBS2"; // Night shift
+      return "RBS1"; // Night shift
     }
   },
 
   // Ensure all shift types have a session entry, creating if not exists
   async ensureAllShiftSessionsExist() {
-    const shifts = ["`", "``", "RBS1", "RBS2"];
+    const shifts = ["`", "``", "RBS", "RBS1"];
     const fixedDate = "1970-01-01"; // Use a fixed date as session_date is irrelevant
 
     const results = [];

@@ -224,11 +224,13 @@ const BillingModel = {
         party_no,
       ]);
 
+      const finalBillRes = await client.query("SELECT * FROM bills WHERE id = $1", [billId]);
+      const finalBill = finalBillRes.rows[0];
+
       await client.query("COMMIT");
       return {
+        ...finalBill,
         bill_id: billId,
-        bill_number,
-        grand_total,
         message: "Bill finalized successfully",
       };
     } catch (err) {
