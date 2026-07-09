@@ -157,7 +157,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
     }
 
     // Block clerks from locked tracks (admin bypass is allowed)
-    if (isTrackLocked && credential.toUpperCase() !== "SHI") {
+    if (isTrackLocked && credential.toUpperCase() !== "SRIHARI") {
       toast.error(
         "Track Logged out",
       );
@@ -165,7 +165,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
     }
 
     // Admin Access Flow
-    if (credential.toUpperCase() === "SHI") {
+    if (credential.toUpperCase() === "SRIHARI") {
       if (!showPwd) {
         setShowPwd(true);
         return;
@@ -217,7 +217,15 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
           <CardTitle className="text-center">Staff Access</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <form 
+            className="space-y-4" 
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!isShiftClosed && !isTrackLocked) {
+                submit();
+              }
+            }}
+          >
             {!showPwd ? (
               <>
                 <div className="grid grid-cols-3 gap-4 items-center">
@@ -231,7 +239,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
                       const nextCredential = e.target.value;
                       setCredential(nextCredential);
 
-                      if (nextCredential.toUpperCase() !== "SHI") {
+                      if (nextCredential.toUpperCase() !== "SRIHARI") {
                         setShowPwd(false);
                         setPassword("");
                       }
@@ -305,21 +313,6 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
               </div>
             )}
 
-            {isTrackLocked && !isShiftClosed && (
-              <div
-                style={{
-                  background: "#fdf4ff",
-                  border: "1px solid #c084fc",
-                  borderRadius: "0.375rem",
-                  padding: "0.75rem 1rem",
-                  color: "#6b21a8",
-                  fontSize: "0.875rem",
-                }}
-              >
-                <strong>🔒 Logged out</strong>
-                <br />
-              </div>
-            )}
 
             {sessionsLoading && (
               <div className="text-xs text-gray-500 text-center">
@@ -329,9 +322,9 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
 
             <div className="flex gap-2 flex-col">
               <Button
-                onClick={() => submit()}
+                type="submit"
                 className="w-full"
-                disabled={isShiftClosed || (isTrackLocked && credential.toUpperCase() !== "SHI")}
+                disabled={isShiftClosed || (isTrackLocked && credential.toUpperCase() !== "SRIHARI")}
               >
                 {showPwd ? "Verify" : "Login"}
               </Button>
@@ -349,10 +342,10 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
               )}
             </div>
             <div className="text-xs text-gray-600 text-center">
-              Hint: Use clerk initials for clerks or 'SHI' for admin. Track:
+              Hint: Use clerk initials for clerks or 'SRIHARI' for admin. Track:
               '`', '``', 'RBS', 'RBS1'
             </div>
-          </div>
+          </form>
         </CardContent>
       </Card>
     </div>

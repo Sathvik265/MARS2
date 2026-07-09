@@ -78,9 +78,12 @@ export default function Billing({
   const qtyRef = useRef(null);
   const searchInputRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const isPrintingRef = useRef(false);
 
   // Array ref for item quantity inputs
   const itemQtyRefs = useRef([]);
+  // Array ref for item move buttons
+  const itemMoveRefs = useRef([]);
   // Array ref for item rows (navigation mode)
   const itemRowRefs = useRef([]);
 
@@ -407,6 +410,7 @@ export default function Billing({
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
+      e.stopPropagation();
       if (itemQtyRefs.current[0]) {
         itemQtyRefs.current[0].focus();
         itemQtyRefs.current[0].select();
@@ -435,9 +439,41 @@ export default function Billing({
     }
   };
 
+  const handleMoveButtonKeyDown = (e, index) => {
+    if (e.key === "Enter" || (e.shiftKey && e.key === "Enter")) {
+      e.preventDefault();
+      handleMoveItemClick(index);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      e.stopPropagation();
+      itemQtyRefs.current[index]?.focus();
+      itemQtyRefs.current[index]?.select();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (index < safeArray(currentDraft.lines).length - 1) {
+        itemMoveRefs.current[index + 1]?.focus();
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (index > 0) {
+        itemMoveRefs.current[index - 1]?.focus();
+      } else {
+        itemCodeRef.current?.focus();
+        itemCodeRef.current?.select();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      itemCodeRef.current?.focus();
+      itemCodeRef.current?.select();
+    }
+  };
+
   const handleTableQtyKeyDown = (e, index) => {
     if (e.key === "ArrowUp") {
       e.preventDefault();
+      e.stopPropagation();
       if (index > 0) {
         itemQtyRefs.current[index - 1]?.focus();
         itemQtyRefs.current[index - 1]?.select();
@@ -447,29 +483,32 @@ export default function Billing({
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
+      e.stopPropagation();
       if (index < safeArray(currentDraft.lines).length - 1) {
         itemQtyRefs.current[index + 1]?.focus();
         itemQtyRefs.current[index + 1]?.select();
       }
     } else if (e.key === "ArrowRight") {
-      // Increment quantity by 1
       e.preventDefault();
+      e.stopPropagation();
+      // Increment quantity by 1
       const currentQty = parseFloat(safeArray(currentDraft.lines)[index]?.quantity || 1);
       const newQty = Math.round((currentQty + 1) * 100) / 100;
       updateQty(index, String(newQty));
     } else if (e.key === "ArrowLeft") {
-      // Decrement quantity by 1 (min 0.5)
       e.preventDefault();
-      const currentQty = parseFloat(safeArray(currentDraft.lines)[index]?.quantity || 1);
-      const newQty = Math.max(0.5, Math.round((currentQty - 1) * 100) / 100);
-      updateQty(index, String(newQty));
+      e.stopPropagation();
+      itemMoveRefs.current[index]?.focus();
     } else if (e.key === "Enter") {
       e.preventDefault();
-      // Move to next input or just handle confirm?
-      // Default behavior: cycle down
-      if (index < safeArray(currentDraft.lines).length - 1) {
-        itemQtyRefs.current[index + 1]?.focus();
-        itemQtyRefs.current[index + 1]?.select();
+      let currentVal = e.target.value;
+      if (currentVal.endsWith(".")) {
+        currentVal = currentVal.slice(0, -1);
+        updateQty(index, currentVal);
+      }
+      if (itemQtyRefs.current[index]) {
+        itemQtyRefs.current[index].focus();
+        itemQtyRefs.current[index].select();
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -486,6 +525,7 @@ export default function Billing({
       itemQtyRefs.current[index]?.select();
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
+      e.stopPropagation();
       const next = index + 1;
       if (itemQtyRefs.current[next]) {
         itemQtyRefs.current[next].focus();
@@ -493,6 +533,7 @@ export default function Billing({
       }
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      e.stopPropagation();
       const prev = index - 1;
       if (prev >= 0 && itemQtyRefs.current[prev]) {
         itemQtyRefs.current[prev].focus();
@@ -625,6 +666,11 @@ export default function Billing({
             lines: updatedLines,
           };
         }
+
+        // Force reload of target table by deleting its cache entry
+        const targetKey = `${targetTableNo}-${targetPartyNo}`;
+        delete nextDrafts[targetKey];
+
         return nextDrafts;
       });
 
@@ -690,22 +736,53 @@ export default function Billing({
     }
   };
 
-  const total = useMemo(() => {
+  const subtotal = useMemo(() => {
     const lines = safeArray(currentDraft.lines);
-    return Number(lines.reduce((s, l) => s + Number(safeGet(l, "line_total", 0)), 0).toFixed(2));
-  }, [currentDraft.lines]);
+    const taxRateSum = (sgstPercentage || 0) + (cgstPercentage || 0);
+    const scalingFactor = 1 / (1 + taxRateSum / 100);
 
-  const sgst = useMemo(
-    () => Number((total * (sgstPercentage / 100)).toFixed(2)),
-    [total, sgstPercentage],
-  );
-  const cgst = useMemo(
-    () => Number((total * (cgstPercentage / 100)).toFixed(2)),
-    [total, cgstPercentage],
-  );
-  const subtotal = useMemo(
-    () => Number((total - sgst - cgst).toFixed(2)),
-    [total, sgst, cgst],
+    return Number(
+      lines.reduce((s, l) => {
+        const unitPriceScaled = Number((Number(l.unit_price || 0) * scalingFactor).toFixed(2));
+        const lineTotalScaled = Number((unitPriceScaled * Number(l.quantity || 0)).toFixed(2));
+        return s + lineTotalScaled;
+      }, 0).toFixed(2)
+    );
+  }, [currentDraft.lines, sgstPercentage, cgstPercentage]);
+
+  const sgst = useMemo(() => {
+    const lines = safeArray(currentDraft.lines);
+    const taxRateSum = (sgstPercentage || 0) + (cgstPercentage || 0);
+    const scalingFactor = 1 / (1 + taxRateSum / 100);
+
+    const totalTax = lines.reduce((s, l) => {
+      const unitPriceScaled = Number((Number(l.unit_price || 0) * scalingFactor).toFixed(2));
+      const lineTotalScaled = Number((unitPriceScaled * Number(l.quantity || 0)).toFixed(2));
+      const itemTax = Number((lineTotalScaled * (taxRateSum / 100)).toFixed(2));
+      return s + itemTax;
+    }, 0);
+
+    return Number((totalTax / 2).toFixed(2));
+  }, [currentDraft.lines, sgstPercentage, cgstPercentage]);
+
+  const cgst = useMemo(() => {
+    const lines = safeArray(currentDraft.lines);
+    const taxRateSum = (sgstPercentage || 0) + (cgstPercentage || 0);
+    const scalingFactor = 1 / (1 + taxRateSum / 100);
+
+    const totalTax = lines.reduce((s, l) => {
+      const unitPriceScaled = Number((Number(l.unit_price || 0) * scalingFactor).toFixed(2));
+      const lineTotalScaled = Number((unitPriceScaled * Number(l.quantity || 0)).toFixed(2));
+      const itemTax = Number((lineTotalScaled * (taxRateSum / 100)).toFixed(2));
+      return s + itemTax;
+    }, 0);
+
+    return Number((totalTax / 2).toFixed(2));
+  }, [currentDraft.lines, sgstPercentage, cgstPercentage]);
+
+  const total = useMemo(
+    () => Number((subtotal + sgst + cgst).toFixed(2)),
+    [subtotal, sgst, cgst],
   );
 
   // These are defined later in the file; keep stable call sites without
@@ -748,7 +825,20 @@ export default function Billing({
           })),
         };
 
-        const createdBill = await createBillAPI(payload);
+        let createdBill = null;
+        let retries = 2;
+        while (retries >= 0) {
+          try {
+            createdBill = await createBillAPI(payload);
+            break; // Success
+          } catch (err) {
+            console.error(`Bill creation attempt failed. Retries left: ${retries}`, err);
+            if (retries === 0) throw err;
+            retries--;
+            await new Promise(r => setTimeout(r, 500)); // 500ms delay before retry
+          }
+        }
+
         const billId = createdBill?.bill_id;
         const billNumber = createdBill?.bill_number || "Unknown";
 
@@ -782,12 +872,17 @@ export default function Billing({
               const billsToPrint = [];
 
               if (regularItems.length > 0) {
-                const grandVal = Number(
+                const sub = Number(
                   regularItems.reduce((s, i) => s + Number(i.line_total || 0), 0).toFixed(2)
                 );
-                const sGstVal = Number((grandVal * (sgstPercentage / 100)).toFixed(2));
-                const cGstVal = Number((grandVal * (cgstPercentage / 100)).toFixed(2));
-                const sub = Number((grandVal - sGstVal - cGstVal).toFixed(2));
+                const taxRateSum = (sgstPercentage || 0) + (cgstPercentage || 0);
+                const totalTax = regularItems.reduce(
+                  (s, i) => s + Number((Number(i.line_total || 0) * (taxRateSum / 100)).toFixed(2)),
+                  0
+                );
+                const sGstVal = Number((totalTax / 2).toFixed(2));
+                const cGstVal = Number((totalTax / 2).toFixed(2));
+                const grandVal = Number((sub + sGstVal + cGstVal).toFixed(2));
 
                 billsToPrint.push({
                   ...fullBillData,
@@ -804,12 +899,17 @@ export default function Billing({
               }
 
               if (splitItems.length > 0) {
-                const grandVal = Number(
+                const sub = Number(
                   splitItems.reduce((s, i) => s + Number(i.line_total || 0), 0).toFixed(2)
                 );
-                const sGstVal = Number((grandVal * (sgstPercentage / 100)).toFixed(2));
-                const cGstVal = Number((grandVal * (cgstPercentage / 100)).toFixed(2));
-                const sub = Number((grandVal - sGstVal - cGstVal).toFixed(2));
+                const taxRateSum = (sgstPercentage || 0) + (cgstPercentage || 0);
+                const totalTax = splitItems.reduce(
+                  (s, i) => s + Number((Number(i.line_total || 0) * (taxRateSum / 100)).toFixed(2)),
+                  0
+                );
+                const sGstVal = Number((totalTax / 2).toFixed(2));
+                const cGstVal = Number((totalTax / 2).toFixed(2));
+                const grandVal = Number((sub + sGstVal + cGstVal).toFixed(2));
 
                 billsToPrint.push({
                   ...fullBillData,
@@ -959,7 +1059,7 @@ export default function Billing({
             unitPrice = safeGet(item, "price_ac", 0);
             break;
           case "P":
-            unitPrice = safeGet(item, "price_fixed", 0);
+            unitPrice = safeGet(item, "price_general", 0);
             break;
           default:
             unitPrice = safeGet(item, "price_general", 0);
@@ -1114,12 +1214,16 @@ export default function Billing({
   );
 
   const handlePrintBill = useCallback(async () => {
-    if (!currentTable) {
-      toast.error("Please enter a table number before printing.");
-      return;
-    }
+    if (isPrintingRef.current) return;
+    isPrintingRef.current = true;
 
-    const billIdToPrint =
+    try {
+      if (!currentTable) {
+        toast.error("Please enter a table number before printing.");
+        return;
+      }
+
+      const billIdToPrint =
       safeGet(currentDraft, "modified_from_bill_id") ||
       safeGet(currentDraft, "header.bill_id");
 
@@ -1152,12 +1256,12 @@ export default function Billing({
             const billsToPrint = [];
 
             if (regularItems.length > 0) {
-              const grandVal = Number(
+              const sub = Number(
                 regularItems.reduce((s, i) => s + Number(i.line_total || 0), 0).toFixed(2)
               );
-              const sGstVal = Number((grandVal * (sgstPercentage / 100)).toFixed(2));
-              const cGstVal = Number((grandVal * (cgstPercentage / 100)).toFixed(2));
-              const sub = Number((grandVal - sGstVal - cGstVal).toFixed(2));
+              const sGstVal = Number((sub * (sgstPercentage / 100)).toFixed(2));
+              const cGstVal = Number((sub * (cgstPercentage / 100)).toFixed(2));
+              const grandVal = sub;
 
               billsToPrint.push({
                 ...fullBillData,
@@ -1174,12 +1278,12 @@ export default function Billing({
             }
 
             if (splitItems.length > 0) {
-              const grandVal = Number(
+              const sub = Number(
                 splitItems.reduce((s, i) => s + Number(i.line_total || 0), 0).toFixed(2)
               );
-              const sGstVal = Number((grandVal * (sgstPercentage / 100)).toFixed(2));
-              const cGstVal = Number((grandVal * (cgstPercentage / 100)).toFixed(2));
-              const sub = Number((grandVal - sGstVal - cGstVal).toFixed(2));
+              const sGstVal = Number((sub * (sgstPercentage / 100)).toFixed(2));
+              const cGstVal = Number((sub * (cgstPercentage / 100)).toFixed(2));
+              const grandVal = sub;
 
               billsToPrint.push({
                 ...fullBillData,
@@ -1253,6 +1357,56 @@ export default function Billing({
     }
 
     let finalLines = safeArray(currentDraft.lines);
+
+    // If draft lines are empty but there might be pending orders in DB, load them
+    if (finalLines.length === 0 && currentTable) {
+      try {
+        const pendingOrders = await getPendingOrdersByTableAndParty(currentTable, String(currentParty));
+        if (pendingOrders && pendingOrders.length > 0) {
+          // Filter by billing date
+          let filteredOrders = pendingOrders;
+          if (billingDate) {
+            filteredOrders = pendingOrders.filter((order) => {
+              let rawDate = safeGet(order, "bill_date");
+              let orderDateStr = "";
+              if (rawDate) {
+                const d = new Date(rawDate);
+                try {
+                  orderDateStr = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'Asia/Kolkata',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                  }).format(d);
+                } catch (e) {
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, "0");
+                  const day = String(d.getDate()).padStart(2, "0");
+                  orderDateStr = `${year}-${month}-${day}`;
+                }
+              }
+              return orderDateStr === billingDate;
+            });
+          }
+          if (filteredOrders.length > 0) {
+            finalLines = filteredOrders.map((order) => ({
+              id: order.id,
+              code: order.item_code || order.numeric_item_code,
+              name: order.item_name,
+              quantity: order.quantity,
+              unit_price: order.unit_price,
+              line_total: order.line_total,
+              numeric_code: order.numeric_item_code,
+              alpha_code: order.item_code,
+              is_separate: !!order.is_separate,
+            }));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load pending orders for print:", err);
+      }
+    }
+
     if (document.activeElement === qtyRef.current && entryCode) {
       const newItem = await addItem(false);
       if (newItem) {
@@ -1267,7 +1421,10 @@ export default function Billing({
       return;
     }
 
-    await createBill(finalLines);
+      await createBill(finalLines);
+    } finally {
+      isPrintingRef.current = false;
+    }
   }, [
     currentTable,
     currentDraft,
@@ -1551,9 +1708,11 @@ export default function Billing({
     const itemsLength = filteredItems.length;
     if (e.key === "ArrowDown") {
       e.preventDefault();
+      e.stopPropagation();
       setSelectedHelpIndex((prev) => (prev + 1) % itemsLength);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      e.stopPropagation();
       setSelectedHelpIndex((prev) => (prev - 1 + itemsLength) % itemsLength);
     } else if (e.key === "Enter") {
       e.preventDefault();
@@ -1563,11 +1722,19 @@ export default function Billing({
           String(safeGet(selectedItem, "numeric_code", "")).trim() ||
           String(safeGet(selectedItem, "alpha_code", "")).trim();
         
-        // Directly add the item to the bill
-        addItem(true, code);
+        // Load the item code in input
+        setEntryCode(code);
         
         setShowF4Popup(false);
         setSearchQuery("");
+
+        // Focus the qty textbox and select all text
+        setTimeout(() => {
+          if (qtyRef.current) {
+            qtyRef.current.focus();
+            qtyRef.current.select();
+          }
+        }, 50);
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -1582,30 +1749,33 @@ export default function Billing({
     <div className="billing-screen-overhaul w-full h-full flex flex-col pb-4">
       <Card className="flex flex-col h-full w-full">
         <CardHeader className="flex-none">
-          <CardTitle className="flex justify-between items-center">
-            <span>Billing for {billingDate}</span>
-            <div className="flex items-center whitespace-nowrap">
-              <Input
-                type="checkbox"
-                id="splitBillModeHeader"
-                checked={isSplitBillMode}
-                onChange={(e) => setIsSplitBillMode(e.target.checked)}
-                className={`h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded !w-auto cursor-pointer ${
-                  isSplitBillMode ? "bg-orange-500 border-orange-500" : ""
-                }`}
-              />
-              <Label
-                htmlFor="splitBillModeHeader"
-                className={`!mb-0 cursor-pointer text-xs font-medium ${
-                  isSplitBillMode ? "text-green-700" : "text-gray-600"
+          <CardTitle className="flex items-center gap-4">
+            <span className="text-xl font-bold text-white">Billing for {billingDate}</span>
+            <div
+              onClick={() => setIsSplitBillMode(!isSplitBillMode)}
+              className="flex items-center gap-2 bg-gray-900/60 border border-gray-800 rounded-full px-3 py-1 cursor-pointer hover:border-gray-700 select-none transition-all duration-200"
+            >
+              <div
+                className={`w-7 h-4 rounded-full flex items-center p-0.5 transition-colors duration-200 ${
+                  isSplitBillMode ? "bg-orange-500" : "bg-gray-700"
                 }`}
               >
-                SPLIT BILL
-              </Label>
-
+                <div
+                  className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${
+                    isSplitBillMode ? "translate-x-3" : "translate-x-0"
+                  }`}
+                />
+              </div>
+              <span
+                className={`text-xs font-semibold tracking-wide transition-colors duration-200 ${
+                  isSplitBillMode ? "text-orange-400" : "text-gray-400"
+                }`}
+              >
+                Split Bill
+              </span>
               {isSplitBillMode && (
-                <span className="ml-2 bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded border border-green-200 animate-pulse">
-                  ACTIVE
+                <span className="ml-1 text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded font-black tracking-widest uppercase animate-pulse">
+                  Active
                 </span>
               )}
             </div>
@@ -1690,16 +1860,21 @@ export default function Billing({
               <Input
                 ref={itemCodeRef}
                 type="text"
-                placeholder="ENTER ITEM CODE"
+                placeholder="ENTER CODE (E.G. 101, TEA)"
                 value={entryCode}
                 onChange={(e) => {
                   const val = e.target.value;
                   setEntryCode(val);
-                  if (/^\d{3}$/.test(val)) {
+                  const cleanVal = val.trim().toLowerCase();
+                  const isThreeDigit = /^\d{3}$/.test(val);
+                  const isAlphaCodeMatch = cleanVal.length >= 2 && menuItems.some(
+                    (i) => String(safeGet(i, "alpha_code", "")).trim().toLowerCase() === cleanVal
+                  );
+                  if (isThreeDigit || isAlphaCodeMatch) {
                     const exists = menuItems.some(
                       (i) =>
                         String(safeGet(i, "numeric_code", "")).trim() === val.trim() ||
-                        String(safeGet(i, "alpha_code", "")).trim().toLowerCase() === val.trim().toLowerCase()
+                        String(safeGet(i, "alpha_code", "")).trim().toLowerCase() === cleanVal
                     );
                     if (exists && qtyRef.current) {
                       qtyRef.current.focus();
@@ -1769,7 +1944,7 @@ export default function Billing({
                   <TableRow
                     key={idx}
                     ref={(el) => (itemRowRefs.current[idx] = el)}
-                    tabIndex={0}
+                    tabIndex={-1}
                     onKeyDown={(e) => handleRowKeyDown(e, idx)}
                     className="focus:bg-blue-50 outline-none ring-2 ring-transparent focus:ring-blue-300 border-b border-gray-200"
                   >
@@ -1796,10 +1971,12 @@ export default function Billing({
                         )}
                         <div className="flex space-x-1.5 ml-4">
                           <Button
+                            ref={(el) => (itemMoveRefs.current[idx] = el)}
                             variant="outline"
                             size="sm"
-                            className="h-6 px-1.5 bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 text-xs font-bold transition-all"
+                            className="h-6 px-1.5 bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 text-xs font-bold transition-all focus:ring-2 focus:ring-blue-500"
                             onClick={() => handleMoveItemClick(idx)}
+                            onKeyDown={(e) => handleMoveButtonKeyDown(e, idx)}
                             title="Move Item to another Table"
                           >
                             MOVE
@@ -1814,6 +1991,7 @@ export default function Billing({
                         className="w-16 h-7 text-lg font-bold text-center border border-gray-300 focus:border-blue-500"
                         value={safeGet(l, "quantity", "")}
                         onChange={(e) => updateQty(idx, e.target.value)}
+                        onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => handleTableQtyKeyDown(e, idx)}
                         onBlur={(e) => {
                           const val = e.target.value;
@@ -1912,9 +2090,15 @@ export default function Billing({
                                   const code =
                                     String(safeGet(item, "numeric_code", "")).trim() ||
                                     String(safeGet(item, "alpha_code", "")).trim();
-                                  addItem(true, code);
+                                  setEntryCode(code);
                                   setShowF4Popup(false);
                                   setSearchQuery("");
+                                  setTimeout(() => {
+                                    if (qtyRef.current) {
+                                      qtyRef.current.focus();
+                                      qtyRef.current.select();
+                                    }
+                                  }, 50);
                                 }}
                               >
                                 <TableCell>

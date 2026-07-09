@@ -66,23 +66,30 @@ function App() {
 
   // ── Printer detection gate ──────────────────────────────────────────────
   const [printerConnected, setPrinterConnected] = useState(true); // optimistic start
+  const [printerError, setPrinterError] = useState("");
   const printerCheckRef = useRef(null);
 
   const checkPrinter = useCallback(async () => {
     try {
       const status = await getPrinterStatus();
       setPrinterConnected(!!status.connected);
+      if (!status.connected) {
+        setPrinterError(status.reason || "Printer offline or not found");
+      } else {
+        setPrinterError("");
+      }
     } catch {
       // If the API itself fails (backend down), don't block the app
       setPrinterConnected(true);
+      setPrinterError("");
     }
   }, []);
 
   useEffect(() => {
     if (mode === "none") return;
-    // Initial check + poll every 15 seconds
+    // Initial check + poll every 5 seconds for faster offline detection
     checkPrinter();
-    printerCheckRef.current = setInterval(checkPrinter, 15000);
+    printerCheckRef.current = setInterval(checkPrinter, 5000);
     return () => clearInterval(printerCheckRef.current);
   }, [mode, checkPrinter]);
 
@@ -139,10 +146,102 @@ function App() {
   // State for admin jump target (shortcuts)
   const [adminJumpTarget, setAdminJumpTarget] = useState(null);
 
+  const clearSessionState = useCallback(() => {
+    setMode("none");
+    setBillingDate(null);
+    setTrack("");
+    setSessionId(null);
+    setUserInitials("CLK");
+    setDrafts({});
+    setCurrentTable("");
+    setActiveTab("billing");
+    localStorage.removeItem("mode");
+    localStorage.removeItem("rbs_active_tab");
+    localStorage.removeItem("rbs_active_user");
+  }, []);
+
+  const handleLogin = useCallback((
+    newMode,
+    date,
+    newTrack,
+    newSessionId,
+    initials = "CLK",
+    authToken = null,
+  ) => {
+    if (authToken) {
+      setAuthToken(authToken);
+    }
+    setMode(newMode);
+    setBillingDate(date);
+    setTrack(newTrack);
+    setSessionId(newSessionId);
+    setUserInitials(initials);
+    localStorage.setItem("mode", newMode);
+    // Claim this tab as the active session
+    claimTab();
+  }, [claimTab]);
+
+  const handleLogout = useCallback(async () => {
+    const confirmed = window.confirm("Are you sure you want to log out?");
+    if (!confirmed) return;
+
+    try {
+      await logoutApi();
+    } catch (error) {
+      clearAuthToken();
+    }
+    clearSessionState();
+  }, [clearSessionState]);
+
+  const handleCloseShiftAndLogout = useCallback(async () => {
+    const confirmed = window.confirm(
+      "This will CLOSE the current shift and log out. Are you sure?"
+    );
+    if (!confirmed) return;
+
+    try {
+      await closeShiftAndLogoutApi();
+    } catch (error) {
+      clearAuthToken();
+    }
+    clearSessionState();
+  }, [clearSessionState]);
+
   useEffect(() => {
     const handleGlobalShortcuts = (e) => {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       const code = e.code;
+
+      // Global logout: Alt + Q (Option + Q on Mac maps to code 'KeyQ')
+      if (e.altKey && !e.shiftKey && (e.key === "q" || e.key === "Q" || code === "KeyQ")) {
+        e.preventDefault();
+        handleLogout();
+        return;
+      }
+
+      // Global close shift + logout: Shift + Alt + Q
+      if (e.altKey && e.shiftKey && (e.key === "q" || e.key === "Q" || code === "KeyQ")) {
+        e.preventDefault();
+        handleCloseShiftAndLogout();
+        return;
+      }
+
+      // Global search focus: Alt+S, Cmd+S, Alt+F, Cmd+F (Option + S maps to 'KeyS', Cmd is isCmdOrCtrl)
+      const isSearchShortcut =
+        (e.altKey && (e.key === "s" || e.key === "S" || code === "KeyS" || e.key === "f" || e.key === "F" || code === "KeyF")) ||
+        (isCmdOrCtrl && (e.key === "s" || e.key === "S" || code === "KeyS" || e.key === "f" || e.key === "F" || code === "KeyF"));
+
+      if (isSearchShortcut) {
+        e.preventDefault();
+        const searchInput = document.querySelector(
+          'input[placeholder*="Search" i], input[placeholder*="search" i], input[placeholder*="SEARCH" i], input[placeholder*="find" i], input[placeholder*="Find" i], input[placeholder*="Type item" i], input[placeholder*="Type category" i]'
+        );
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+        return;
+      }
 
       // Admin Main Tabs (Ctrl + Alt + Number / Cmd + Option + Number)
       if (isCmdOrCtrl && e.altKey) {
@@ -225,68 +324,93 @@ function App() {
     };
     window.addEventListener("keydown", handleGlobalShortcuts);
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
-  }, [isAdmin]);
+  }, [isAdmin, handleLogout, handleCloseShiftAndLogout]);
 
-  const clearSessionState = () => {
-    setMode("none");
-    setBillingDate(null);
-    setTrack("");
-    setSessionId(null);
-    setUserInitials("CLK");
-    setDrafts({});
-    setCurrentTable("");
-    setActiveTab("billing");
-    localStorage.removeItem("mode");
-    localStorage.removeItem("rbs_active_tab");
-    localStorage.removeItem("rbs_active_user");
-  };
+  // Global arrow-key navigation across all visible focusable elements
+  useEffect(() => {
+    const handleArrowNav = (e) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
 
-  const handleLogin = (
-    newMode,
-    date,
-    newTrack,
-    newSessionId,
-    initials = "CLK",
-    authToken = null,
-  ) => {
-    if (authToken) {
-      setAuthToken(authToken);
-    }
-    setMode(newMode);
-    setBillingDate(date);
-    setTrack(newTrack);
-    setSessionId(newSessionId);
-    setUserInitials(initials);
-    localStorage.setItem("mode", newMode);
-    // Claim this tab as the active session
-    claimTab();
-  };
+      const active = document.activeElement;
+      const tag = active?.tagName?.toLowerCase();
 
-  const handleLogout = async () => {
-    const confirmed = window.confirm("Are you sure you want to log out?");
-    if (!confirmed) return;
+      // Don't interfere with textareas — they handle vertical arrows internally
+      if (tag === "textarea") return;
 
-    try {
-      await logoutApi();
-    } catch (error) {
-      clearAuthToken();
-    }
-    clearSessionState();
-  };
+      // Don't interfere with elements that have their own keyDown handlers (e.g. table rows in billing)
+      // Check if the element or a close ancestor has data-arrow-nav="false"
+      if (active?.closest("[data-arrow-nav='false']")) return;
 
-  const handleCloseShiftAndLogout = async () => {
-    const confirmed = window.confirm(
-      "This will CLOSE the current shift and log out. Are you sure?"
-    );
-    if (!confirmed) return;
+      const focusable = Array.from(
+        document.querySelectorAll(
+          'button:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href], input:not([disabled]), select:not([disabled])'
+        )
+      ).filter((el) => {
+        // Only visible elements
+        if (el.offsetParent === null && el.tagName !== "BODY") return false;
+        // Skip hidden elements
+        const style = window.getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        return true;
+      });
 
-    try {
-      await closeShiftAndLogoutApi();
-    } catch (error) {
-      clearAuthToken();
-    }
-    clearSessionState();
-  };
+      if (focusable.length === 0) return;
+
+      const currentIdx = focusable.indexOf(active);
+      let nextIdx;
+
+      if (e.key === "ArrowDown") {
+        nextIdx = currentIdx < focusable.length - 1 ? currentIdx + 1 : 0;
+      } else {
+        nextIdx = currentIdx > 0 ? currentIdx - 1 : focusable.length - 1;
+      }
+
+      e.preventDefault();
+      focusable[nextIdx]?.focus();
+    };
+
+    window.addEventListener("keydown", handleArrowNav);
+    return () => window.removeEventListener("keydown", handleArrowNav);
+  }, []);
+
+  // Global Tab Focus Trap (locks tab focus within the page, wrapping from last to first)
+  useEffect(() => {
+    const handleTabTrap = (e) => {
+      if (e.key !== "Tab") return;
+
+      const active = document.activeElement;
+      const focusable = Array.from(
+        document.querySelectorAll(
+          'button:not([disabled]), [tabindex]:not([tabindex="-1"]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+        )
+      ).filter((el) => {
+        if (el.offsetParent === null && el.tagName !== "BODY") return false;
+        const style = window.getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        return true;
+      });
+
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleTabTrap);
+    return () => window.removeEventListener("keydown", handleTabTrap);
+  }, []);
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -353,6 +477,16 @@ function App() {
             <div style={{ color: "#9ca3af", maxWidth: 400, textAlign: "center" }}>
               The billing system requires a connected printer. Please connect your printer and wait — the system will check again automatically every 15 seconds.
             </div>
+            {printerError && (
+              <div style={{
+                color: "#fca5a5", fontSize: "0.9rem", marginTop: "0.5rem",
+                background: "rgba(239, 68, 68, 0.2)", padding: "0.6rem 1.2rem",
+                borderRadius: "6px", maxWidth: 500, textAlign: "center",
+                border: "1px solid rgba(239, 68, 68, 0.4)", wordBreak: "break-word"
+              }}>
+                <strong>Details:</strong> {printerError}
+              </div>
+            )}
             <Button
               onClick={checkPrinter}
               style={{ background: "#2563eb", color: "#fff", marginTop: "0.5rem" }}
@@ -362,69 +496,71 @@ function App() {
           </div>
         )}
 
-        {mode === "none" ? (
-          <div className="flex-1 flex items-center justify-center">
-            <LoginPanel onLogin={handleLogin} />
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="billing">Billing</TabsTrigger>
-                <TabsTrigger value="recent-bills">Recent Bills</TabsTrigger>
-                <TabsTrigger value="shifts">Shifts</TabsTrigger>
-                <TabsTrigger value="menu">Food Menu</TabsTrigger>
-                {isAdmin && <TabsTrigger value="admin">Admin</TabsTrigger>}
-              </TabsList>
+        <div inert={((!printerConnected && mode !== "none") || tabBlocked) ? "" : null} className="flex-1 flex flex-col">
+          {mode === "none" ? (
+            <div className="flex-1 flex items-center justify-center">
+              <LoginPanel onLogin={handleLogin} />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                  <TabsTrigger value="billing">Billing</TabsTrigger>
+                  <TabsTrigger value="recent-bills">Recent Bills</TabsTrigger>
+                  <TabsTrigger value="shifts">Shifts</TabsTrigger>
+                  <TabsTrigger value="menu">Food Menu</TabsTrigger>
+                  {isAdmin && <TabsTrigger value="admin">Admin</TabsTrigger>}
+                </TabsList>
 
-              <TabsContent value="billing">
-                <Billing
-                  drafts={drafts}
-                  setDrafts={setDrafts}
-                  currentTable={currentTable}
-                  setCurrentTable={setCurrentTable}
-                  billingDate={billingDate}
-                  activeTab={activeTab}
-                  track={track}
-                  sessionId={sessionId}
-                  activeShift={activeShift}
-                  userInitials={userInitials}
-                  isShiftLoading={isShiftLoading}
-                  setPrintData={setPrintData}
-                />
-              </TabsContent>
-
-              <TabsContent value="recent-bills">
-                <RecentBills billingDate={billingDate} />
-              </TabsContent>
-
-              <TabsContent value="shifts">
-                <ShiftTab
-                  mode={mode}
-                  sessionId={sessionId}
-                  currentShift={track}
-                  currentDate={billingDate}
-                  onLogout={handleLogout}
-                  onCloseShiftAndLogout={handleCloseShiftAndLogout}
-                />
-              </TabsContent>
-
-              <TabsContent value="menu">
-                <FoodMenu mode={mode} />
-              </TabsContent>
-
-              {isAdmin && (
-                <TabsContent value="admin">
-                  <EnhancedAdminPanel
-                    mode={mode}
+                <TabsContent value="billing">
+                  <Billing
+                    drafts={drafts}
+                    setDrafts={setDrafts}
+                    currentTable={currentTable}
+                    setCurrentTable={setCurrentTable}
+                    billingDate={billingDate}
+                    activeTab={activeTab}
+                    track={track}
                     sessionId={sessionId}
-                    jumpTarget={adminJumpTarget}
+                    activeShift={activeShift}
+                    userInitials={userInitials}
+                    isShiftLoading={isShiftLoading}
+                    setPrintData={setPrintData}
                   />
                 </TabsContent>
-              )}
-            </Tabs>
-          </div>
-        )}
+
+                <TabsContent value="recent-bills">
+                  <RecentBills billingDate={billingDate} />
+                </TabsContent>
+
+                <TabsContent value="shifts">
+                  <ShiftTab
+                    mode={mode}
+                    sessionId={sessionId}
+                    currentShift={track}
+                    currentDate={billingDate}
+                    onLogout={handleLogout}
+                    onCloseShiftAndLogout={handleCloseShiftAndLogout}
+                  />
+                </TabsContent>
+
+                <TabsContent value="menu">
+                  <FoodMenu mode={mode} />
+                </TabsContent>
+
+                {isAdmin && (
+                  <TabsContent value="admin">
+                    <EnhancedAdminPanel
+                      mode={mode}
+                      sessionId={sessionId}
+                      jumpTarget={adminJumpTarget}
+                    />
+                  </TabsContent>
+                )}
+              </Tabs>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Hidden print area */}

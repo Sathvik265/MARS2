@@ -85,6 +85,57 @@ const OrderModel = {
     return result.rows[0];
   },
 
+  // Bulk create orders for faster finalization
+  async bulkCreateOrders(ordersArray) {
+    if (!ordersArray || ordersArray.length === 0) return [];
+
+    const finalBillDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
+
+    const values = [];
+    const params = [];
+    let paramIndex = 1;
+
+    for (const orderData of ordersArray) {
+      const {
+        track, clerk_initials, table_no, party_no = "1", bill_number, bill_date,
+        item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate
+      } = orderData;
+
+      const dateToUse = bill_date || finalBillDate;
+
+      if (created_at) {
+        values.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
+        params.push(
+          track, clerk_initials, table_no, party_no, bill_number, dateToUse,
+          item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate === true
+        );
+      } else {
+        values.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, DEFAULT, $${paramIndex++})`);
+        params.push(
+          track, clerk_initials, table_no, party_no, bill_number, dateToUse,
+          item_code, numeric_item_code, item_name, quantity, unit_price, line_total, is_separate === true
+        );
+      }
+    }
+
+    const query = `
+      INSERT INTO orders (
+        track, clerk_initials, table_no, party_no, bill_number, bill_date,
+        item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate
+      )
+      VALUES ${values.join(', ')}
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, params);
+    return result.rows;
+  },
+
   // Get pending orders by table and party
   async getPendingOrdersByTableAndParty(table_no, party_no) {
     const result = await pool.query(

@@ -45,7 +45,7 @@ export const Input = React.forwardRef(({ className = "", ...props }, ref) => (
   />
 ));
 
-export const Button = ({
+export const Button = React.forwardRef(({
   children,
   onClick,
   className = "",
@@ -54,7 +54,7 @@ export const Button = ({
   disabled = false,
   style: propStyle = {},
   ...props
-}) => {
+}, ref) => {
   const baseClasses =
     "font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all";
   const variants = {
@@ -72,6 +72,7 @@ export const Button = ({
 
   return (
     <button
+      ref={ref}
       onClick={onClick}
       disabled={disabled}
       style={propStyle}
@@ -83,7 +84,7 @@ export const Button = ({
       {children}
     </button>
   );
-};
+});
 
 export const Label = ({ children, className = "" }) => (
   <label

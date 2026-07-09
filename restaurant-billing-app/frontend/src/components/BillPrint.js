@@ -29,9 +29,9 @@ const printStyles = `
 }
 `;
 
-const BillContent = ({ data, settings }) => {
+const BillContent = ({ data, settings, isLast = true }) => {
   const header = safeObject(data.header);
-  const items = safeArray(data.items || data.items_json);
+  const items = safeArray(data.items_json || data.items);
   const mergedData = { ...settings, ...data };
 
   const billNumber = safeGet(data, "bill_number") || safeGet(header, "bill_number", "N/A");
@@ -58,7 +58,6 @@ const BillContent = ({ data, settings }) => {
   const displayHotelName = titleSuffix ? `${hotelHeading} ${titleSuffix}` : hotelHeading;
 
   const createdAt = safeGet(data, "created_at", null);
-  const subtotal = safeGet(data, "subtotal", 0);
   const sgst = safeGet(data, "sgst", 0);
   const cgst = safeGet(data, "cgst", 0);
   const sgstPercentage = safeGet(mergedData, "sgst_percentage", 2.5);
@@ -142,8 +141,6 @@ const BillContent = ({ data, settings }) => {
   ascii += separator + "\n";
 
   // Totals
-  const subTotalStr = Number(subtotal).toFixed(2);
-  ascii += padRight("Subtotal", LINE_WIDTH - subTotalStr.length) + subTotalStr + "\n";
 
   const cgstLabel = `CGST (${Number(cgstPercentage || 0).toFixed(1)}%)`;
   const cgstStr = Number(cgst || 0).toFixed(2);
@@ -161,19 +158,19 @@ const BillContent = ({ data, settings }) => {
   ascii += separator + "\n";
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\n";
 
-  // 12 lines = roughly 2 inches in standard Generic/Text line spacing.
-  // We MUST place a tiny dot on *every single line* to physically trick Chrome 
-  // into printing the 2-inch space. If a line is truly "empty", Chrome silently deletes it!
-  for (let i = 0; i < 20; i++) {
-    ascii += ".\n";
-  }
+  // Feed lines at bottom
+  // if (isLast) {
+  //   for (let i = 0; i < 20; i++) {
+  //     ascii += ".\n";
+  //   }
+  // }
 
   return (
     <pre style={{
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: "13px",
       margin: 0,
-      padding: "10px 5px",
+      padding: "0px 5px",
       whiteSpace: "pre",
       color: "black",
       background: "white",
@@ -213,12 +210,12 @@ export default function BillPrint({ billData = null }) {
         {bills.length > 0 ? (
           bills.map((bill, index) => (
             <React.Fragment key={index}>
-              <BillContent data={bill} settings={fetchedSettings || data} />
-              {index < bills.length - 1 && <div style={{ borderTop: "2px dashed #000", margin: "20px 0" }} />}
+              <BillContent data={bill} settings={fetchedSettings || data} isLast={index === bills.length - 1} />
+              {index < bills.length - 1 && <div style={{ borderTop: "1px dashed #000", margin: "4px 0" }} />}
             </React.Fragment>
           ))
         ) : (
-          <BillContent data={data} settings={fetchedSettings || data} />
+          <BillContent data={data} settings={fetchedSettings || data} isLast={true} />
         )}
       </div>
     </>

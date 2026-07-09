@@ -2,7 +2,7 @@ import { safeGet, safeArray, safeObject } from "./helpers";
 
 export function generateAsciiReceipt(data, settings) {
   const header = safeObject(data.header);
-  const items = safeArray(data.items || data.items_json);
+  const items = safeArray(data.items_json || data.items);
   const mergedData = { ...settings, ...data };
 
   const billNumber = safeGet(data, "bill_number") || safeGet(header, "bill_number", "N/A");
@@ -26,7 +26,6 @@ export function generateAsciiReceipt(data, settings) {
   const trackLetter = getTrackLetter(trackVal);
 
   const createdAt = safeGet(data, "created_at", null);
-  const subtotal = safeGet(data, "subtotal", 0);
   const sgst = safeGet(data, "sgst", 0);
   const cgst = safeGet(data, "cgst", 0);
   const sgstPercentage = safeGet(mergedData, "sgst_percentage", 2.5);
@@ -36,7 +35,7 @@ export function generateAsciiReceipt(data, settings) {
   const printTime = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
   const printDate = createdAt ? new Date(createdAt).toLocaleDateString("en-GB") : new Date().toLocaleDateString("en-GB");
 
-  const LINE_WIDTH = 32; // 32 characters to prevent cutoff on 58mm POS printer
+  const LINE_WIDTH = 40; // 40 characters at 12 CPI (Elite) = 3.33 inches — matches old system
 
   const padRight = (str, len) => {
     let s = String(str);
@@ -72,8 +71,8 @@ export function generateAsciiReceipt(data, settings) {
 
   ascii += separator + "\r\n";
 
-  // Items header (16, 5, 11)
-  ascii += padRight("Item", 16) + padLeft("Qty", 5) + padLeft("Total", 11) + "\r\n";
+  // Items header (24, 5, 11)
+  ascii += padRight("Item", 24) + padLeft("Qty", 5) + padLeft("Total", 11) + "\r\n";
   ascii += separator + "\r\n";
 
   if (items.length === 0) {
@@ -85,8 +84,8 @@ export function generateAsciiReceipt(data, settings) {
       const nameLines = [];
       let temp = name;
       while (temp.length > 0) {
-        nameLines.push(temp.substring(0, 16));
-        temp = temp.substring(16);
+        nameLines.push(temp.substring(0, 24));
+        temp = temp.substring(24);
       }
 
       const qty = String(item.quantity || item.qty);
@@ -94,9 +93,9 @@ export function generateAsciiReceipt(data, settings) {
 
       nameLines.forEach((line, i) => {
         if (i === 0) {
-          ascii += padRight(line, 16) + padLeft(qty, 5) + padLeft(total, 11) + "\r\n";
+          ascii += padRight(line, 24) + padLeft(qty, 5) + padLeft(total, 11) + "\r\n";
         } else {
-          ascii += padRight(line, 16) + " ".repeat(16) + "\r\n";
+          ascii += padRight(line, 24) + " ".repeat(16) + "\r\n";
         }
       });
     });
@@ -105,8 +104,6 @@ export function generateAsciiReceipt(data, settings) {
   ascii += separator + "\r\n";
 
   // Totals
-  const subTotalStr = Number(subtotal).toFixed(2);
-  ascii += padRight("Subtotal", LINE_WIDTH - subTotalStr.length) + subTotalStr + "\r\n";
 
   const cgstLabel = `CGST (${Number(cgstPercentage || 0).toFixed(1)}%)`;
   const cgstStr = Number(cgst || 0).toFixed(2);

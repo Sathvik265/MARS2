@@ -12,6 +12,7 @@ router.get("/date-range", reportController.getDateRangeReport);
 router.get("/by-shift", reportController.getShiftReport);
 router.get("/shift-summary", reportController.getShiftSummaryReport);
 router.get("/shift-detailed", reportController.getShiftDetailedReport);
+router.get("/shift-only", reportController.getShiftOnlyReport);
 
 // Reports for frontend component
 router.get("/shift-wise", reportController.getShiftWiseReport);

@@ -97,6 +97,18 @@ const billingController = {
       );
       let provisionalBill = provisionalRes.rows[0];
 
+      if (provisionalBill) {
+        const targetTrack = track || provisionalBill.track;
+        const targetClerk = clerk_initials || provisionalBill.clerk_initials;
+        if (provisionalBill.track !== targetTrack || provisionalBill.clerk_initials !== targetClerk) {
+          const updateRes = await pool.query(
+            `UPDATE bills SET track = $1, clerk_initials = $2 WHERE id = $3 RETURNING *`,
+            [targetTrack, targetClerk, provisionalBill.id]
+          );
+          provisionalBill = updateRes.rows[0];
+        }
+      }
+
       if (!provisionalBill) {
         const now = new Date();
         const provisionalBillData = {
@@ -122,24 +134,23 @@ const billingController = {
       // 2. Sync database orders with the items sent from the frontend if provided
       if (Array.isArray(items) && items.length > 0) {
         await OrderModel.clearOrders(table_no, party_no);
-        for (const item of items) {
-          await OrderModel.createOrder({
-            track: track || provisionalBill.track,
-            clerk_initials: clerk_initials || provisionalBill.clerk_initials,
-            table_no: parseInt(table_no),
-            party_no: party_no,
-            bill_number: 0,
-            bill_date: provisionalBill.bill_date,
-            item_code: item.item_code,
-            numeric_item_code: item.numeric_item_code,
-            item_name: item.item_name,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            line_total: item.line_total,
-            created_at: provisionalBill.created_at,
-            is_separate: item.is_separate,
-          });
-        }
+        const ordersToCreate = items.map(item => ({
+          track: track || provisionalBill.track,
+          clerk_initials: clerk_initials || provisionalBill.clerk_initials,
+          table_no: parseInt(table_no),
+          party_no: party_no,
+          bill_number: 0,
+          bill_date: provisionalBill.bill_date,
+          item_code: item.item_code,
+          numeric_item_code: item.numeric_item_code,
+          item_name: item.item_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          line_total: item.line_total,
+          created_at: provisionalBill.created_at,
+          is_separate: item.is_separate,
+        }));
+        await OrderModel.bulkCreateOrders(ordersToCreate);
       }
 
       // 3. Fetch all orders (now guaranteed to match the frontend state)
@@ -201,6 +212,8 @@ const billingController = {
 
       const finalizeData = {
         ...billData,
+        table_no: parseInt(table_no),
+        party_no,
         bill_date,
         subtotal: totalsCheck.computed.subtotal,
         sgst: totalsCheck.computed.sgst,
@@ -209,8 +222,8 @@ const billingController = {
         grand_total: totalsCheck.computed.grand_total,
         track, // Use the corrected track value
         clerk_initials, // Use the corrected clerk_initials
-        created_at: provisionalBill.created_at, // Vital: Pass the key to matching
-        order_id: `ORD-${billData.table_no}-${billData.party_no}-${Date.now()}`,
+        provisional_bill_id: provisionalBill.id, // Vital: Match exactly on ID
+        order_id: `ORD-${table_no}-${party_no}-${Date.now()}`,
       };
 
       // Finalize bill
@@ -497,6 +510,48 @@ const billingController = {
       res
         .status(500)
         .json({ error: "Failed to purge bills", details: error.message });
+    }
+  },
+
+  // Purge bills for a specific shift in a date range
+  async purgeShiftBills(req, res) {
+    try {
+      const { startDate, endDate, shiftName, confirmPassword } = req.body;
+
+      if (confirmPassword !== ADMIN_FULL_PASSWORD) {
+        return res.status(403).json({ error: "Invalid admin password" });
+      }
+
+      if (!shiftName || !shiftName.trim()) {
+        return res.status(400).json({ error: "shiftName is required" });
+      }
+
+      let start = startDate;
+      let end = endDate;
+
+      if (!start || !end) {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        const today = new Date(now.getTime() - offset)
+          .toISOString()
+          .split("T")[0];
+        if (!start) start = today;
+        if (!end) end = today;
+      }
+
+      const count = await BillingModel.deleteBillsByDateRangeAndShift(start, end, shiftName.trim());
+
+      res.status(200).json({
+        message: `Purged ${count} bills for shift "${shiftName}" from ${start} to ${end}`,
+        count,
+        range: { start, end },
+        shiftName: shiftName.trim(),
+      });
+    } catch (error) {
+      console.error("Shift purge error:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to purge shift bills", details: error.message });
     }
   },
 

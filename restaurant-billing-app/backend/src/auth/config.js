@@ -1,6 +1,6 @@
 const ADMIN_FULL_PASSWORD =
-  process.env.ADMIN_FULL_PASSWORD || "SHRIDAR123";
-const ADMIN_LIMITED_PASSWORD = process.env.ADMIN_LIMITED_PASSWORD || "SHRIDAR";
+  process.env.ADMIN_FULL_PASSWORD || "vittal";
+const ADMIN_LIMITED_PASSWORD = process.env.ADMIN_LIMITED_PASSWORD || "vittal123";
 const AUTH_HEADER_NAME = "x-auth-token";
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 

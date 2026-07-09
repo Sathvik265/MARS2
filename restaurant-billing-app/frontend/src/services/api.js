@@ -105,7 +105,7 @@ export const closeShiftAndLogout = async () => {
 };
 
 export const getPrinterStatus = async () => {
-  const response = await api.get("/printer/status");
+  const response = await api.get(`/printer/status?_=${Date.now()}`);
   return response.data;
 };
 
@@ -127,6 +127,11 @@ export const deleteMenuItem = async (id) => {
 
 export const lookupMenuItem = async (code) => {
   const response = await api.get(`/menu/lookup/${code}`);
+  return response.data;
+};
+
+export const bulkUpdateMenuItems = async (items) => {
+  const response = await api.post("/menu/bulk-update", items);
   return response.data;
 };
 
@@ -182,7 +187,7 @@ export const getLastBillNumber = async (date, track) => {
 };
 
 export const createBill = async (billData) => {
-  const response = await api.post("/billing/bills", billData);
+  const response = await api.post("/billing/bills", billData, { timeout: 30000 });
   return response.data;
 };
 

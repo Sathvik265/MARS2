@@ -15,6 +15,7 @@ router.get("/bills/last-number/:date", billingController.getLastBillNumber);
 router.post("/bills", billingController.createBill);
 
 router.post("/bills/purge", requireAdminFull, billingController.purgeBills);
+router.post("/bills/purge-shift", requireAdminFull, billingController.purgeShiftBills);
 
 router.get(
   "/bills/date-range/:startDate/:endDate",

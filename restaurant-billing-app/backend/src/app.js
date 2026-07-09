@@ -113,7 +113,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     let mode = "clerk";
 
-    if (upperStaffCode === "SHI") {
+    if (upperStaffCode === "SRIHARI") {
       mode = resolveAdminMode(password);
 
       if (!mode) {
@@ -177,12 +177,11 @@ app.post("/api/auth/login", async (req, res) => {
 
     if (shiftSessionResult.rows.length > 0) {
       // Reuse the existing open session for this track.
-      // Also clear is_locked — covers the case where clerk logged out
-      // (setting is_locked=TRUE) but the admin has since reopened the track.
+      // Also clear is_locked and update clerk_initials so that the session reflects the current logged in clerk
       shift_session_id = shiftSessionResult.rows[0].session_id;
       await pool.query(
-        `UPDATE sessions SET is_locked = FALSE WHERE session_id = $1`,
-        [shift_session_id],
+        `UPDATE sessions SET is_locked = FALSE, clerk_initials = $1 WHERE session_id = $2`,
+        [upperStaffCode, shift_session_id],
       );
     } else {
       // No open session exists for this track, create a new one
@@ -225,23 +224,8 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 app.post("/api/auth/logout", requireAuth, async (req, res) => {
-  const { mode, track } = req.auth;
-
-  // If a clerk logs out: just lock the track (is_locked = TRUE) but keep the
-  // session OPEN. This prevents new clerk logins until an admin unlocks.
-  // The shift itself stays open — clerks logging out do NOT close the shift.
-  if (mode === "clerk" && track) {
-    try {
-      await ShiftModel.setTrackLocked(track, true);
-      console.log(`🔒 Track '${track}' locked on clerk logout (session stays OPEN).`);
-    } catch (err) {
-      console.error(`Failed to lock track '${track}' on logout:`, err.message);
-      // Non-fatal — still complete the logout
-    }
-  }
-
   deleteSession(req.auth.token);
-  res.json({ detail: "Logged out", track_locked: mode === "clerk" && !!track });
+  res.json({ detail: "Logged out", track_locked: false });
 });
 
 // POST /api/auth/close-shift-logout — closes the current shift AND logs out
@@ -277,6 +261,111 @@ app.get("/api/menu", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Get menu error:", error);
     res.status(500).json({ detail: "Failed to fetch menu items" });
+  }
+});
+
+// POST /api/menu/bulk-update
+app.post("/api/menu/bulk-update", requireAdminFull, async (req, res) => {
+  try {
+    const items = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: "Expected an array of items" });
+    }
+
+    const results = [];
+    for (const itemData of items) {
+      const alphaCode = itemData.alpha_code ? String(itemData.alpha_code).trim().toUpperCase() : null;
+      const numericCode = itemData.numeric_code ? String(itemData.numeric_code).trim() : null;
+
+      let existingItemResult = null;
+      if (alphaCode) {
+        const numericVal = !isNaN(Number(alphaCode)) && alphaCode.trim() !== '' ? Number(alphaCode) : -1;
+        existingItemResult = await pool.query(
+          `SELECT * FROM items WHERE UPPER(alpha_code) = $1 OR UPPER(numeric_code) = $1 OR id = $2 LIMIT 1`,
+          [alphaCode.toUpperCase(), numericVal]
+        );
+      }
+      if ((!existingItemResult || existingItemResult.rows.length === 0) && numericCode) {
+        const numericVal = !isNaN(Number(numericCode)) && numericCode.trim() !== '' ? Number(numericCode) : -1;
+        existingItemResult = await pool.query(
+          `SELECT * FROM items WHERE UPPER(alpha_code) = $1 OR UPPER(numeric_code) = $1 OR id = $2 LIMIT 1`,
+          [numericCode.toUpperCase(), numericVal]
+        );
+      }
+
+      const existingItem = existingItemResult && existingItemResult.rows.length > 0 ? existingItemResult.rows[0] : null;
+
+      if (existingItem) {
+        let categoryJson = existingItem.category;
+        try {
+          const parsed = typeof categoryJson === "string" ? JSON.parse(categoryJson) : categoryJson;
+          if (!Array.isArray(parsed)) {
+            if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+              categoryJson = JSON.stringify([parsed]);
+            } else {
+              categoryJson = JSON.stringify([{ qty: 1, name: "General" }]);
+            }
+          } else {
+            categoryJson = JSON.stringify(parsed);
+          }
+        } catch (e) {
+          categoryJson = JSON.stringify([{ qty: 1, name: "General" }]);
+        }
+
+        const payload = {
+          name: itemData.name || existingItem.name,
+          alpha_code: alphaCode || existingItem.alpha_code,
+          numeric_code: numericCode || existingItem.numeric_code,
+          price_fixed: parseFloat(itemData.price_fixed) !== undefined && !isNaN(parseFloat(itemData.price_fixed)) ? parseFloat(itemData.price_fixed) : existingItem.price_fixed,
+          price_general: parseFloat(itemData.price_general) !== undefined && !isNaN(parseFloat(itemData.price_general)) ? parseFloat(itemData.price_general) : existingItem.price_general,
+          price_ac: parseFloat(itemData.price_ac) !== undefined && !isNaN(parseFloat(itemData.price_ac)) ? parseFloat(itemData.price_ac) : existingItem.price_ac,
+          category: categoryJson,
+          is_separate: existingItem.is_separate,
+        };
+
+        const updated = await pool.query(
+          `UPDATE items SET
+            name = $1, alpha_code = $2, numeric_code = $3,
+            price_fixed = $4, price_general = $5, price_ac = $6,
+            category = $7, is_separate = $8
+           WHERE id = $9 RETURNING *`,
+          [
+            payload.name,
+            payload.alpha_code,
+            payload.numeric_code,
+            payload.price_fixed,
+            payload.price_general,
+            payload.price_ac,
+            payload.category,
+            payload.is_separate,
+            existingItem.id
+          ]
+        );
+        results.push(updated.rows[0]);
+      } else {
+        const categoryJson = JSON.stringify([{ qty: 1, name: "General" }]);
+        const inserted = await pool.query(
+          `INSERT INTO items (name, alpha_code, numeric_code, price_fixed, price_general, price_ac, category, is_separate)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+          [
+            itemData.name || "Unknown Item",
+            alphaCode,
+            numericCode,
+            parseFloat(itemData.price_fixed) || 0,
+            parseFloat(itemData.price_general) || 0,
+            parseFloat(itemData.price_ac) || 0,
+            categoryJson,
+            false
+          ]
+        );
+        results.push(inserted.rows[0]);
+      }
+    }
+
+    res.json({ message: "Bulk update complete", count: results.length });
+  } catch (error) {
+    console.error("Bulk update error:", error);
+    res.status(500).json({ detail: "Failed to perform bulk update", details: error.message });
   }
 });
 

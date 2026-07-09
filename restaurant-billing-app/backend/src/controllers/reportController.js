@@ -92,26 +92,17 @@ exports.getShiftSummaryReport = async (req, res) => {
       WITH GstRate AS (
           SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 as rate
           FROM settings LIMIT 1
-      ),
-      FlatItems AS (
-          SELECT 
-              b.bill_date,
-              b.track as shift_name,
-              (item->>'quantity')::integer as qty,
-              (item->>'line_total')::decimal as amount
-          FROM bills b,
-          jsonb_array_elements(b.items_json) as item
-          WHERE b.bill_date = $1 AND b.bill_number > 0
       )
       SELECT 
-          f.bill_date as date,
-          f.shift_name,
-          SUM(f.amount) as amount,
-          SUM(f.amount) * (SELECT rate FROM GstRate) as gst_amount,
-          SUM(f.amount) * (1 + (SELECT rate FROM GstRate)) as total_amount
-      FROM FlatItems f
-      GROUP BY f.bill_date, f.shift_name
-      ORDER BY f.shift_name
+          b.bill_date as date,
+          b.track as shift_name,
+          SUM(b.grand_total) as amount,
+          SUM(b.grand_total) * (SELECT rate FROM GstRate) as gst_amount,
+          SUM(b.grand_total) as total_amount
+      FROM bills b
+      WHERE b.bill_date = $1 AND b.bill_number > 0
+      GROUP BY b.bill_date, b.track
+      ORDER BY b.track
       `,
       [date],
     );
@@ -174,7 +165,7 @@ exports.getShiftDetailedReport = async (req, res) => {
         SUM(p.qty) as total_quantity,
         SUM(p.amount) as total_amount,
         SUM(p.amount) * (SELECT rate FROM GstRate) as gst_amount,
-        SUM(p.amount) * (1 + (SELECT rate FROM GstRate)) as final_total
+        SUM(p.amount) as final_total
       FROM ProcessedItems p
       GROUP BY p.item_code, p.item_name, p.category_name
       ORDER BY p.category_name, p.item_name
@@ -569,6 +560,47 @@ exports.getClerkStats = async (req, res) => {
   } catch (error) {
     console.error("Clerk stats error:", error);
     res.status(500).json({ detail: "Failed to fetch clerk stats" });
+  }
+};
+
+// GET /api/reports/shift-only
+exports.getShiftOnlyReport = async (req, res) => {
+  try {
+    const { date, shift_name } = req.query;
+    if (!date || !shift_name)
+      return res
+        .status(400)
+        .json({ detail: "date and shift_name are required" });
+
+    const result = await pool.query(
+      `
+      WITH GstRate AS (
+          SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 as rate
+          FROM settings LIMIT 1
+      )
+      SELECT 
+          b.track as shift_name,
+          COUNT(b.id) as bill_count,
+          SUM(b.grand_total) as total_amount,
+          SUM(b.grand_total) * (SELECT rate FROM GstRate) as gst_amount
+      FROM bills b
+      WHERE b.bill_date = $1 AND b.track = $2 AND b.bill_number > 0
+      GROUP BY b.track
+      `,
+      [date, shift_name],
+    );
+
+    res.json(
+      result.rows[0] || {
+        shift_name,
+        bill_count: 0,
+        total_amount: 0,
+        gst_amount: 0,
+      },
+    );
+  } catch (error) {
+    console.error("Shift only report error:", error);
+    res.status(500).json({ detail: "Failed to generate shift only report" });
   }
 };
 
