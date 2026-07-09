@@ -148,11 +148,10 @@ const BillingModel = {
   async finalizeBill(data) {
     const {
       // Keys to find the bill
-      table_no,
-      party_no,
+      provisional_bill_id,
+
       track,
       clerk_initials,
-      created_at, // The linking key!
 
       // Update data
       bill_date,
@@ -162,6 +161,8 @@ const BillingModel = {
       tax_amount,
       grand_total,
       order_id,
+      table_no, // needed for move_orders_to_bill_json
+      party_no, // needed for move_orders_to_bill_json
     } = data;
 
     const client = await pool.connect();
@@ -172,7 +173,7 @@ const BillingModel = {
       const bill_number = await this.getNextBillNumber(track, bill_date, client);
 
       // 2. Update the existing provisional bill
-      // We must match on the Created At because that's the FK link
+      // We must match on the explicit ID for safety
       const updateRes = await client.query(
         `UPDATE bills SET
           bill_number = $1,
@@ -183,10 +184,8 @@ const BillingModel = {
           tax_amount = $6,
           grand_total = $7,
           order_id = $8,
-          clerk_initials = $12
-        WHERE table_no = $9 
-          AND party_no = $10 
-          AND created_at = $11 -- Vital: Match the FK column exactly
+          clerk_initials = $10
+        WHERE id = $9 
           AND bill_number = 0 -- Safety check
         RETURNING id`,
         [
@@ -198,10 +197,8 @@ const BillingModel = {
           tax_amount,
           grand_total,
           order_id,
-          parseInt(table_no),
-          party_no,
-          created_at,
-          clerk_initials,
+          provisional_bill_id, // 9
+          clerk_initials,      // 10
         ],
       );
 
@@ -224,12 +221,44 @@ const BillingModel = {
         party_no,
       ]);
 
+      // Load settings to fetch current CGST and SGST rates for this clerk,
+      // and dynamically compute the scaling factor to apply to item prices.
+      const SettingsModel = require("./settingsModel");
+      const settings = await SettingsModel.getSettings(clerk_initials || "CLK");
+      const sgstRate = Number(settings?.sgst_percentage || 0);
+      const cgstRate = Number(settings?.cgst_percentage || 0);
+      const taxRateSum = sgstRate + cgstRate;
+      const scalingFactor = 1 / (1 + taxRateSum / 100);
+
       const finalBillRes = await client.query("SELECT * FROM bills WHERE id = $1", [billId]);
       const finalBill = finalBillRes.rows[0];
+      const items = finalBill.items_json || [];
+
+      // Scale unit price and line total for each item in the aggregated list
+      const scaledItems = items.map(item => {
+        const unitPriceScaled = Number((Number(item.unit_price || item.fixed_price || 0) * scalingFactor).toFixed(2));
+        const lineTotalScaled = Number((unitPriceScaled * Number(item.quantity || 0)).toFixed(2));
+        return {
+          ...item,
+          fixed_price: unitPriceScaled, // keep them aligned in JSON structure
+          actual_price: unitPriceScaled,
+          unit_price: unitPriceScaled,
+          line_total: lineTotalScaled
+        };
+      });
+
+      await client.query(
+        "UPDATE bills SET items_json = $1 WHERE id = $2",
+        [JSON.stringify(scaledItems), billId]
+      );
+
+      // Re-fetch the updated bill to return correct items_json to frontend
+      const updatedBillRes = await client.query("SELECT * FROM bills WHERE id = $1", [billId]);
+      const updatedBill = updatedBillRes.rows[0];
 
       await client.query("COMMIT");
       return {
-        ...finalBill,
+        ...updatedBill,
         bill_id: billId,
         message: "Bill finalized successfully",
       };
@@ -391,6 +420,34 @@ const BillingModel = {
 
       await client.query("COMMIT");
       return result.rowCount; // Number of bills deleted
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  // Delete bills (and associated orders) for a given date range AND specific shift (track)
+  async deleteBillsByDateRangeAndShift(startDate, endDate, shiftName) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // 1. Delete orders for this shift in the date range
+      await client.query(
+        "DELETE FROM orders WHERE bill_date BETWEEN $1 AND $2 AND track = $3",
+        [startDate, endDate, shiftName],
+      );
+
+      // 2. Delete bills for this shift in the date range
+      const result = await client.query(
+        "DELETE FROM bills WHERE bill_date BETWEEN $1 AND $2 AND track = $3",
+        [startDate, endDate, shiftName],
+      );
+
+      await client.query("COMMIT");
+      return result.rowCount;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

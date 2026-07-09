@@ -678,6 +678,14 @@ function PurgeBillsSection() {
   const [endDate, setEndDate] = useState(
     new Date().toISOString().split("T")[0],
   );
+  const [shiftPurgeLoading, setShiftPurgeLoading] = useState(false);
+  const [shiftStartDate, setShiftStartDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [shiftEndDate, setShiftEndDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [shiftName, setShiftName] = useState("");
 
   const handlePurge = async () => {
     const confirmPassword = window.prompt(
@@ -713,53 +721,153 @@ function PurgeBillsSection() {
     }
   };
 
+  const handleShiftPurge = async () => {
+    if (!shiftName || !shiftName.trim()) {
+      toast.error("Please enter a shift name (e.g. `, ``, RBS1, RBS2)");
+      return;
+    }
+
+    const confirmPassword = window.prompt(
+      "Enter admin full password to confirm shift purge:",
+      "",
+    );
+
+    if (!confirmPassword) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `DANGER: Are you sure you want to DELETE ALL bills for shift "${shiftName}" from ${shiftStartDate} to ${shiftEndDate}?\n\nThis will ONLY delete bills for this specific shift. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setShiftPurgeLoading(true);
+    try {
+      const res = await api.post("/billing/bills/purge-shift", {
+        startDate: shiftStartDate,
+        endDate: shiftEndDate,
+        shiftName: shiftName.trim(),
+        confirmPassword,
+      });
+      toast.success(res.data.message);
+    } catch (e) {
+      console.error("Shift purge failed", e);
+      toast.error(safeGet(e, "response.data.error", "Shift purge failed"));
+    } finally {
+      setShiftPurgeLoading(false);
+    }
+  };
+
   return (
-    <Card className="border-red-200 bg-red-50 mt-8">
-      <CardHeader>
-        <CardTitle className="text-red-800">Danger Zone: Purge Bills</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <p className="text-sm text-red-600">
-            Select a date range to delete <strong>ALL</strong> bills created
-            within that period (inclusive).
-          </p>
+    <div className="space-y-6">
+      <Card className="border-red-200 bg-red-50 mt-8">
+        <CardHeader>
+          <CardTitle className="text-red-800">Danger Zone: Purge All Bills</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-red-600">
+              Select a date range to delete <strong>ALL</strong> bills created
+              within that period (inclusive). This deletes bills for ALL shifts.
+            </p>
 
-          <div className="flex gap-4 items-center">
-            <div className="flex flex-col gap-1">
-              <Label className="text-red-800">Start Date</Label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="bg-white"
-              />
+            <div className="flex gap-4 items-center">
+              <div className="flex flex-col gap-1">
+                <Label className="text-red-800">Start Date</Label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-white"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-red-800">End Date</Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-white"
+                />
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <Label className="text-red-800">End Date</Label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="bg-white"
-              />
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="destructive"
+                onClick={handlePurge}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="animate-spin mr-2" size={16} />
+                ) : null}
+                Purge All Bills
+              </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="destructive"
-              onClick={handlePurge}
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="animate-spin mr-2" size={16} />
-              ) : null}
-              Purge Bills
-            </Button>
+      <Card className="border-orange-200 bg-orange-50">
+        <CardHeader>
+          <CardTitle className="text-orange-800">Shift-Wise Purge</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-sm text-orange-600">
+              Delete bills for a <strong>specific shift only</strong> within a date range.
+              Bills from other shifts will NOT be affected.
+            </p>
+
+            <div className="flex gap-4 items-center flex-wrap">
+              <div className="flex flex-col gap-1">
+                <Label className="text-orange-800">Start Date</Label>
+                <Input
+                  type="date"
+                  value={shiftStartDate}
+                  onChange={(e) => setShiftStartDate(e.target.value)}
+                  className="bg-white"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-orange-800">End Date</Label>
+                <Input
+                  type="date"
+                  value={shiftEndDate}
+                  onChange={(e) => setShiftEndDate(e.target.value)}
+                  className="bg-white"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-orange-800">Shift Name</Label>
+                <Input
+                  type="text"
+                  value={shiftName}
+                  onChange={(e) => setShiftName(e.target.value)}
+                  placeholder="`, ``, RBS1, RBS2"
+                  className="bg-white w-40"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="destructive"
+                onClick={handleShiftPurge}
+                disabled={shiftPurgeLoading || !shiftName.trim()}
+              >
+                {shiftPurgeLoading ? (
+                  <Loader2 className="animate-spin mr-2" size={16} />
+                ) : null}
+                Purge Shift Bills
+              </Button>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

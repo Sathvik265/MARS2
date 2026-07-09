@@ -19,8 +19,9 @@ import {
   TableHead,
   TableCell,
 } from "./ui/Table";
-import { updateMenuItem } from "../services/api";
+import { updateMenuItem, bulkUpdateMenuItems } from "../services/api";
 import { API, toast, safeGet, safeArray } from "../utils/helpers";
+import * as XLSX from "xlsx";
 
 export default function FoodMenu({ mode }) {
   const [items, setItems] = useState([]);
@@ -37,6 +38,9 @@ export default function FoodMenu({ mode }) {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [bulkUpdateStatus, setBulkUpdateStatus] = useState("");
+  const [bulkUpdateErrorMsg, setBulkUpdateErrorMsg] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
   const searchInputRef = React.useRef(null);
 
@@ -412,6 +416,167 @@ export default function FoodMenu({ mode }) {
     }
   };
 
+  const handleBulkUpdate = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!window.confirm(`Are you sure you want to perform bulk update using "${file.name}"?`)) {
+      e.target.value = "";
+      return;
+    }
+
+    setBulkUpdating(true);
+    setBulkUpdateStatus("Reading file...");
+    setBulkUpdateErrorMsg("");
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const data = evt.target.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        if (rows.length < 2) {
+          throw new Error("The selected file is empty or missing data rows.");
+        }
+
+        setBulkUpdateStatus("Parsing spreadsheet rows...");
+
+        const headers = rows[0].map(h => String(h || "").trim());
+        const nameIdx = headers.findIndex(h => h.toLowerCase() === "item name" || h.toLowerCase() === "name");
+        const alphaIdx = headers.findIndex(h => h.toLowerCase() === "alpha code" || h.toLowerCase() === "code");
+        const numericIdx = headers.findIndex(h => h.toLowerCase() === "numeric code");
+        const priceFixedIdx = headers.findIndex(h => h.toLowerCase() === "fixed price");
+        const priceGenIdx = headers.findIndex(h => h.toLowerCase() === "general price");
+        const priceAcIdx = headers.findIndex(h => h.toLowerCase() === "ac price");
+
+        if (nameIdx === -1 || (alphaIdx === -1 && numericIdx === -1)) {
+          throw new Error("Excel must contain 'Item Name' and at least one code column ('Alpha Code' or 'Numeric Code')");
+        }
+
+        const parsedItems = [];
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0 || row.every(cell => cell === null || cell === undefined || cell === "")) {
+            continue;
+          }
+
+          const name = row[nameIdx] ? String(row[nameIdx]).trim() : "";
+          if (!name) continue;
+
+          const alphaCode = alphaIdx !== -1 && row[alphaIdx] ? String(row[alphaIdx]).trim().toUpperCase() : null;
+          const numericCode = numericIdx !== -1 && row[numericIdx] ? String(row[numericIdx]).trim() : null;
+
+          if (!alphaCode && !numericCode) continue;
+
+          const priceFixed = priceFixedIdx !== -1 && row[priceFixedIdx] ? parseFloat(row[priceFixedIdx]) : 0;
+          const priceGeneral = priceGenIdx !== -1 && row[priceGenIdx] ? parseFloat(row[priceGenIdx]) : 0;
+          const priceAc = priceAcIdx !== -1 && row[priceAcIdx] ? parseFloat(row[priceAcIdx]) : 0;
+
+          parsedItems.push({
+            name,
+            alpha_code: alphaCode,
+            numeric_code: numericCode,
+            price_fixed: isNaN(priceFixed) ? 0 : priceFixed,
+            price_general: isNaN(priceGeneral) ? 0 : priceGeneral,
+            price_ac: isNaN(priceAc) ? 0 : priceAc
+          });
+        }
+
+        if (parsedItems.length === 0) {
+          throw new Error("No valid items found in the file.");
+        }
+
+        setBulkUpdateStatus(`Uploading ${parsedItems.length} items to database...`);
+        const res = await bulkUpdateMenuItems(parsedItems);
+        
+        setBulkUpdateStatus("SUCCESS");
+        toast.success(res.message || `Successfully processed ${res.count} items!`);
+        load();
+        setTimeout(() => {
+          setBulkUpdating(false);
+        }, 1500);
+      } catch (err) {
+        console.error("Bulk update parsing error:", err);
+        setBulkUpdateStatus("FAILED");
+        const errMsg = err?.response?.data?.detail || err?.response?.data?.error || err.message || "Unknown error";
+        setBulkUpdateErrorMsg(errMsg);
+        alert("Bulk Update Failed: " + errMsg);
+      } finally {
+        e.target.value = "";
+      }
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  const renderBulkUpdateModal = () => {
+    if (!bulkUpdating) return null;
+
+    const overlayStyle = {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.75)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 2147483647,
+      padding: 16,
+    };
+
+    const modalStyle = {
+      maxWidth: 400,
+      width: "100%",
+      background: "#1c1c1e",
+      border: "1px solid #2a2a2e",
+      borderRadius: "0.85rem",
+      padding: 24,
+      textAlign: "center",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+      color: "white"
+    };
+
+    const modal = (
+      <div style={overlayStyle}>
+        <div style={modalStyle} className="space-y-4">
+          <h3 className="text-xl font-bold text-white mb-2">📥 Bulk Updating Menu</h3>
+          <div className="flex flex-col items-center justify-center space-y-4">
+            {bulkUpdateStatus !== "SUCCESS" && bulkUpdateStatus !== "FAILED" ? (
+              <>
+                <div className="animate-spin text-blue-500 text-3xl">↻</div>
+                <p className="text-gray-300 font-semibold">{bulkUpdateStatus}</p>
+                <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden mt-2">
+                  <div className="bg-blue-600 h-full animate-pulse" style={{ width: "80%" }} />
+                </div>
+              </>
+            ) : bulkUpdateStatus === "SUCCESS" ? (
+              <>
+                <div className="text-green-500 text-4xl font-bold">✓</div>
+                <p className="text-green-400 font-bold text-lg">Bulk Update Successful!</p>
+              </>
+            ) : (
+              <>
+                <div className="text-red-500 text-4xl font-bold text-center">✗</div>
+                <p className="text-red-400 font-bold text-lg">Bulk Update Failed</p>
+                <p className="text-sm text-gray-400 max-h-32 overflow-y-auto w-full text-left bg-gray-900 p-2 rounded">{bulkUpdateErrorMsg}</p>
+                <Button onClick={() => setBulkUpdating(false)} className="mt-4 bg-red-600 hover:bg-red-700 text-white border-none font-semibold w-full">
+                  Close
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+
+    return ReactDOM.createPortal(modal, document.body);
+  };
+
   // Filter items based on searchTerm
   const filteredItems = items.filter((item) => {
     const term = searchTerm.toLowerCase();
@@ -437,15 +602,37 @@ export default function FoodMenu({ mode }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Food Menu ({items.length} items)</CardTitle>
-        <div className="mt-2">
-          <Input
-            ref={searchInputRef}
-            placeholder="Search items..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-sm"
-          />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <CardTitle>Food Menu ({items.length} items)</CardTitle>
+            <div className="mt-2 flex items-center gap-3">
+              <Input
+                ref={searchInputRef}
+                placeholder="Search items..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+              {mode === "admin-full" && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => document.getElementById("bulk-update-file-input").click()}
+                    variant="outline"
+                    className="bg-blue-600 hover:bg-blue-700 text-white border-none font-semibold transition-all h-10 px-4 flex items-center gap-2"
+                  >
+                    📥 Bulk Update (Excel)
+                  </Button>
+                  <input
+                    type="file"
+                    id="bulk-update-file-input"
+                    accept=".xlsx, .xls, .csv"
+                    onChange={handleBulkUpdate}
+                    style={{ display: "none" }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -747,6 +934,7 @@ export default function FoodMenu({ mode }) {
           </Table>
         )}
         {renderEditModal()}
+        {renderBulkUpdateModal()}
       </CardContent>
     </Card>
   );

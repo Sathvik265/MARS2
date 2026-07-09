@@ -26,7 +26,7 @@ function getSectionForTable(tableNo) {
 function getExpectedPriceForSection(item, section) {
   switch (section) {
     case "P":
-      return roundMoney(item.price_fixed);
+      return roundMoney(item.price_general);
     case "AC":
       return roundMoney(item.price_ac);
     default:
@@ -115,16 +115,33 @@ async function verifyBillIntegrity({ orders, clerkInitials, submittedTotals }) {
     return { ok: false, detail: "No pending orders found to finalize" };
   }
 
-  const grand_total = roundMoney(
-    orders.reduce((sum, order) => sum + Number(order.line_total || 0), 0),
-  );
   const settings = await SettingsModel.getSettings(clerkInitials || "CLK");
   const sgstRate = Number(settings?.sgst_percentage || 0);
   const cgstRate = Number(settings?.cgst_percentage || 0);
-  const sgst = roundMoney(grand_total * (sgstRate / 100));
-  const cgst = roundMoney(grand_total * (cgstRate / 100));
+  const taxRateSum = sgstRate + cgstRate;
+  const scalingFactor = 1 / (1 + taxRateSum / 100);
+
+  const subtotal = roundMoney(
+    orders.reduce((sum, order) => {
+      const unitPriceScaled = roundMoney(Number(order.unit_price || 0) * scalingFactor);
+      const lineTotalScaled = roundMoney(unitPriceScaled * Number(order.quantity || 0));
+      return sum + lineTotalScaled;
+    }, 0),
+  );
+
+  const totalTax = roundMoney(
+    orders.reduce((sum, order) => {
+      const unitPriceScaled = roundMoney(Number(order.unit_price || 0) * scalingFactor);
+      const lineTotalScaled = roundMoney(unitPriceScaled * Number(order.quantity || 0));
+      const itemTax = roundMoney(lineTotalScaled * (taxRateSum / 100));
+      return sum + itemTax;
+    }, 0),
+  );
+
+  const sgst = roundMoney(totalTax / 2);
+  const cgst = roundMoney(totalTax / 2);
   const tax_amount = roundMoney(sgst + cgst);
-  const subtotal = roundMoney(grand_total - tax_amount);
+  const grand_total = roundMoney(subtotal + sgst + cgst);
 
   const submitted = {
     subtotal: roundMoney(submittedTotals.subtotal),

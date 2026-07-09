@@ -100,6 +100,19 @@ export function TimeRangeReport({ sessionId }) {
     );
   };
 
+  useEffect(() => {
+    const handleCtrlP = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
+        if (report && report.length > 0) {
+          e.preventDefault();
+          handlePrint();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleCtrlP);
+    return () => window.removeEventListener("keydown", handleCtrlP);
+  }, [report]);
+
   return (
     <Card>
       <CardHeader>
@@ -245,6 +258,19 @@ export function DateRangeReport({ sessionId }) {
     );
   };
 
+  useEffect(() => {
+    const handleCtrlP = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
+        if (report && report.length > 0) {
+          e.preventDefault();
+          handlePrint();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleCtrlP);
+    return () => window.removeEventListener("keydown", handleCtrlP);
+  }, [report]);
+
   return (
     <Card>
       <CardHeader>
@@ -339,6 +365,7 @@ export function ShiftReport({ sessionId }) {
   const [detailedReport, setDetailedReport] = useState(null);
   const [settings, setSettings] = useState({});
   const [asciiPreview, setAsciiPreview] = useState("");
+  const [shiftOnlyReport, setShiftOnlyReport] = useState(null);
 
   useEffect(() => {
     fetchSettings().then((data) => setSettings(data || {}));
@@ -414,7 +441,100 @@ export function ShiftReport({ sessionId }) {
     );
   };
 
-  const handlePrintSummary = async () => {
+  const triggerActiveReportPrint = () => {
+    if (activeReportType === "list" && report && report.length > 0) {
+      sendToPosPrinter(
+        `Shift Bills (${filters.date.slice(5)} - ${filters.shiftName})`,
+        [
+          { header: "Bill", accessor: (r) => r.bill_number, width: 6 },
+          { header: "Tbl", accessor: (r) => r.table_no, width: 4 },
+          {
+            header: "Amount",
+            accessor: (r) => Number(r.grand_total).toFixed(2),
+            width: 9,
+            align: "right",
+          },
+          {
+            header: "Time",
+            accessor: (r) => new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+            width: 9,
+            align: "right",
+          },
+        ],
+        report
+      );
+    } else if (activeReportType === "summary" && summaryReport && summaryReport.length > 0) {
+      sendToPosPrinter(
+        `Shift Summary (${filters.date})`,
+        [
+          { header: "Shift Name", accessor: (r) => r.shift_name, width: 14 },
+          {
+            header: "GST Rs",
+            accessor: (r) => Number(r.gst_amount).toFixed(2),
+            width: 8,
+            align: "right",
+          },
+          {
+            header: "Total Rs",
+            accessor: (r) => Number(r.total_amount).toFixed(2),
+            width: 9,
+            align: "right",
+          },
+        ],
+        summaryReport
+      );
+    } else if (activeReportType === "detailed" && detailedReport && detailedReport.length > 0) {
+      sendToPosPrinter(
+        `Detailed Shift Rpt (${filters.shiftName})`,
+        [
+          { header: "Item Desc", accessor: (r) => r.item_name, width: 19 },
+          { header: "Qty", accessor: (r) => r.total_quantity, width: 4 },
+          {
+            header: "Total Rs",
+            accessor: (r) => Number(r.final_total).toFixed(2),
+            width: 8,
+            align: "right",
+          },
+        ],
+        detailedReport
+      );
+    } else if (activeReportType === "shift-only" && shiftOnlyReport) {
+      const shiftOnlyData = [
+        { label: "Shift", value: shiftOnlyReport.shift_name || filters.shiftName },
+        { label: "Bills", value: String(shiftOnlyReport.bill_count || 0) },
+        { label: "Total Amount", value: `Rs. ${Number(shiftOnlyReport.total_amount || 0).toFixed(2)}` },
+        { label: "GST Amount", value: `Rs. ${Number(shiftOnlyReport.gst_amount || 0).toFixed(2)}` },
+      ];
+      sendToPosPrinter(
+        `Shift Only (${filters.shiftName} - ${filters.date})`,
+        [
+          { header: "Field", accessor: (r) => r.label, width: 15 },
+          {
+            header: "Value",
+            accessor: (r) => r.value,
+            width: 16,
+            align: "right",
+          },
+        ],
+        shiftOnlyData
+      );
+    }
+  };
+
+  useEffect(() => {
+    const handleCtrlP = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
+        if (asciiPreview) {
+          e.preventDefault();
+          triggerActiveReportPrint();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleCtrlP);
+    return () => window.removeEventListener("keydown", handleCtrlP);
+  }, [asciiPreview, activeReportType, report, summaryReport, detailedReport, shiftOnlyReport]);
+
+  const handleGenerateSummary = async () => {
     try {
       setLoading(true);
       const res = await axios.get(`${API}/reports/shift-summary`, {
@@ -463,26 +583,6 @@ export function ShiftReport({ sessionId }) {
         settings
       );
       setAsciiPreview(rawText.replace(/\.\r?\n/g, ""));
-
-      sendToPosPrinter(
-        `Shift Summary (${filters.date})`,
-        [
-          { header: "Shift Name", accessor: (r) => r.shift_name, width: 14 },
-          {
-            header: "GST Rs",
-            accessor: (r) => Number(r.gst_amount).toFixed(2),
-            width: 8,
-            align: "right",
-          },
-          {
-            header: "Total Rs",
-            accessor: (r) => Number(r.total_amount).toFixed(2),
-            width: 9,
-            align: "right",
-          },
-        ],
-        summaryData
-      );
     } catch (e) {
       console.error("Failed to generate summary report:", e);
       toast.error("Failed to generate summary report");
@@ -491,7 +591,7 @@ export function ShiftReport({ sessionId }) {
     }
   };
 
-  const handlePrintDetailed = async () => {
+  const handleGenerateDetailed = async () => {
     if (!filters.shiftName || filters.shiftName.trim() === "") {
       toast.error(
         "Please enter a valid shift name (e.g. RBS1) for detailed report",
@@ -544,21 +644,6 @@ export function ShiftReport({ sessionId }) {
         settings
       );
       setAsciiPreview(rawText.replace(/\.\r?\n/g, ""));
-
-      sendToPosPrinter(
-        `Detailed Shift Rpt (${filters.shiftName})`,
-        [
-          { header: "Item Desc", accessor: (r) => r.item_name, width: 19 },
-          { header: "Qty", accessor: (r) => r.total_quantity, width: 4 },
-          {
-            header: "Total Rs",
-            accessor: (r) => Number(r.final_total).toFixed(2),
-            width: 8,
-            align: "right",
-          },
-        ],
-        detailedData
-      );
     } catch (e) {
       console.error("Failed to generate detailed report:", e);
       toast.error("Failed to generate detailed report");
@@ -567,13 +652,80 @@ export function ShiftReport({ sessionId }) {
     }
   };
 
+  const handleGenerateShiftOnly = async () => {
+    if (!filters.shiftName || filters.shiftName.trim() === "") {
+      toast.error(
+        "Please enter a valid shift name (e.g. RBS1) for shift only report",
+      );
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API}/reports/shift-only`, {
+        params: { date: filters.date, shift_name: filters.shiftName },
+      });
+      const data = res.data;
+      if (!data || (Number(data.bill_count) === 0 && Number(data.total_amount) === 0)) {
+        toast.error("No bills found for this shift");
+        return;
+      }
+
+      setShiftOnlyReport(data);
+      setActiveReportType("shift-only");
+
+      const shiftOnlyData = [
+        { label: "Shift", value: data.shift_name || filters.shiftName },
+        { label: "Bills", value: String(data.bill_count || 0) },
+        { label: "Total Amount", value: `Rs. ${Number(data.total_amount || 0).toFixed(2)}` },
+        { label: "GST Amount", value: `Rs. ${Number(data.gst_amount || 0).toFixed(2)}` },
+      ];
+
+      const rawText = generateAsciiReport(
+        `Shift Only (${filters.shiftName} - ${filters.date})`,
+        [
+          { header: "Field", accessor: (r) => r.label, width: 15 },
+          {
+            header: "Value",
+            accessor: (r) => r.value,
+            width: 16,
+            align: "right",
+          },
+        ],
+        shiftOnlyData,
+        settings
+      );
+      setAsciiPreview(rawText.replace(/\.\r?\n/g, ""));
+    } catch (e) {
+      console.error("Failed to generate shift only report:", e);
+      toast.error("Failed to generate shift only report");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isShiftNameEntered = filters.shiftName && filters.shiftName.trim() !== "";
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Shift Report</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Summary Report Section at the top (before date input) */}
+          <div className="border-b pb-4">
+            <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wider">Day Summary Report</h3>
+            <Button
+              onClick={handleGenerateSummary}
+              variant="outline"
+              disabled={loading}
+              className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+            >
+              {loading ? <Loader2 size={16} className="mr-2" /> : null}
+              Summary Report (All Shifts)
+            </Button>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Date</Label>
@@ -593,36 +745,50 @@ export function ShiftReport({ sessionId }) {
                 onChange={(e) =>
                   setFilters({ ...filters, shiftName: e.target.value })
                 }
-                placeholder="\`, \`\`, RBS1, RBS2"
+                placeholder="`, ``, RBS1, RBS2"
               />
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {report && report.length > 0 && (
-              <Button onClick={handlePrint} variant="outline">
-                Print Bill List
-              </Button>
-            )}
+          <div className="flex flex-wrap gap-2 pt-2">
             <Button
-              onClick={handlePrintSummary}
-              variant="outline"
-              disabled={loading}
-              className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+              onClick={generateReport}
+              disabled={loading || !isShiftNameEntered}
             >
               {loading ? <Loader2 size={16} className="mr-2" /> : null}
-              Summary Report
+              Generate Bill List
             </Button>
             <Button
-              onClick={handlePrintDetailed}
+              onClick={handleGenerateDetailed}
               variant="outline"
-              disabled={loading}
-              className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200"
+              disabled={loading || !isShiftNameEntered}
+              className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200 disabled:opacity-50"
             >
               {loading ? <Loader2 size={16} className="mr-2" /> : null}
               Detailed Report
             </Button>
+            <Button
+              onClick={handleGenerateShiftOnly}
+              variant="outline"
+              disabled={loading || !isShiftNameEntered}
+              className="bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 disabled:opacity-50"
+            >
+              {loading ? <Loader2 size={16} className="mr-2" /> : null}
+              Shift Only
+            </Button>
           </div>
+
+          {asciiPreview && (
+            <div className="flex justify-between items-center bg-gray-100 p-3 rounded border border-gray-300">
+              <span className="text-sm font-semibold text-gray-700">Preview Generated Successfully</span>
+              <Button
+                onClick={triggerActiveReportPrint}
+                className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-6 py-2 shadow transition-all"
+              >
+                Print Report (Ctrl + P)
+              </Button>
+            </div>
+          )}
 
           {asciiPreview && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6 border-t pt-6">
@@ -737,6 +903,30 @@ export function ShiftReport({ sessionId }) {
                     )}
                   </div>
                 )}
+
+                {activeReportType === "shift-only" && shiftOnlyReport && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-gray-800">Shift Only Report ({filters.shiftName})</h3>
+                    <div className="bg-white border rounded-lg p-6 space-y-3">
+                      <div className="flex justify-between items-center py-2 border-b">
+                        <span className="text-gray-600 font-medium">Shift Name</span>
+                        <span className="font-bold text-lg">{shiftOnlyReport.shift_name || filters.shiftName}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b">
+                        <span className="text-gray-600 font-medium">Number of Bills</span>
+                        <span className="font-bold text-lg">{shiftOnlyReport.bill_count || 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b">
+                        <span className="text-gray-600 font-medium">Total Amount</span>
+                        <span className="font-bold text-xl text-green-700">₹{Number(shiftOnlyReport.total_amount || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-gray-600 font-medium">GST Amount (Display Only)</span>
+                        <span className="font-semibold text-gray-700">₹{Number(shiftOnlyReport.gst_amount || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Thermal Receipt Print Spool Preview (Colspan 5) */}
@@ -842,6 +1032,19 @@ export function ItemReport({ sessionId }) {
       report
     );
   };
+
+  useEffect(() => {
+    const handleCtrlP = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
+        if (report && report.length > 0) {
+          e.preventDefault();
+          handlePrint();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleCtrlP);
+    return () => window.removeEventListener("keydown", handleCtrlP);
+  }, [report]);
 
   return (
     <Card>

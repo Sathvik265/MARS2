@@ -76,6 +76,62 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.post("/bulk-update", requireAdminFull, async (req, res) => {
+  try {
+    const items = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: "Expected an array of items" });
+    }
+
+    const results = [];
+    for (const itemData of items) {
+      const alphaCode = itemData.alpha_code ? String(itemData.alpha_code).trim().toUpperCase() : null;
+      const numericCode = itemData.numeric_code ? String(itemData.numeric_code).trim() : null;
+
+      let existingItem = null;
+      if (alphaCode) {
+        existingItem = await ItemModel.getItemByCode(alphaCode);
+      }
+      if (!existingItem && numericCode) {
+        existingItem = await ItemModel.getItemByCode(numericCode);
+      }
+
+      if (existingItem) {
+        const payload = {
+          name: itemData.name || existingItem.name,
+          alpha_code: alphaCode || existingItem.alpha_code,
+          numeric_code: numericCode || existingItem.numeric_code,
+          price_fixed: parseFloat(itemData.price_fixed) !== undefined && !isNaN(parseFloat(itemData.price_fixed)) ? parseFloat(itemData.price_fixed) : existingItem.price_fixed,
+          price_general: parseFloat(itemData.price_general) !== undefined && !isNaN(parseFloat(itemData.price_general)) ? parseFloat(itemData.price_general) : existingItem.price_general,
+          price_ac: parseFloat(itemData.price_ac) !== undefined && !isNaN(parseFloat(itemData.price_ac)) ? parseFloat(itemData.price_ac) : existingItem.price_ac,
+          category: existingItem.category,
+          is_separate: existingItem.is_separate,
+        };
+        const updated = await ItemModel.updateItem(existingItem.id, payload);
+        results.push(updated);
+      } else {
+        const payload = {
+          name: itemData.name || "Unknown Item",
+          alpha_code: alphaCode,
+          numeric_code: numericCode,
+          price_fixed: parseFloat(itemData.price_fixed) || 0,
+          price_general: parseFloat(itemData.price_general) || 0,
+          price_ac: parseFloat(itemData.price_ac) || 0,
+          category: { qty: 1, name: "General" },
+          is_separate: false,
+        };
+        const inserted = await ItemModel.createItem(payload);
+        results.push(inserted);
+      }
+    }
+
+    res.json({ message: "Bulk update complete", count: results.length });
+  } catch (error) {
+    console.error("Bulk update error:", error);
+    res.status(500).json({ error: "Failed to perform bulk update", details: error.message });
+  }
+});
+
 router.post("/", requireAdminFull, async (req, res) => {
   try {
     const item = await ItemModel.createItem(req.body);

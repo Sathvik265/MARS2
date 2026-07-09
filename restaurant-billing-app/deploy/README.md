@@ -1,6 +1,8 @@
 Deployment helper files for IIS
 
 - `publish-to-zip.ps1` - builds frontend, assembles a deploy package and creates a ZIP.
+- `run-local.ps1` - PowerShell script running the DB restoration and spawning the frontend and backend directly.
+- `RunApp.bat` - Double-clickable batch script to bypass ExecutionPolicy and launch `run-local.ps1`.
 
 Usage (from repo root):
 
@@ -8,7 +10,7 @@ Usage (from repo root):
 .\restaurant-billing-app\deploy\publish-to-zip.ps1 -OutputZip ..\rbs-deploy.zip
 ```
 
-Take the created ZIP to your IIS server and extract into the IIS site folder.
+Take the created ZIP to your target server and extract it.
 
 Included helper scripts:
 
