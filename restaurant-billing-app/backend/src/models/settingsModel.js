@@ -32,6 +32,7 @@ const SettingsModel = {
       gstin,
       sgst_percentage,
       cgst_percentage,
+      allowed_clerks,
     } = data;
 
     // Check if master CLK exists
@@ -45,7 +46,7 @@ const SettingsModel = {
 
     const result = await pool.query(
       `UPDATE settings 
-       SET hotel_name = $1, address = $2, phone = $3, gstin = $4, sgst_percentage = $5, cgst_percentage = $6
+       SET hotel_name = $1, address = $2, phone = $3, gstin = $4, sgst_percentage = $5, cgst_percentage = $6, allowed_clerks = $7
        WHERE clerk_initials = 'CLK' 
        RETURNING *`,
       [
@@ -55,21 +56,23 @@ const SettingsModel = {
         gstin,
         sgst_percentage ?? 2.5,
         cgst_percentage ?? 2.5,
+        allowed_clerks ?? 'CLK,V,P,B',
       ],
     );
 
     // Sync to this specific clerk's settings row as well
     if (code !== "CLK") {
       await pool.query(
-        `INSERT INTO settings (hotel_name, address, phone, gstin, sgst_percentage, cgst_percentage, clerk_initials, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        `INSERT INTO settings (hotel_name, address, phone, gstin, sgst_percentage, cgst_percentage, allowed_clerks, clerk_initials, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
          ON CONFLICT (clerk_initials) DO UPDATE SET 
            hotel_name = EXCLUDED.hotel_name,
            address = EXCLUDED.address,
            phone = EXCLUDED.phone,
            gstin = EXCLUDED.gstin,
            sgst_percentage = EXCLUDED.sgst_percentage,
-           cgst_percentage = EXCLUDED.cgst_percentage`,
+           cgst_percentage = EXCLUDED.cgst_percentage,
+           allowed_clerks = EXCLUDED.allowed_clerks`,
         [
           hotel_name,
           address,
@@ -77,6 +80,7 @@ const SettingsModel = {
           gstin,
           sgst_percentage ?? 2.5,
           cgst_percentage ?? 2.5,
+          allowed_clerks ?? 'CLK,V,P,B',
           code
         ]
       );
@@ -86,6 +90,21 @@ const SettingsModel = {
       ...result.rows[0],
       clerk_initials: code
     };
+  },
+
+  // Update section setting globally on the master CLK row
+  async updateSection(section) {
+    const sectionVal = String(section || "L").toUpperCase().slice(0, 10);
+    const result = await pool.query(
+      `UPDATE settings 
+       SET section = $1
+       WHERE clerk_initials = 'CLK' 
+       RETURNING *`,
+      [sectionVal]
+    );
+
+    // Sync to other clerks if they exist, but since everything reads from CLK, this is sufficient.
+    return result.rows[0];
   },
 
   // Ensure settings exist for a clerk (auto-provisioning)
@@ -109,6 +128,8 @@ const SettingsModel = {
       gstin: "",
       sgst_percentage: 2.5,
       cgst_percentage: 2.5,
+      allowed_clerks: 'CLK,V,P,B',
+      section: 'L',
     };
 
     const template = await pool.query(
@@ -121,8 +142,8 @@ const SettingsModel = {
 
     // 3. Insert new row for this clerk
     const result = await pool.query(
-      `INSERT INTO settings (hotel_name, address, phone, gstin, sgst_percentage, cgst_percentage, clerk_initials, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      `INSERT INTO settings (hotel_name, address, phone, gstin, sgst_percentage, cgst_percentage, allowed_clerks, section, clerk_initials, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
        ON CONFLICT (clerk_initials) DO UPDATE SET hotel_name = EXCLUDED.hotel_name 
        RETURNING *`,
       [
@@ -132,6 +153,8 @@ const SettingsModel = {
         defaults.gstin,
         defaults.sgst_percentage,
         defaults.cgst_percentage,
+        defaults.allowed_clerks || 'CLK,V,P,B',
+        defaults.section || 'L',
         code,
       ],
     );

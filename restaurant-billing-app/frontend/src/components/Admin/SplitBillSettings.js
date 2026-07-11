@@ -13,11 +13,14 @@ const API = process.env.REACT_APP_API_URL;
 
 // ── Toggle Switch ────────────────────────────────────────────────────────────
 function Toggle({ checked, onChange }) {
+  const [focused, setFocused] = useState(false);
   return (
     <button
       role="switch"
       aria-checked={checked}
       onClick={onChange}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       style={{
         position: "relative",
         display: "inline-flex",
@@ -27,10 +30,11 @@ function Toggle({ checked, onChange }) {
         borderRadius: "9999px",
         border: "none",
         cursor: "pointer",
-        transition: "background 0.2s",
+        transition: "background 0.2s, box-shadow 0.2s",
         background: checked ? "#6366f1" : "#d1d5db",
         flexShrink: 0,
         outline: "none",
+        boxShadow: focused ? "0 0 0 3px rgba(99, 102, 241, 0.6)" : "none",
       }}
     >
       <span
@@ -107,6 +111,8 @@ export default function SplitBillSettings() {
   const [saving, setSaving] = useState({}); // { [itemId]: true }
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [focusedPill, setFocusedPill] = useState(null);
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -180,7 +186,7 @@ export default function SplitBillSettings() {
     );
   }
 
-  const pillStyle = (active) => ({
+  const pillStyle = (active, focused) => ({
     padding: "0.3rem 0.85rem",
     borderRadius: "9999px",
     fontSize: "0.8rem",
@@ -191,6 +197,8 @@ export default function SplitBillSettings() {
     background: active ? "#6366f1" : "transparent",
     borderColor: active ? "#6366f1" : "#d1d5db",
     color: active ? "white" : "#374151",
+    outline: "none",
+    boxShadow: focused ? "0 0 0 3px rgba(99, 102, 241, 0.4)" : "none",
   });
 
   return (
@@ -253,22 +261,32 @@ export default function SplitBillSettings() {
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
                   placeholder="🔍 Search name / code…"
                   style={{
                     width: "100%",
                     padding: "0.4rem 0.75rem",
                     borderRadius: "0.375rem",
-                    border: "1px solid #d1d5db",
+                    border: searchFocused ? "1.5px solid #6366f1" : "1px solid #d1d5db",
+                    boxShadow: searchFocused ? "0 0 0 3px rgba(99, 102, 241, 0.2)" : "none",
                     fontSize: "0.85rem",
                     outline: "none",
                     boxSizing: "border-box",
+                    transition: "border-color 0.15s, box-shadow 0.15s",
                   }}
                 />
               </div>
               {/* Filter pills */}
               <div style={{ display: "flex", gap: "0.4rem" }}>
                 {[["all", "All"], ["separate", "Separate"], ["regular", "Regular"]].map(([val, lbl]) => (
-                  <button key={val} style={pillStyle(filterMode === val)} onClick={() => setFilterMode(val)}>
+                  <button
+                    key={val}
+                    style={pillStyle(filterMode === val, focusedPill === val)}
+                    onClick={() => setFilterMode(val)}
+                    onFocus={() => setFocusedPill(val)}
+                    onBlur={() => setFocusedPill(null)}
+                  >
                     {lbl}
                   </button>
                 ))}

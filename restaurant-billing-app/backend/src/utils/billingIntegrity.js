@@ -162,11 +162,11 @@ async function verifyBillIntegrity({ orders, clerkInitials, submittedTotals }) {
   const TOLERANCE = 0.02; // Allow up to 2 cents rounding drift between frontend & backend
 
   const matches =
-    Math.abs(submitted.subtotal - computed.subtotal) <= TOLERANCE &&
-    Math.abs(submitted.sgst     - computed.sgst)     <= TOLERANCE &&
-    Math.abs(submitted.cgst     - computed.cgst)     <= TOLERANCE &&
-    Math.abs(submitted.tax_amount - computed.tax_amount) <= TOLERANCE &&
-    Math.abs(submitted.grand_total - computed.grand_total) <= TOLERANCE;
+    roundMoney(Math.abs(submitted.subtotal - computed.subtotal)) <= TOLERANCE &&
+    roundMoney(Math.abs(submitted.sgst     - computed.sgst))     <= TOLERANCE &&
+    roundMoney(Math.abs(submitted.cgst     - computed.cgst))     <= TOLERANCE &&
+    roundMoney(Math.abs(submitted.tax_amount - computed.tax_amount)) <= TOLERANCE &&
+    roundMoney(Math.abs(submitted.grand_total - computed.grand_total)) <= TOLERANCE;
 
   if (!matches) {
     return {

@@ -54,12 +54,48 @@ Write-Host "Copying in new binaries..." -ForegroundColor Cyan
 Copy-Item $newBackendExe  ".\backend\rbs-backend.exe" -Force
 Copy-Item $newFrontendExe ".\frontend\rbs-frontend.exe" -Force
 
-# If the new package ships a schema migration, it'll be here - apply manually
-# if present, this script does not run SQL automatically.
-if (Test-Path (Join-Path $NewPackagePath "backend\Final_Dump_Fixed.sql")) {
-  Write-Host "Note: a Final_Dump_Fixed.sql is present in the new package. If this" -ForegroundColor Yellow
-  Write-Host "release includes DB schema changes, apply the relevant migration" -ForegroundColor Yellow
-  Write-Host "manually - this script does not touch your database." -ForegroundColor Yellow
+# Run automated database migrations using existing backend\.env credentials
+$envPath = ".\backend\.env"
+if (Test-Path $envPath) {
+  Write-Host "Extracting database credentials to apply migrations..." -ForegroundColor Cyan
+  $envContent = Get-Content $envPath
+  $dbUser = "postgres"
+  $dbPassword = ""
+  $dbHost = "localhost"
+  $dbPort = "5432"
+  $dbName = "restaurant_billing_db"
+
+  foreach ($line in $envContent) {
+      if ($line -match "^([^=]+)=(.*)$") {
+          $key = $Matches[1].Trim()
+          $val = $Matches[2].Trim()
+          switch ($key) {
+              "DB_USER" { $dbUser = $val }
+              "DB_PASSWORD" { $dbPassword = $val }
+              "DB_HOST" { $dbHost = $val }
+              "DB_PORT" { $dbPort = $val }
+              "DB_NAME" { $dbName = $val }
+          }
+      }
+  }
+
+  $env:PGPASSWORD = $dbPassword
+  Write-Host "Running database schema migrations against database '$dbName'..." -ForegroundColor Cyan
+  
+  $migrationSql = "ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS allowed_clerks TEXT DEFAULT 'CLK,V,P,B'; ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS section VARCHAR(10) DEFAULT 'L'; ALTER TABLE public.sessions DROP CONSTRAINT IF EXISTS sessions_shift_name_session_date_clerk_initials_key;"
+  
+  # Check if psql command exists
+  $onPath = Get-Command psql -ErrorAction SilentlyContinue
+  if ($onPath) {
+      psql -U $dbUser -h $dbHost -p $dbPort -d $dbName -c $migrationSql
+      if ($LASTEXITCODE -eq 0) {
+          Write-Host "Database migrations successfully applied!" -ForegroundColor Green
+      } else {
+          Write-Warning "Failed to execute database migrations automatically. Please run them manually."
+      }
+  } else {
+      Write-Warning "psql command utility was not found in PATH. Skipping automated migrations."
+  }
 }
 
 Write-Host "Restarting services..." -ForegroundColor Cyan

@@ -48,7 +48,8 @@ New-Item -ItemType Directory -Path "$OutputDir\backend" -Force | Out-Null
 New-Item -ItemType Directory -Path "$OutputDir\frontend" -Force | Out-Null
 
 Copy-Item "$root\backend\dist\rbs-backend.exe" "$OutputDir\backend\"
-Copy-Item "$root\backend\.env.example" "$OutputDir\backend\.env"
+Copy-Item "$root\backend\.env" "$OutputDir\backend\.env"
+(Get-Content "$OutputDir\backend\.env") -replace 'DB_USER=.*', 'DB_USER=postgres' | Set-Content "$OutputDir\backend\.env"
 
 Copy-Item "$fsDir\dist\rbs-frontend.exe" "$OutputDir\frontend\"
 Copy-Item "$root\frontend\.env.example" "$OutputDir\frontend\.env" -ErrorAction SilentlyContinue

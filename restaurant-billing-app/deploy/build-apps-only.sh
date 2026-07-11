@@ -39,7 +39,8 @@ mkdir -p "$OUTPUT_DIR/frontend"
 
 # Backend
 cp "$BACKEND_DIR/dist/rbs-backend.exe" "$OUTPUT_DIR/backend/"
-cp "$BACKEND_DIR/.env.example" "$OUTPUT_DIR/backend/.env"
+cp "$BACKEND_DIR/.env" "$OUTPUT_DIR/backend/.env"
+sed -i '' 's/DB_USER=.*/DB_USER=postgres/g' "$OUTPUT_DIR/backend/.env"
 
 # Frontend
 cp "$FS_DIR/dist/rbs-frontend.exe" "$OUTPUT_DIR/frontend/"

@@ -68,11 +68,11 @@ async function resolvePrinter() {
         $name = $matched.Name;
         $offline = $matched.WorkOffline;
         if ($offline -eq $true -or $offline -eq 1 -or $offline -eq "True") {
-          Write-Output "OFFLINE:$name";
-          exit 2;
+           Write-Output "OFFLINE:$name";
+           exit 2;
         } else {
-          Write-Output "ONLINE:$name";
-          exit 0;
+           Write-Output "ONLINE:$name";
+           exit 0;
         }
       `;
       execFile("powershell.exe", ["-Command", psCommand], { timeout: 5000 }, (error, stdout) => {
@@ -241,6 +241,11 @@ router.post("/print", async (req, res) => {
   }
   if (typeof text !== "string" || text.length > MAX_PRINT_SIZE) {
     return res.status(413).json({ error: "Print content exceeds maximum size limit" });
+  }
+
+  if (DISABLE_PRINTER_CHECK) {
+    console.log("[Printer] Bypass physical printing (DISABLE_PRINTER_CHECK=true)");
+    return res.json({ message: "Print job bypassed successfully (DISABLE_PRINTER_CHECK=true)" });
   }
 
   try {

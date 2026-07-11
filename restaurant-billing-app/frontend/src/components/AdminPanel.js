@@ -207,15 +207,156 @@ function EnhancedReconciliation({ sessionId, mode }) {
   );
 }
 
+// ================== HOURLY SALES DASHBOARD ==================
+
+function HourlySalesDashboard({ billingDate }) {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState({ totalSales: 0, totalBills: 0, avgBill: 0 });
+
+  const loadData = useCallback(async () => {
+    if (!billingDate) return;
+    setLoading(true);
+    try {
+      const res = await api.get(`/reports/time-wise?bill_date=${billingDate}`);
+      const report = safeArray(res.data?.report);
+      // Sort report chronologically by time slot
+      report.sort((a, b) => a.time_slot.localeCompare(b.time_slot));
+      setData(report);
+
+      // Calculate summary stats
+      let totalSales = 0;
+      let totalBills = 0;
+      report.forEach(item => {
+        totalSales += parseFloat(item.total_amount || 0);
+        totalBills += parseInt(item.bill_count || 0);
+      });
+      const avgBill = totalBills > 0 ? (totalSales / totalBills) : 0;
+      setSummary({ totalSales, totalBills, avgBill });
+    } catch (e) {
+      console.error("Failed to load time-wise report:", e);
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [billingDate]);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 300000); // 5 min refresh
+    return () => clearInterval(interval);
+  }, [loadData]);
+
+  // SVG Chart rendering helpers
+  const svgWidth = 500;
+  const svgHeight = 160;
+  const padding = 30;
+  const chartWidth = svgWidth - 2 * padding;
+  const chartHeight = svgHeight - 2 * padding;
+
+  const maxVal = data.length > 0 ? Math.max(...data.map(d => parseFloat(d.total_amount || 0))) * 1.15 || 100 : 100;
+
+  const points = data.map((d, index) => {
+    const x = padding + (index / Math.max(1, data.length - 1)) * chartWidth;
+    const y = svgHeight - padding - (parseFloat(d.total_amount || 0) / maxVal) * chartHeight;
+    return { x, y, data: d };
+  });
+
+  const pathD = points.reduce((acc, p, i) => {
+    return acc + `${i === 0 ? "M" : "L"} ${p.x} ${p.y} `;
+  }, "");
+
+  const areaD = points.length > 0
+    ? `${pathD} L ${points[points.length - 1].x} ${svgHeight - padding} L ${points[0].x} ${svgHeight - padding} Z`
+    : "";
+
+  return (
+    <Card className="border border-zinc-800 bg-zinc-950 text-white rounded-xl shadow-lg">
+      <CardHeader className="border-b border-zinc-900 pb-4 flex flex-row items-center justify-between">
+        <CardTitle className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+          <span>📊 Sales Trend (Hourly)</span>
+        </CardTitle>
+        <span className="text-xs text-zinc-400">Date: {billingDate}</span>
+      </CardHeader>
+      <CardContent className="p-6 space-y-6">
+        {/* Metric Cards Row */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="p-3 bg-zinc-905 bg-zinc-900/40 border border-zinc-850 rounded-lg">
+            <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Total Sales</div>
+            <div className="text-xl font-extrabold text-emerald-400 mt-1">₹{summary.totalSales.toFixed(2)}</div>
+          </div>
+          <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-lg">
+            <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Total Bills</div>
+            <div className="text-xl font-extrabold text-indigo-400 mt-1">{summary.totalBills}</div>
+          </div>
+          <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-lg">
+            <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Avg. Bill Value</div>
+            <div className="text-xl font-extrabold text-amber-400 mt-1">₹{summary.avgBill.toFixed(2)}</div>
+          </div>
+        </div>
+
+        {/* SVG Graph */}
+        <div className="relative border border-zinc-900 bg-zinc-950 rounded-lg p-2 flex justify-center">
+          {loading && data.length === 0 ? (
+            <div className="h-40 flex items-center justify-center">
+              <Loader2 className="animate-spin text-zinc-500" />
+            </div>
+          ) : data.length === 0 ? (
+            <div className="h-40 flex items-center justify-center text-sm text-zinc-500">
+              No sales data captured yet for today
+            </div>
+          ) : (
+            <svg width="100%" height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="overflow-visible">
+              <defs>
+                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+
+              {/* Grid Lines */}
+              <line x1={padding} y1={padding} x2={svgWidth - padding} y2={padding} stroke="#1f2937" strokeDasharray="3 3" />
+              <line x1={padding} y1={padding + chartHeight/2} x2={svgWidth - padding} y2={padding + chartHeight/2} stroke="#1f2937" strokeDasharray="3 3" />
+              <line x1={padding} y1={svgHeight - padding} x2={svgWidth - padding} y2={svgHeight - padding} stroke="#374151" />
+
+              {/* Y Axis Labels */}
+              <text x={padding - 5} y={padding + 4} fill="#6b7280" fontSize="8" textAnchor="end">₹{maxVal.toFixed(0)}</text>
+              <text x={padding - 5} y={padding + chartHeight/2 + 4} fill="#6b7280" fontSize="8" textAnchor="end">₹{(maxVal/2).toFixed(0)}</text>
+              <text x={padding - 5} y={svgHeight - padding + 4} fill="#6b7280" fontSize="8" textAnchor="end">₹0</text>
+
+              {/* Area path */}
+              {areaD && <path d={areaD} fill="url(#chartGrad)" />}
+
+              {/* Line path */}
+              {pathD && <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />}
+
+              {/* Data points */}
+              {points.map((p, i) => (
+                <g key={i} className="group cursor-pointer">
+                  <circle cx={p.x} cy={p.y} r="4" fill="#818cf8" stroke="#1e1b4b" strokeWidth="1.5" className="transition hover:scale-150" />
+                  <title>{`${p.data.time_slot} - ₹${parseFloat(p.data.total_amount).toFixed(2)} (${p.data.bill_count} bills)`}</title>
+                  
+                  {/* X Axis labels */}
+                  { (i === 0 || i === points.length - 1 || i % Math.max(2, Math.floor(points.length / 4)) === 0) && (
+                    <text x={p.x} y={svgHeight - 12} fill="#6b7280" fontSize="8" textAnchor="middle">{p.data.time_slot}</text>
+                  )}
+                </g>
+              ))}
+            </svg>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ================== TOP ITEMS DASHBOARD ==================
 
-function TopItemsDashboard({ sessionId }) {
+function TopItemsDashboard({ sessionId, billingDate }) {
   const [topItems, setTopItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const loadTopItems = useCallback(async () => {
-    if (!sessionId) return;
-
     setLoading(true);
     try {
       const res = await api.get(`/dashboard/top-items`);
@@ -227,7 +368,7 @@ function TopItemsDashboard({ sessionId }) {
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, []);
 
   useEffect(() => {
     loadTopItems();
@@ -235,35 +376,45 @@ function TopItemsDashboard({ sessionId }) {
     return () => clearInterval(interval);
   }, [loadTopItems]);
 
+  const maxQty = topItems.length > 0 ? Math.max(...topItems.map(item => parseInt(item.total_quantity || 0))) : 1;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Top 5 Best-Selling Items Today</CardTitle>
+    <Card className="border border-zinc-800 bg-zinc-950 text-white rounded-xl shadow-lg">
+      <CardHeader className="border-b border-zinc-900 pb-4">
+        <CardTitle className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+          <span>🔥 Top Best-Sellers (Today)</span>
+        </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         {loading ? (
           <div className="text-center py-8">
-            <Loader2 size={24} className="mb-2" />
-            <p>Loading top items...</p>
+            <Loader2 size={24} className="mb-2 animate-spin text-zinc-500 mx-auto" />
+            <p className="text-zinc-500 text-sm">Loading items...</p>
           </div>
         ) : topItems.length > 0 ? (
-          <div className="space-y-3">
-            {topItems.map((item, index) => (
-              <div
-                key={index}
-                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-              >
-                <div>
-                  <h4 className="font-medium">{item.item_name}</h4>
+          <div className="space-y-4">
+            {topItems.map((item, index) => {
+              const qty = parseInt(item.total_quantity || 0);
+              const percentage = (qty / maxQty) * 100;
+              return (
+                <div key={index} className="space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-semibold text-zinc-200">{index + 1}. {item.item_name}</span>
+                    <span className="font-bold text-zinc-400">{qty} items</span>
+                  </div>
+                  {/* Custom Progress Bar */}
+                  <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800/60">
+                    <div 
+                      className="h-full bg-gradient-to-r from-indigo-600 to-violet-500 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold">{item.total_quantity} sold</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-zinc-500 text-sm">
             No sales data available for today
           </div>
         )}
@@ -271,6 +422,7 @@ function TopItemsDashboard({ sessionId }) {
     </Card>
   );
 }
+
 
 // ================== SETTINGS EDITOR ==================
 
@@ -398,7 +550,7 @@ function SettingsEditor({ settings, onChange, clerk }) {
 
 // ================== ENHANCED ADMIN PANEL ==================
 
-export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget }) {
+export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billingDate }) {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState("dashboard");
@@ -475,9 +627,16 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget }) {
         {mode === "admin-full" && (
           <TabsContent value="dashboard">
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <TopItemsDashboard sessionId={sessionId} />
-                <ClerkStatsDashboard sessionId={sessionId} />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <HourlySalesDashboard billingDate={billingDate} />
+                </div>
+                <div className="lg:col-span-1">
+                  <TopItemsDashboard sessionId={sessionId} billingDate={billingDate} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-6">
+                <ClerkStatsDashboard sessionId={sessionId} billingDate={billingDate} />
               </div>
             </div>
           </TabsContent>
@@ -574,7 +733,7 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget }) {
   );
 }
 
-function ClerkStatsDashboard({ sessionId }) {
+function ClerkStatsDashboard({ sessionId, billingDate }) {
   const [stats, setStats] = useState({ sales: [], history: [] });
   const [loading, setLoading] = useState(false);
 
@@ -593,74 +752,108 @@ function ClerkStatsDashboard({ sessionId }) {
 
   useEffect(() => {
     loadStats();
-    // Refresh every 5 minutes
     const interval = setInterval(loadStats, 300000);
     return () => clearInterval(interval);
   }, [loadStats]);
 
   const { sales = [], history = [] } = stats;
 
+  const totalClerkSales = sales.reduce((acc, s) => acc + parseFloat(s.total_sales || 0), 0);
+  const maxClerkSales = sales.length > 0 ? Math.max(...sales.map(s => parseFloat(s.total_sales || 0))) : 1;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Clerk Performance (Today)</CardTitle>
+    <Card className="border border-zinc-800 bg-zinc-950 text-white rounded-xl shadow-lg">
+      <CardHeader className="border-b border-zinc-900 pb-4">
+        <CardTitle className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+          <span>👥 Clerks & Active Sessions</span>
+        </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         {loading && !sales.length && !history.length ? (
           <div className="text-center py-8">
-            <Loader2 size={24} className="mb-2" />
-            <p>Loading stats...</p>
+            <Loader2 size={24} className="mb-2 animate-spin text-zinc-500 mx-auto" />
+            <p className="text-zinc-500 text-sm">Loading stats...</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            <div>
-              <h4 className="text-sm font-semibold text-gray-500 mb-2 border-b pb-1">
-                Top Sales by Clerk
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Sales contribution */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-bold text-zinc-450 text-zinc-400 uppercase tracking-widest border-b border-zinc-900 pb-2">
+                Clerk Contribution (Sales)
               </h4>
               {sales.length > 0 ? (
-                <div className="space-y-2">
-                  {sales.map((s, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span>
-                        {s.clerk_initials} ({s.track})
-                      </span>
-                      <span className="font-bold">
-                        ₹{parseFloat(s.total_sales).toFixed(2)} ({s.bill_count}{" "}
-                        bills)
-                      </span>
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  {sales.map((s, i) => {
+                    const salesVal = parseFloat(s.total_sales || 0);
+                    const pctOfMax = (salesVal / maxClerkSales) * 100;
+                    const pctOfTotal = totalClerkSales > 0 ? (salesVal / totalClerkSales) * 100 : 0;
+                    const displayTrack = s.track === "`" ? "I (`)" : s.track === "``" ? "II (``)" : s.track;
+
+                    return (
+                      <div key={i} className="space-y-1">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="font-semibold text-zinc-300">
+                            {s.clerk_initials} <span className="text-xs text-zinc-500">({displayTrack})</span>
+                          </span>
+                          <span className="font-bold text-emerald-400">
+                            ₹{salesVal.toFixed(2)}{" "}
+                            <span className="text-xs text-zinc-500 font-normal">({s.bill_count} bills, {pctOfTotal.toFixed(0)}%)</span>
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out"
+                            style={{ width: `${pctOfMax}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="text-sm text-gray-400">No sales yet today.</div>
+                <div className="text-sm text-zinc-500 py-4">No sales recorded yet today.</div>
               )}
             </div>
 
-            <div>
-              <h4 className="text-sm font-semibold text-gray-500 mb-2 border-b pb-1">
-                Login History
+            {/* Login history timeline */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-900 pb-2">
+                Session Activity Log
               </h4>
               {history.length > 0 ? (
-                <div className="max-h-40 overflow-y-auto space-y-2">
-                  {history.map((h, i) => (
-                    <div key={i} className="text-xs flex justify-between">
-                      <span>
-                        <span className="font-bold">{h.clerk_initials}</span> @{" "}
-                        {h.shift_name}
-                      </span>
-                      <span className="text-gray-500">
-                        {new Date(h.login_time).toLocaleTimeString()} -{" "}
-                        {h.logout_time
-                          ? new Date(h.logout_time).toLocaleTimeString()
-                          : "Active"}
-                      </span>
-                    </div>
-                  ))}
+                <div className="max-h-60 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                  {history.map((h, i) => {
+                    const isSessionActive = !h.logout_time;
+                    const displayTrack = h.shift_name === "`" ? "I (`)" : h.shift_name === "``" ? "II (``)" : h.shift_name;
+                    return (
+                      <div key={i} className="flex gap-3 text-xs">
+                        {/* Timeline Node */}
+                        <div className="flex flex-col items-center">
+                          <div className={`w-2.5 h-2.5 rounded-full ${isSessionActive ? "bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse" : "bg-zinc-700"}`} />
+                          {i < history.length - 1 && <div className="w-0.5 flex-1 bg-zinc-900 my-1" />}
+                        </div>
+                        <div className="flex-1 pb-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-zinc-200">
+                              Clerk <span className="text-indigo-400 font-bold">{h.clerk_initials}</span> @ {displayTrack}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isSessionActive ? "bg-emerald-950 text-emerald-400" : "bg-zinc-900 text-zinc-500"}`}>
+                              {isSessionActive ? "Active" : "Finished"}
+                            </span>
+                          </div>
+                          <p className="text-zinc-500 mt-0.5">
+                            {new Date(h.login_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{" "}
+                            {h.logout_time
+                              ? new Date(h.logout_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : "Now"}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="text-sm text-gray-400">
-                  No login history today.
-                </div>
+                <div className="text-sm text-zinc-500 py-4">No session logins recorded yet today.</div>
               )}
             </div>
           </div>

@@ -82,6 +82,7 @@ app.use("/api/reconciliation", requireAdminAny, reconciliationRoutes);
 app.get("/api/settings/clerks", requireAdminAny, reportController.getClerks);
 app.get("/api/settings", requireAuth, reportController.getSettings);
 app.put("/api/settings", requireAdminAny, reportController.updateSettings);
+app.put("/api/settings/section", requireAuth, reportController.updateSection);
 
 app.get("/api/auth/shift-status", async (req, res) => {
   try {
@@ -96,7 +97,6 @@ app.get("/api/auth/shift-status", async (req, res) => {
   }
 });
 
-// ================ AUTH ROUTES (UPDATED) ================
 // POST /api/auth/login - Updated for shift_sessions table
 app.post("/api/auth/login", async (req, res) => {
   try {
@@ -119,6 +119,12 @@ app.post("/api/auth/login", async (req, res) => {
       if (!mode) {
         return res.status(401).json({
           detail: "Invalid admin password",
+        });
+      }
+    } else {
+      if (upperStaffCode.length > 3) {
+        return res.status(400).json({
+          detail: "Clerk initials must be at most 3 characters",
         });
       }
     }
@@ -201,8 +207,12 @@ app.post("/api/auth/login", async (req, res) => {
       }
     }
 
-    // Ensure settings exist for this clerk (Auto-provisioning)
-    await SettingsModel.ensureSettings(upperStaffCode);
+    // Ensure settings exist for the master row 'CLK' and admin 'SRIHARI'
+    if (upperStaffCode === "SRIHARI") {
+      await SettingsModel.ensureSettings("SRIHARI");
+    } else {
+      await SettingsModel.ensureSettings("CLK");
+    }
     const authToken = createSession({
       staff_code: upperStaffCode,
       mode,
