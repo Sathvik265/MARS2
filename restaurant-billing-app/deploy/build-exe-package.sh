@@ -39,7 +39,7 @@ mkdir -p "$OUTPUT_DIR/frontend"
 
 cp "$BACKEND_DIR/dist/rbs-backend.exe" "$OUTPUT_DIR/backend/"
 cp "$BACKEND_DIR/.env.example" "$OUTPUT_DIR/backend/.env"
-cp "$ROOT/../Final_Dump_Fixed.sql" "$OUTPUT_DIR/backend/" || true
+cp "$ROOT/Final_Dump_Fixed.sql" "$OUTPUT_DIR/backend/" || cp "$ROOT/../Final_Dump_Fixed.sql" "$OUTPUT_DIR/backend/" || true
 
 cp "$FS_DIR/dist/rbs-frontend.exe" "$OUTPUT_DIR/frontend/"
 

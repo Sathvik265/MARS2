@@ -31,7 +31,6 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [isShiftClosed, setIsShiftClosed] = useState(false);
-  const [isTrackLocked, setIsTrackLocked] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
   const [password, setPassword] = useState("");
   const passwordInputRef = useRef(null);
@@ -65,13 +64,11 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
   useEffect(() => {
     if (!track || sessions.length === 0) {
       setIsShiftClosed(false);
-      setIsTrackLocked(false);
       return;
     }
     const validTracks = ["`", "``", "RBS", "RBS1"];
     if (!validTracks.includes(track)) {
       setIsShiftClosed(false);
-      setIsTrackLocked(false);
       return;
     }
 
@@ -82,7 +79,6 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
     if (matchingSessions.length === 0) {
       // No session exists for this shift yet — allow login (backend will create one)
       setIsShiftClosed(false);
-      setIsTrackLocked(false);
       return;
     }
 
@@ -97,25 +93,6 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
     setIsShiftClosed(hasClosed && !hasOpen);
   }, [track, date, sessions]);
 
-  // Separately check is_locked from the track status endpoint (requires auth but
-  // falls back gracefully). We re-check whenever track changes.
-  useEffect(() => {
-    if (!track) {
-      setIsTrackLocked(false);
-      return;
-    }
-    const validTracks = ["`", "``", "RBS", "RBS1"];
-    if (!validTracks.includes(track)) {
-      setIsTrackLocked(false);
-      return;
-    }
-
-    // is_locked is now returned by /api/auth/shift-status (no auth required)
-    // so we can read it directly from the sessions state.
-    const found = sessions.find((s) => s.shift_name === track);
-    setIsTrackLocked(found ? !!found.is_locked : false);
-  }, [track, sessions]);
-
   useEffect(() => {
     if (credentialInputRef.current && !showPwd) {
       credentialInputRef.current.focus();
@@ -127,9 +104,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
   const handleKeyDown = (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      if (!isShiftClosed && !isTrackLocked) {
-        submit();
-      }
+      submit();
     } else if (event.key === "Escape" && showPwd) {
       setShowPwd(false);
       setPassword("");
@@ -149,18 +124,16 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
       return;
     }
 
-    if (isShiftClosed) {
+    // Only block if shift is closed AND the user is not the admin SRIHARI
+    if (isShiftClosed && credential.toUpperCase() !== "SRIHARI") {
       toast.error(
-        "This shift is closed and cannot be accessed. An admin must re-open it from Shift Management first.",
+        "This shift is closed and cannot be accessed. Please log in as admin SRIHARI to re-open it from Shift Management."
       );
       return;
     }
 
-    // Block clerks from locked tracks (admin bypass is allowed)
-    if (isTrackLocked && credential.toUpperCase() !== "SRIHARI") {
-      toast.error(
-        "Track Logged out",
-      );
+    if (credential.toUpperCase() !== "SRIHARI" && credential.length > 3) {
+      toast.error("Clerk initials must be at most 3 characters.");
       return;
     }
 
@@ -217,13 +190,11 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
           <CardTitle className="text-center">Staff Access</CardTitle>
         </CardHeader>
         <CardContent>
-          <form 
-            className="space-y-4" 
+          <form
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!isShiftClosed && !isTrackLocked) {
-                submit();
-              }
+              submit();
             }}
           >
             {!showPwd ? (
@@ -324,7 +295,6 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isShiftClosed || (isTrackLocked && credential.toUpperCase() !== "SRIHARI")}
               >
                 {showPwd ? "Verify" : "Login"}
               </Button>
@@ -341,10 +311,10 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
                 </Button>
               )}
             </div>
-            <div className="text-xs text-gray-600 text-center">
+            {/* <div className="text-xs text-gray-600 text-center">
               Hint: Use clerk initials for clerks or 'SRIHARI' for admin. Track:
               '`', '``', 'RBS', 'RBS1'
-            </div>
+            </div> */}
           </form>
         </CardContent>
       </Card>

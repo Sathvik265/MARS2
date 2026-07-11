@@ -490,6 +490,21 @@ exports.updateSettings = async (req, res) => {
   }
 };
 
+// PUT /api/settings/section
+exports.updateSection = async (req, res) => {
+  try {
+    const { section } = req.body;
+    if (!section) {
+      return res.status(400).json({ detail: "Section is required" });
+    }
+    const settings = await SettingsModel.updateSection(section);
+    res.json(settings);
+  } catch (err) {
+    console.error("Update section error:", err);
+    res.status(500).json({ detail: "Failed to update section" });
+  }
+};
+
 const BillingModel = require("../models/billingModel");
 
 // GET /api/dashboard/top-items

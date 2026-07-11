@@ -68,20 +68,25 @@ function App() {
   const [printerConnected, setPrinterConnected] = useState(true); // optimistic start
   const [printerError, setPrinterError] = useState("");
   const printerCheckRef = useRef(null);
+  const isCheckingRef = useRef(false);
 
   const checkPrinter = useCallback(async () => {
+    if (isCheckingRef.current) return;
+    isCheckingRef.current = true;
     try {
       const status = await getPrinterStatus();
+      console.log(`[Printer Status Monitor] API returned status:`, status);
       setPrinterConnected(!!status.connected);
       if (!status.connected) {
         setPrinterError(status.reason || "Printer offline or not found");
       } else {
         setPrinterError("");
       }
-    } catch {
-      // If the API itself fails (backend down), don't block the app
-      setPrinterConnected(true);
-      setPrinterError("");
+    } catch (err) {
+      console.warn(`[Printer Status Monitor] API status check failed:`, err);
+      // Keep previous printerConnected state on transient network failures rather than forcing 'true'
+    } finally {
+      isCheckingRef.current = false;
     }
   }, []);
 
@@ -416,13 +421,19 @@ function App() {
   return (
     <div className={`min-h-screen bg-black text-white p-4 flex flex-col ${activeTab === "billing" ? "billing-tab-active" : ""}`}>
       <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-white tracking-tight">
-            New Udipi Anand Bhavan
-          </h1>
+        <div className={`text-center ${activeTab === "billing" ? "mb-2" : "mb-6"}`}>
+          {activeTab === "billing" ? (
+            <h1 className="text-lg font-bold text-zinc-500 tracking-tight">
+              New Udipi Anand Bhavan
+            </h1>
+          ) : (
+            <h1 className="text-3xl font-bold text-white tracking-tight">
+              New Udipi Anand Bhavan
+            </h1>
+          )}
           {mode !== "none" && billingDate && (
-            <div className="mt-2 text-sm text-gray-300">
-              Mode: {mode} | Date: {billingDate} | Track: {track || "Default"}
+            <div className={`${activeTab === "billing" ? "mt-1" : "mt-2"} text-sm text-gray-300`}>
+              Date: {billingDate} | {track === "`" ? "I (`)" : track === "``" ? "II (``)" : (track || "Default")}
               <span className="ml-4 inline-flex gap-2">
                 <Button
                   variant="outline"
@@ -554,6 +565,7 @@ function App() {
                       mode={mode}
                       sessionId={sessionId}
                       jumpTarget={adminJumpTarget}
+                      billingDate={billingDate}
                     />
                   </TabsContent>
                 )}

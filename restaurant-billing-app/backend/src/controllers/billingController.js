@@ -90,10 +90,22 @@ const billingController = {
 
       let { table_no, party_no, track, clerk_initials, items } = billData;
 
-      // 1. Find or Create Provisional Bill first
+      // 1. Find or Create Provisional Bill first for the specific business date
+      const queryDate = billData.bill_date || new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date());
+
       const provisionalRes = await pool.query(
-        `SELECT * FROM bills WHERE table_no = $1 AND party_no = $2 AND bill_number = 0 ORDER BY created_at DESC LIMIT 1`,
-        [parseInt(table_no), party_no],
+        `SELECT * FROM bills 
+         WHERE table_no = $1 
+           AND party_no = $2 
+           AND bill_number = 0 
+           AND bill_date = $3
+         ORDER BY created_at DESC LIMIT 1`,
+        [parseInt(table_no), party_no, queryDate],
       );
       let provisionalBill = provisionalRes.rows[0];
 
@@ -112,13 +124,7 @@ const billingController = {
       if (!provisionalBill) {
         const now = new Date();
         const provisionalBillData = {
-          bill_date:
-            billData.bill_date || new Intl.DateTimeFormat('en-CA', {
-              timeZone: 'Asia/Kolkata',
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit'
-            }).format(new Date()),
+          bill_date: queryDate,
           table_no: parseInt(table_no),
           party_no: party_no,
           section: billData.section || "G",
@@ -581,8 +587,20 @@ const billingController = {
       let targetClerk = (req.auth && req.auth.staff_code) ? req.auth.staff_code : order.clerk_initials;
       let targetCreatedAt;
 
-      // 2. Check if the target table already has active pending orders
-      const targetOrders = await OrderModel.getPendingOrdersByTableAndParty(targetTableNo, targetPartyNo);
+      // 2. Check if the target table already has active pending orders for the same business date
+      const getFormattedDateStr = (dateInput) => {
+        if (!dateInput) return "";
+        const d = new Date(dateInput);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      };
+
+      const orderDateStr = getFormattedDateStr(order.bill_date);
+
+      const allTargetOrders = await OrderModel.getPendingOrdersByTableAndParty(targetTableNo, targetPartyNo);
+      const targetOrders = allTargetOrders.filter(o => getFormattedDateStr(o.bill_date) === orderDateStr);
 
       if (targetOrders && targetOrders.length > 0) {
         // Target table is already occupied; inherit its active credentials to merge properly under the same provisional bill

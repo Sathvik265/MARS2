@@ -53,8 +53,12 @@ const BillContent = ({ data, settings, isLast = true }) => {
     return "";
   };
   const trackLetter = getTrackLetter(trackVal);
+  const section = safeGet(mergedData, "section", "L");
+  const sectionChar = (section === "P" || section.toUpperCase() === "PARCEL") ? "P" : "L";
+  const hotelNameWithSection = `${hotelName} ${sectionChar}`;
+
   const titleSuffix = safeGet(data, "titleSuffix", "");
-  const hotelHeading = trackLetter ? `${hotelName} ${trackLetter}` : hotelName;
+  const hotelHeading = trackLetter ? `${hotelNameWithSection} ${trackLetter}` : hotelNameWithSection;
   const displayHotelName = titleSuffix ? `${hotelHeading} ${titleSuffix}` : hotelHeading;
 
   const createdAt = safeGet(data, "created_at", null);

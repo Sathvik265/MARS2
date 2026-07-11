@@ -5,18 +5,14 @@ import React, {
   useState,
   useCallback,
 } from "react";
-import axios from "axios";
 import api from "../services/api";
 
 import {
   Card,
-  CardHeader,
-  CardTitle,
   CardContent,
   Input,
   Button,
   Label,
-  Loader2,
 } from "./ui/UIComponents";
 import {
   Table,
@@ -36,7 +32,7 @@ import {
   updateOrder,
   deleteOrder,
 } from "../services/api";
-import { API, toast, safeGet, safeArray, safeObject } from "../utils/helpers";
+import { toast, safeGet, safeArray, safeObject } from "../utils/helpers";
 import { generateAsciiReceipt } from "../utils/receiptGenerator";
 
 export const getSectionForTable = (tableNo) => {
@@ -65,7 +61,6 @@ export default function Billing({
   const [qty, setQty] = useState("1");
   const [loading, setLoading] = useState(false);
   const [isSplitBillMode, setIsSplitBillMode] = useState(false);
-  const [nextBillNumber, setNextBillNumber] = useState(null);
   const [currentParty, setCurrentParty] = useState("1");
 
   const draftKey = currentTable ? `${currentTable}-${currentParty}` : "";
@@ -184,29 +179,7 @@ export default function Billing({
     loadMenu();
   }, []);
 
-  useEffect(() => {
-    const fetchLastBillNumberData = async () => {
-      try {
-        const res = await getLastBillNumber(billingDate, track);
 
-        // The API returns the *last* bill number. We want to show the *next* one.
-        const lastNum = parseInt(res.last_bill_number, 10);
-
-        if (!isNaN(lastNum)) {
-          setNextBillNumber(lastNum + 1);
-        } else {
-          setNextBillNumber(1); // Default to 1 if no bills exist
-        }
-      } catch (e) {
-        console.error("Failed to fetch last bill number:", e);
-        // Fallback or leave as null
-      }
-    };
-
-    if (activeTab === "billing" || activeTab === "home") {
-      fetchLastBillNumberData();
-    }
-  }, [billingDate, track, activeTab]); // Re-fetch when tab/date/track changes (manual refreshes handle bill finalization)
 
   useEffect(() => {
     if (activeTab === "billing" && tableNoRef.current) {
@@ -616,11 +589,15 @@ export default function Billing({
       currentTable || ""
     );
 
-    if (targetTableStr === null) return; // User cancelled
+    if (targetTableStr === null) {
+      if (itemCodeRef.current) itemCodeRef.current.focus();
+      return; // User cancelled
+    }
 
     const targetTableNo = parseInt(targetTableStr.trim(), 10);
     if (isNaN(targetTableNo) || targetTableNo <= 0 || targetTableNo > 30) {
       toast.error("Please enter a valid table number (1-30).");
+      if (itemCodeRef.current) itemCodeRef.current.focus();
       return;
     }
 
@@ -629,7 +606,10 @@ export default function Billing({
       targetTableNo === parseInt(currentTable, 10) ? (currentParty === "1" ? "2" : "1") : "1"
     );
 
-    if (targetPartyStr === null) return; // User cancelled
+    if (targetPartyStr === null) {
+      if (itemCodeRef.current) itemCodeRef.current.focus();
+      return; // User cancelled
+    }
 
     const targetPartyNo = targetPartyStr.trim();
     const targetPartyNum = parseInt(targetPartyNo, 10);
@@ -682,6 +662,7 @@ export default function Billing({
     } catch (err) {
       console.error("Failed to move item:", err);
       toast.error(safeGet(err, "response.data.detail", "Failed to move item"));
+      if (itemCodeRef.current) itemCodeRef.current.focus();
     } finally {
       setLoading(false);
     }
@@ -713,6 +694,10 @@ export default function Billing({
         console.error(err);
       }
     }
+
+    setTimeout(() => {
+      if (itemCodeRef.current) itemCodeRef.current.focus();
+    }, 50);
   };
 
   const removeLine = (index) => {
@@ -734,6 +719,10 @@ export default function Billing({
         .then(() => fetchActiveTablesRef.current?.())
         .catch((e) => console.error("Failed to delete order from backend", e));
     }
+
+    setTimeout(() => {
+      if (itemCodeRef.current) itemCodeRef.current.focus();
+    }, 50);
   };
 
   const subtotal = useMemo(() => {
@@ -792,6 +781,7 @@ export default function Billing({
 
   const createBill = useCallback(
     async (lines) => {
+      if (loading) return;
       if (!lines || lines.length === 0) {
         toast.error("No items to bill");
         return;
@@ -1007,6 +997,9 @@ export default function Billing({
         toast.error(
           safeGet(e, "response.data.detail", "Failed to create bill"),
         );
+        setTimeout(() => {
+          if (itemCodeRef.current) itemCodeRef.current.focus();
+        }, 100);
       } finally {
         setLoading(false);
       }
@@ -1214,7 +1207,7 @@ export default function Billing({
   );
 
   const handlePrintBill = useCallback(async () => {
-    if (isPrintingRef.current) return;
+    if (loading || isPrintingRef.current) return;
     isPrintingRef.current = true;
 
     try {
@@ -1645,8 +1638,13 @@ export default function Billing({
         event.preventDefault();
         setShowF4Popup(true);
         setHelpTab("shortcuts");
-      // F3 or Cmd+3 / Alt+3
-      } else if (event.key === "F3" || (isCmdOrCtrl && (event.key === "3" || code === "Digit3")) || (isAlt && (event.key === "3" || code === "Digit3"))) {
+      // F3 or Cmd+3 / Alt+3 or Shift+Alt+S
+      } else if (
+        event.key === "F3" || 
+        (isCmdOrCtrl && (event.key === "3" || code === "Digit3")) || 
+        (isAlt && (event.key === "3" || code === "Digit3")) ||
+        (event.shiftKey && event.altKey && (event.key.toLowerCase() === "s" || code === "KeyS"))
+      ) {
         event.preventDefault();
         setIsSplitBillMode((prev) => {
           const newState = !prev;
@@ -1660,7 +1658,7 @@ export default function Billing({
     return () => {
       window.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [handlePrintBill, helpTab, showF4Popup, setCurrentTable, setCurrentParty]);
+  }, [handlePrintBill, helpTab, showF4Popup, setCurrentTable, setCurrentParty, setIsSplitBillMode]);
 
   const tempBillNumber = useMemo(() => {
     const existingBillNum = safeGet(currentDraft, "header.bill_number");
@@ -1748,108 +1746,120 @@ export default function Billing({
   return (
     <div className="billing-screen-overhaul w-full h-full flex flex-col pb-4">
       <Card className="flex flex-col h-full w-full">
-        <CardHeader className="flex-none">
-          <CardTitle className="flex items-center gap-4">
-            <span className="text-xl font-bold text-white">Billing for {billingDate}</span>
-            <div
-              onClick={() => setIsSplitBillMode(!isSplitBillMode)}
-              className="flex items-center gap-2 bg-gray-900/60 border border-gray-800 rounded-full px-3 py-1 cursor-pointer hover:border-gray-700 select-none transition-all duration-200"
-            >
-              <div
-                className={`w-7 h-4 rounded-full flex items-center p-0.5 transition-colors duration-200 ${
-                  isSplitBillMode ? "bg-orange-500" : "bg-gray-700"
-                }`}
-              >
-                <div
-                  className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${
-                    isSplitBillMode ? "translate-x-3" : "translate-x-0"
-                  }`}
-                />
-              </div>
-              <span
-                className={`text-xs font-semibold tracking-wide transition-colors duration-200 ${
-                  isSplitBillMode ? "text-orange-400" : "text-gray-400"
-                }`}
-              >
-                Split Bill
-              </span>
-              {isSplitBillMode && (
-                <span className="ml-1 text-[10px] bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded font-black tracking-widest uppercase animate-pulse">
-                  Active
-                </span>
-              )}
-            </div>
-          </CardTitle>
-        </CardHeader>
         <CardContent className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-none space-y-4 mb-4">
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <Label>Table No</Label>
-                <Input
-                  ref={tableNoRef}
-                  placeholder="Type & Enter"
-                  value={currentTable}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "") {
-                      if (setCurrentTable) setCurrentTable("");
-                      return;
-                    }
+            <div className="flex justify-between items-end gap-4">
+              <div className="grid grid-cols-4 gap-4 flex-1">
+                <div>
+                  <Label>Table No</Label>
+                  <Input
+                    ref={tableNoRef}
+                    placeholder="Type & Enter"
+                    value={currentTable}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "") {
+                        if (setCurrentTable) setCurrentTable("");
+                        return;
+                      }
 
-                    const num = parseInt(val, 10);
+                      const num = parseInt(val, 10);
 
-                    // Validation: Allow only numbers, max 30
-                    if (!isNaN(num) && num >= 1 && num <= 30) {
-                      if (setCurrentTable) setCurrentTable(val);
-                      // Trigger section update IMMEDIATELY on change
-                      setSectionByTable(val);
-                    } else {
-                      // Optional: Show toast or just ignore invalid input
-                      // toast.error("Table number must be between 1 and 30");
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  onKeyDown={handleTableNoKeyDown}
-                />
+                      // Validation: Allow only numbers, max 30
+                      if (!isNaN(num) && num >= 1 && num <= 30) {
+                        if (setCurrentTable) setCurrentTable(val);
+                        // Trigger section update IMMEDIATELY on change
+                        setSectionByTable(val);
+                      } else {
+                        // Optional: Show toast or just ignore invalid input
+                        // toast.error("Table number must be between 1 and 30");
+                      }
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    onKeyDown={handleTableNoKeyDown}
+                  />
+                </div>
+                <div>
+                  <Label>Party No.</Label>
+                  <Input
+                    ref={partyNoRef}
+                    value={currentParty}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "") {
+                        setCurrentParty("");
+                        return;
+                      }
+
+                      const num = parseInt(val, 10);
+
+                      // Validation: Allow only numbers, less than 10 (1-9)
+                      if (!isNaN(num) && num >= 1 && num < 10) {
+                        setCurrentParty(String(num));
+                      } else {
+                        toast.error("Party number must be between 1 and 9");
+                      }
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    onKeyDown={handlePartyNoKeyDown}
+                  />
+                </div>
+                <div>
+                  <Label>Section</Label>
+                  <Input
+                    ref={sectionRef}
+                    value={safeGet(currentDraft, "header.section", "G")}
+                    readOnly
+                    onKeyDown={handleSectionKeyDown}
+                  />
+                </div>
+                <div>
+                  <Label>Bill No.</Label>
+                  <Input value={displayBillNumber || "..."} readOnly />
+                </div>
               </div>
-              <div>
-                <Label>Party No.</Label>
-                <Input
-                  ref={partyNoRef}
-                  value={currentParty}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "") {
-                      setCurrentParty("");
-                      return;
-                    }
-
-                    const num = parseInt(val, 10);
-
-                    // Validation: Allow only numbers, less than 10 (1-9)
-                    if (!isNaN(num) && num >= 1 && num < 10) {
-                      setCurrentParty(String(num));
-                    } else {
-                      toast.error("Party number must be between 1 and 9");
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  onKeyDown={handlePartyNoKeyDown}
-                />
-              </div>
-              <div>
-                <Label>Section</Label>
-                <Input
-                  ref={sectionRef}
-                  value={safeGet(currentDraft, "header.section", "G")}
-                  readOnly
-                  onKeyDown={handleSectionKeyDown}
-                />
-              </div>
-              <div>
-                <Label>Bill No.</Label>
-                <Input value={displayBillNumber || "..."} readOnly />
+              <div className="flex flex-col items-end justify-center gap-1 flex-none bg-zinc-900/40 border border-zinc-800/80 rounded-lg px-3 py-1.5 mb-0.5">
+                <span className="text-[10px] font-black text-zinc-500 tracking-wider">DATE: {billingDate}</span>
+                <div className="flex items-center gap-2 select-none mt-0.5">
+                  <span className="text-xs font-black text-zinc-300">SPLIT BILL</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isSplitBillMode}
+                    onClick={() => {
+                      setIsSplitBillMode(!isSplitBillMode);
+                      setTimeout(() => {
+                        if (itemCodeRef.current) itemCodeRef.current.focus();
+                      }, 50);
+                    }}
+                    style={{
+                      position: "relative",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      width: "2.75rem",
+                      height: "1.5rem",
+                      borderRadius: "9999px",
+                      border: "none",
+                      cursor: "pointer",
+                      transition: "background 0.2s",
+                      background: isSplitBillMode ? "#f97316" : "#4b5563",
+                      flexShrink: 0,
+                      outline: "none",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        width: "1.1rem",
+                        height: "1.1rem",
+                        borderRadius: "50%",
+                        background: "white",
+                        transition: "left 0.2s",
+                        left: isSplitBillMode ? "calc(100% - 1.25rem)" : "0.2rem",
+                      }}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1918,7 +1928,7 @@ export default function Billing({
             </div>
           </div>
 
-          <div className="overflow-y-auto flex-1 border border-gray-200 rounded-md">
+          <div className="overflow-y-auto flex-1 border border-gray-200 rounded-md" style={{ maxHeight: "calc(100vh - 310px)", minHeight: "150px" }}>
             <Table>
               <TableHeader className="bg-gray-100 sticky top-0 z-10">
                 <TableRow>
@@ -2021,7 +2031,12 @@ export default function Billing({
           <div className="f4-popup-content">
             <button
               className="f4-popup-close"
-              onClick={() => setShowF4Popup(false)}
+              onClick={() => {
+                setShowF4Popup(false);
+                setTimeout(() => {
+                  if (itemCodeRef.current) itemCodeRef.current.focus();
+                }, 50);
+              }}
             >
               ×
             </button>
@@ -2195,6 +2210,9 @@ export default function Billing({
                               }
                               setCurrentParty(String(t.party_no));
                               setShowF4Popup(false);
+                              setTimeout(() => {
+                                if (itemCodeRef.current) itemCodeRef.current.focus();
+                              }, 50);
                             }}
                           >
                             <td>

@@ -60,8 +60,12 @@ export function generateAsciiReceipt(data, settings) {
   let ascii = "";
 
   // Title Suffix support (for split bills)
+  const section = safeGet(mergedData, "section", "L");
+  const sectionChar = (section === "P" || section.toUpperCase() === "PARCEL") ? "P" : "L";
+  const hotelNameWithSection = `${hotelName} ${sectionChar}`;
+
   const titleSuffix = safeGet(data, "titleSuffix", "");
-  const hotelHeading = trackLetter ? `${hotelName} ${trackLetter}` : hotelName;
+  const hotelHeading = trackLetter ? `${hotelNameWithSection} ${trackLetter}` : hotelNameWithSection;
   const displayHotelName = titleSuffix ? `${hotelHeading} ${titleSuffix}` : hotelHeading;
 
   // Meta Info

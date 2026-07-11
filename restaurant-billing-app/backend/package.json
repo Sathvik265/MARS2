@@ -15,7 +15,7 @@
     "dev": "nodemon src/app.js",
     "init-db": "psql -U $DB_USER -d $DB_NAME -f database_schema.sql",
     "build:exe": "pkg . --output dist/rbs-backend.exe",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node simulate_billing_test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
