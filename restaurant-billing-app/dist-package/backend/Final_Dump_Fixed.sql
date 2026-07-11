@@ -163,6 +163,7 @@ BEGIN
             'actual_price', o.unit_price,
             'line_total', o.line_total,
             'is_separate', COALESCE(o.is_separate, i.is_separate, false),
+            'split_category', COALESCE(o.split_category, i.split_category, 0),
             'categories', COALESCE(i.category, '[]'::jsonb) -- Key changed to 'categories' to support dashboard/reporting controller
         )
         ORDER BY o.id
@@ -381,6 +382,7 @@ CREATE TABLE public.items (
     price_ac numeric(10,2) DEFAULT 0.00,
     category jsonb DEFAULT '[]'::jsonb,
     is_separate boolean DEFAULT false,
+    split_category integer DEFAULT 0,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_category_format CHECK (((category IS NULL) OR (jsonb_typeof(category) = 'array'::text)))
 );
@@ -429,6 +431,7 @@ CREATE TABLE public.orders (
     unit_price numeric(10,2) DEFAULT 0.00,
     line_total numeric(10,2) DEFAULT 0.00,
     is_separate boolean DEFAULT false,
+    split_category integer DEFAULT 0,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
@@ -549,7 +552,9 @@ CREATE TABLE public.settings (
     clerk_initials character varying(10) DEFAULT 'CLK'::character varying,
     sgst_percentage numeric(5,2) DEFAULT 2.50,
     cgst_percentage numeric(5,2) DEFAULT 2.50,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    allowed_clerks text DEFAULT 'CLK,V,P,B'::text,
+    section character varying(10) DEFAULT 'L'::character varying
 );
 
 
@@ -986,9 +991,9 @@ COPY public.sessions (id, session_id, shift_name, clerk_initials, session_date, 
 -- Data for Name: settings; Type: TABLE DATA; Schema: public; Owner: sathvikkemtur
 --
 
-COPY public.settings (id, hotel_name, address, phone, gstin, clerk_initials, sgst_percentage, cgst_percentage, created_at) FROM stdin;
-1	Udipi Anand Bhavan	Default Address	123-456-7890	GST123456789	CLK	2.50	2.50	2026-06-21 13:02:49.393803+05:30
-3	Udipi Anand Bhavan	Default Address	123-456-7890	GST123456789	SRIHARI	2.50	2.50	2026-07-06 18:51:44.032495+05:30
+COPY public.settings (id, hotel_name, address, phone, gstin, clerk_initials, sgst_percentage, cgst_percentage, created_at, allowed_clerks, section) FROM stdin;
+1	Udipi Anand Bhavan	Default Address	123-456-7890	GST123456789	CLK	2.50	2.50	2026-06-21 13:02:49.393803+05:30	CLK,V,P,B	L
+3	Udipi Anand Bhavan	Default Address	123-456-7890	GST123456789	SRIHARI	2.50	2.50	2026-07-06 18:51:44.032495+05:30	CLK,V,P,B	L
 \.
 
 

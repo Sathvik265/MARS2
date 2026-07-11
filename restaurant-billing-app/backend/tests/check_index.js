@@ -1,4 +1,4 @@
-const pool = require("./src/db/index");
+const pool = require("../src/db/index");
 
 async function checkIndex() {
   try {

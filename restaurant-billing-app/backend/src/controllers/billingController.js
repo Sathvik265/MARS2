@@ -155,6 +155,7 @@ const billingController = {
           line_total: item.line_total,
           created_at: provisionalBill.created_at,
           is_separate: item.is_separate,
+          split_category: item.split_category || 0,
         }));
         await OrderModel.bulkCreateOrders(ordersToCreate);
       }
@@ -401,7 +402,7 @@ const billingController = {
   async updateOrder(req, res) {
     try {
       const { orderId } = req.params;
-      const { quantity, is_separate } = req.body;
+      const { quantity, is_separate, split_category } = req.body;
 
       const existingOrder = await OrderModel.getOrderById(orderId);
 
@@ -418,6 +419,7 @@ const billingController = {
       }
 
       const finalIsSeparate = is_separate !== undefined ? is_separate : existingOrder.is_separate;
+      const finalSplitCategory = split_category !== undefined ? split_category : existingOrder.split_category || 0;
 
       const line_total = roundMoney(
         safeQuantity * Number(existingOrder.unit_price || 0),
@@ -427,7 +429,8 @@ const billingController = {
         orderId,
         safeQuantity,
         line_total,
-        finalIsSeparate
+        finalIsSeparate,
+        finalSplitCategory
       );
 
       res.json(updatedOrder);

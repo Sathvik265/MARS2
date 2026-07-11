@@ -82,6 +82,7 @@ app.use("/api/reconciliation", requireAdminAny, reconciliationRoutes);
 app.get("/api/settings/clerks", requireAdminAny, reportController.getClerks);
 app.get("/api/settings", requireAuth, reportController.getSettings);
 app.put("/api/settings", requireAdminAny, reportController.updateSettings);
+app.post("/api/settings/clerk", requireAdminAny, reportController.createClerk);
 app.put("/api/settings/section", requireAuth, reportController.updateSection);
 
 app.get("/api/auth/shift-status", async (req, res) => {
@@ -694,10 +695,19 @@ app.use((err, req, res, next) => {
   });
 });
 
-// DB connection test
+// DB connection test & auto-migrations for settings schema integrity
 pool
   .query("SELECT NOW()")
-  .then(() => console.log("✅ Database connected successfully"))
+  .then(async () => {
+    console.log("✅ Database connected successfully");
+    try {
+      await pool.query("ALTER TABLE settings ADD COLUMN IF NOT EXISTS allowed_clerks TEXT DEFAULT 'CLK,V,P,B'");
+      await pool.query("ALTER TABLE settings ADD COLUMN IF NOT EXISTS section VARCHAR(10) DEFAULT 'L'");
+      console.log("✅ Settings table schema verified (allowed_clerks and section columns ensured)");
+    } catch (e) {
+      console.error("Warning: Settings table schema check failed:", e.message);
+    }
+  })
   .catch((err) => console.error("❌ Database connection failed:", err));
 
 const server = app.listen(PORT, () => {

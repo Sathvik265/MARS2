@@ -1,5 +1,5 @@
-const pool = require("./src/db");
-const BillingModel = require("./src/models/billingModel");
+const pool = require("../src/db");
+const BillingModel = require("../src/models/billingModel");
 
 // Mock shift model if needed, but BillingModel only uses it if we revert to old logic.
 // New logic passes track directly.

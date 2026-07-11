@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS settings (
     clerk_initials VARCHAR(50) UNIQUE,
     sgst_percentage DECIMAL(5,2) DEFAULT 2.50,
     cgst_percentage DECIMAL(5,2) DEFAULT 2.50,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    allowed_clerks TEXT DEFAULT 'CLK,V,P,B',
+    section VARCHAR(10) DEFAULT 'L'
 );
 
 -- Table for menu items
@@ -67,6 +69,7 @@ CREATE TABLE IF NOT EXISTS items (
     price_ac DECIMAL(10,2) DEFAULT 0,
     category JSONB DEFAULT '[]'::jsonb,
     is_separate BOOLEAN DEFAULT FALSE,
+    split_category INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_category_format CHECK (category IS NULL OR jsonb_typeof(category) = 'array')
 );
@@ -143,6 +146,7 @@ CREATE TABLE IF NOT EXISTS orders (
     unit_price DECIMAL(10,2) DEFAULT 0,
     line_total DECIMAL(10,2) DEFAULT 0,
     is_separate BOOLEAN DEFAULT FALSE,
+    split_category INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_orders_bills_composite FOREIGN KEY (table_no, party_no, created_at, track, clerk_initials)
@@ -268,6 +272,7 @@ BEGIN
             'fixed_price', o.unit_price,
             'actual_price', o.unit_price,
             'line_total', o.line_total,
+            'split_category', COALESCE(o.split_category, i.split_category, 0),
             'categories', COALESCE(i.category, '[]'::jsonb)
         )
     )
@@ -353,8 +358,8 @@ ORDER BY t.table_id;
 -- ========================================================================
 
 -- Insert default settings
-INSERT INTO settings (hotel_name, address, phone, gstin, clerk_initials, sgst_percentage, cgst_percentage)
-SELECT 'Udupi Anand Bhavan', 'Default Address', '123-456-7890', 'GST123456789', 'CLK', 2.50, 2.50
+INSERT INTO settings (hotel_name, address, phone, gstin, clerk_initials, sgst_percentage, cgst_percentage, allowed_clerks, section)
+SELECT 'Udupi Anand Bhavan', 'Default Address', '123-456-7890', 'GST123456789', 'CLK', 2.50, 2.50, 'CLK,V,P,B', 'L'
 WHERE NOT EXISTS (SELECT 1 FROM settings);
 
 -- Populate the standard shift names

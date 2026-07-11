@@ -69,7 +69,7 @@ async function runSimulation() {
 
     // 2. Start the Express server
     console.log("\n[2/7] Starting Express server on port 8009...");
-    const app = require("./src/app");
+    const app = require("../src/app");
     
     // Give the server a moment to bind and print start logs
     await new Promise(r => setTimeout(r, 1500));
@@ -151,8 +151,9 @@ async function runSimulation() {
         const unitPrice = section === "AC" ? Number(menuItem.price_ac) : Number(menuItem.price_general);
         const lineTotal = roundMoney(unitPrice * qty);
         
-        // 20% chance of split billing/separate printed receipt
-        const isSeparate = Math.random() < 0.20;
+        // Random split category between 0 and 3 (20% chance of split billing)
+        const splitCat = Math.random() < 0.20 ? Math.floor(Math.random() * 3) + 1 : 0;
+        const isSeparate = splitCat > 0;
 
         return {
           item_name: menuItem.name,
@@ -161,7 +162,8 @@ async function runSimulation() {
           line_total: lineTotal,
           item_code: menuItem.alpha_code,
           numeric_item_code: menuItem.numeric_code,
-          is_separate: isSeparate
+          is_separate: isSeparate,
+          split_category: splitCat
         };
       });
 

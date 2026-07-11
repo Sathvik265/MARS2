@@ -479,6 +479,17 @@ exports.updateSettings = async (req, res) => {
     const targetClerk = String(
       req.query.clerk || req.auth?.staff_code || "CLK",
     ).toUpperCase();
+
+    // Check if the targetClerk is 'CLK' or exists in the database settings table
+    const checkExists = await pool.query(
+      "SELECT 1 FROM settings WHERE clerk_initials = $1",
+      [targetClerk]
+    );
+
+    if (targetClerk !== "CLK" && checkExists.rows.length === 0) {
+      return res.status(404).json({ detail: "This isn't a valid clerk name" });
+    }
+
     const settings = await SettingsModel.updateSettings(
       targetClerk,
       req.body,
@@ -487,6 +498,22 @@ exports.updateSettings = async (req, res) => {
   } catch (err) {
     console.error("Update settings error:", err);
     res.status(500).json({ detail: "Failed to update settings" });
+  }
+};
+
+// POST /api/settings/clerk
+exports.createClerk = async (req, res) => {
+  try {
+    const { clerk } = req.body;
+    if (!clerk) {
+      return res.status(400).json({ detail: "Clerk initials are required" });
+    }
+    const targetClerk = String(clerk).toUpperCase().slice(0, 10);
+    const settings = await SettingsModel.ensureSettings(targetClerk);
+    res.json(settings);
+  } catch (err) {
+    console.error("Create clerk error:", err);
+    res.status(500).json({ detail: "Failed to create clerk" });
   }
 };
 

@@ -1,4 +1,4 @@
-const pool = require('./src/db');
+const pool = require('../src/db');
 async function check() {
   const result = await pool.query(`
     SELECT pg_get_functiondef(oid) 

@@ -88,7 +88,7 @@ async function verify() {
 }
 
 async function createTestBill(client, track, date, tableNo) {
-  const BillingModel = require("./src/models/billingModel");
+  const BillingModel = require("../src/models/billingModel");
 
   // Ensure table exists
   await client.query(

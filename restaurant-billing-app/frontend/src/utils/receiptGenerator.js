@@ -20,7 +20,7 @@ export function generateAsciiReceipt(data, settings) {
     if (clean === "`") return "I";
     if (clean === "``") return "II";
     if (clean.toLowerCase() === "rbs") return "R";
-    if (clean.toLowerCase() === "rbs1" || clean.toLowerCase() === "rbs 1") return "R2";
+    if (clean.toLowerCase() === "rbs1" || clean.toLowerCase() === "rbs 1") return "R1";
     return "";
   };
   const trackLetter = getTrackLetter(trackVal);
@@ -60,13 +60,20 @@ export function generateAsciiReceipt(data, settings) {
   let ascii = "";
 
   // Title Suffix support (for split bills)
-  const section = safeGet(mergedData, "section", "L");
+  const section = safeGet(settings, "section") || safeGet(data, "section") || "L";
   const sectionChar = (section === "P" || section.toUpperCase() === "PARCEL") ? "P" : "L";
   const hotelNameWithSection = `${hotelName} ${sectionChar}`;
 
   const titleSuffix = safeGet(data, "titleSuffix", "");
   const hotelHeading = trackLetter ? `${hotelNameWithSection} ${trackLetter}` : hotelNameWithSection;
   const displayHotelName = titleSuffix ? `${hotelHeading} ${titleSuffix}` : hotelHeading;
+
+  // Header (Hotel Name, Address, Phone, GST)
+  ascii += centerText(`${displayHotelName} (${clerkInitials})`, LINE_WIDTH) + "\r\n";
+  if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
+  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
+  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
+  ascii += separator + "\r\n";
 
   // Meta Info
   const timeAndBill = `${printTime} #${billNumber}`;
@@ -125,17 +132,6 @@ export function generateAsciiReceipt(data, settings) {
   ascii += separator + "\r\n";
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\r\n";
   ascii += separator + "\r\n";
-
-  // Minimal gap between details and footer
-  for (let i = 0; i < 2; i++) {
-    ascii += "\r\n";
-  }
-
-  // Header moved to the bottom
-  ascii += centerText(`${displayHotelName} (${clerkInitials})`, LINE_WIDTH) + "\r\n";
-  if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
-  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
-  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
 
   // 2-inch gap for mechanical paper feed tear-off (approx 12 lines)
   /* for (let i = 0; i < 12; i++) {

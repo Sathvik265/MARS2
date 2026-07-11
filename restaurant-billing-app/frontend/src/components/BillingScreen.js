@@ -60,8 +60,41 @@ export default function Billing({
   const [entryCode, setEntryCode] = useState("");
   const [qty, setQty] = useState("1");
   const [loading, setLoading] = useState(false);
-  const [isSplitBillMode, setIsSplitBillMode] = useState(false);
+  const [splitBillUpto, setSplitBillUpto] = useState(0);
   const [currentParty, setCurrentParty] = useState("1");
+
+  const computeSplitBillTotals = (itemsInSubBill, sgstPct, cgstPct) => {
+    const taxRateSum = (sgstPct || 0) + (cgstPct || 0);
+    const scalingFactor = 1 / (1 + taxRateSum / 100);
+
+    const sub = Number(
+      itemsInSubBill.reduce((sum, item) => {
+        const valPrice = item.unit_price || item.actual_price || item.fixed_price || 0;
+        const unitPriceScaled = Number((Number(valPrice) * scalingFactor).toFixed(2));
+        const lineTotalScaled = Number((unitPriceScaled * Number(item.quantity || 0)).toFixed(2));
+        return sum + lineTotalScaled;
+      }, 0).toFixed(2)
+    );
+
+    const totalTax = itemsInSubBill.reduce((sum, item) => {
+      const valPrice = item.unit_price || item.actual_price || item.fixed_price || 0;
+      const unitPriceScaled = Number((Number(valPrice) * scalingFactor).toFixed(2));
+      const lineTotalScaled = Number((unitPriceScaled * Number(item.quantity || 0)).toFixed(2));
+      const itemTax = Number((lineTotalScaled * (taxRateSum / 100)).toFixed(2));
+      return sum + itemTax;
+    }, 0);
+
+    const sGstVal = Number((totalTax / 2).toFixed(2));
+    const cGstVal = Number((totalTax / 2).toFixed(2));
+    const grandVal = Number((sub + sGstVal + cGstVal).toFixed(2));
+
+    return {
+      subtotal: sub,
+      sgst: sGstVal,
+      cgst: cGstVal,
+      grand_total: grandVal,
+    };
+  };
 
   const draftKey = currentTable ? `${currentTable}-${currentParty}` : "";
 
@@ -91,6 +124,19 @@ export default function Billing({
   const [helpTab, setHelpTab] = useState("shortcuts");
   const [searchQuery, setSearchQuery] = useState("");
   const [menuItems, setMenuItems] = useState([]);
+
+  const maxSplitCategoryFromMenu = useMemo(() => {
+    return Math.max(3, ...menuItems.map((item) => parseInt(item.split_category, 10) || 0));
+  }, [menuItems]);
+
+  const dropdownOptions = useMemo(() => {
+    const options = [];
+    for (let i = 0; i <= maxSplitCategoryFromMenu; i++) {
+      options.push(i);
+    }
+    return options;
+  }, [maxSplitCategoryFromMenu]);
+
   const [filteredItems, setFilteredItems] = useState([]);
   const [selectedHelpIndex, setSelectedHelpIndex] = useState(0);
 
@@ -118,11 +164,15 @@ export default function Billing({
   }, [userInitials, activeShift]);
 
   const currentDraft = useMemo(() => {
+    let sectionDefault = getSectionForTable(currentTable || "");
+    if (settingsCache?.section?.toUpperCase() === "P") {
+      sectionDefault = "P";
+    }
     const defaultDraft = {
       header: {
         table_no: currentTable || "",
         party_no: currentParty || "1",
-        section: getSectionForTable(currentTable || ""),
+        section: sectionDefault,
         track: track || "",
         bill_number: null,
       },
@@ -144,7 +194,7 @@ export default function Billing({
       lines: safeArray(draft.lines, []),
       modified_from_bill_id: draft.modified_from_bill_id || null,
     };
-  }, [drafts, currentTable, currentParty, draftKey, track]);
+  }, [drafts, currentTable, currentParty, draftKey, track, settingsCache]);
 
   const matchedItem = useMemo(() => {
     if (!entryCode || !entryCode.trim()) return null;
@@ -207,7 +257,10 @@ export default function Billing({
   };
 
   const setSectionByTable = (tableNo) => {
-    const section = getSectionForTable(tableNo);
+    let section = getSectionForTable(tableNo);
+    if (settingsCache?.section?.toUpperCase() === "P") {
+      section = "P";
+    }
     // Ensure we trigger the update on the CURRENT draft if it exists
     if (onHeaderChange) {
       onHeaderChange({ section });
@@ -228,7 +281,10 @@ export default function Billing({
     let modifiedFromBillId = null;
 
     // Calculate section for new draft
-    const initialSection = getSectionForTable(tableNo);
+    let initialSection = getSectionForTable(tableNo);
+    if (settingsCache?.section?.toUpperCase() === "P") {
+      initialSection = "P";
+    }
 
     try {
       const pendingOrders = await getPendingOrdersByTableAndParty(tableNo, String(partyNo));
@@ -271,6 +327,7 @@ export default function Billing({
           numeric_code: order.numeric_item_code,
           alpha_code: order.item_code,
           is_separate: !!order.is_separate,
+          split_category: order.split_category || 0,
         }));
         toast.success(
           `Loaded ${filteredOrders.length} pending items for Table ${tableNo} (Party ${partyNo})`,
@@ -668,17 +725,15 @@ export default function Billing({
     }
   };
 
-  const toggleLineSplit = async (index) => {
+  const updateLineSplitCategory = async (index, newCategory) => {
     if (!setDrafts || !draftKey) return;
     const lines = safeArray(currentDraft.lines);
     const lineToToggle = lines[index];
     if (!lineToToggle) return;
 
-    const newIsSeparate = !lineToToggle.is_separate;
-
     const updatedLines = lines.map((l, i) => {
       if (i !== index) return l;
-      return { ...l, is_separate: newIsSeparate };
+      return { ...l, split_category: newCategory, is_separate: newCategory > 0 };
     });
 
     setDrafts((prev) => ({
@@ -688,9 +743,9 @@ export default function Billing({
 
     if (lineToToggle.id) {
       try {
-        await updateOrder(lineToToggle.id, { is_separate: newIsSeparate });
+        await updateOrder(lineToToggle.id, { split_category: newCategory, is_separate: newCategory > 0 });
       } catch (err) {
-        toast.error("Failed to sync split status");
+        toast.error("Failed to sync split category");
         console.error(err);
       }
     }
@@ -812,6 +867,7 @@ export default function Billing({
             item_code: l.alpha_code || l.code,
             numeric_item_code: l.numeric_code,
             is_separate: l.is_separate,
+            split_category: l.split_category || 0,
           })),
         };
 
@@ -840,81 +896,57 @@ export default function Billing({
           // --- SPLIT BILL PRINTING LOGIC ---
           let printPayload = fullBillData;
 
-          if (isSplitBillMode) {
+          if (splitBillUpto > 0) {
             const allItems = safeArray(
               fullBillData.items_json || fullBillData.items,
             );
-            const splitItems = allItems.filter(
-              (i) =>
-                i.is_separate === true ||
-                String(i.is_separate) === "true" ||
-                i.is_separate === 1,
-            );
-            const regularItems = allItems.filter(
-              (i) =>
-                !i.is_separate ||
-                String(i.is_separate) === "false" ||
-                i.is_separate === 0,
-            );
+            const billsToPrint = [];
 
-            if (splitItems.length > 0 || regularItems.length > 0) {
-              // Changed condition
-              const billsToPrint = [];
-
-              if (regularItems.length > 0) {
-                const sub = Number(
-                  regularItems.reduce((s, i) => s + Number(i.line_total || 0), 0).toFixed(2)
-                );
-                const taxRateSum = (sgstPercentage || 0) + (cgstPercentage || 0);
-                const totalTax = regularItems.reduce(
-                  (s, i) => s + Number((Number(i.line_total || 0) * (taxRateSum / 100)).toFixed(2)),
-                  0
-                );
-                const sGstVal = Number((totalTax / 2).toFixed(2));
-                const cGstVal = Number((totalTax / 2).toFixed(2));
-                const grandVal = Number((sub + sGstVal + cGstVal).toFixed(2));
-
+            // 1. Gather all split bills for categories 1 to splitBillUpto
+            let hasAnySplits = false;
+            for (let c = 1; c <= splitBillUpto; c++) {
+              const catItems = allItems.filter((i) => (i.split_category || 0) === c);
+              if (catItems.length > 0) {
+                hasAnySplits = true;
+                const totals = computeSplitBillTotals(catItems, sgstPercentage, cgstPercentage);
                 billsToPrint.push({
                   ...fullBillData,
                   split: false,
                   bills: null,
-                  items: regularItems,
-                  items_json: regularItems,
-                  titleSuffix: splitItems.length > 0 ? "(Main)" : "", // Add suffix only if there are split items
-                  subtotal: sub,
-                  grand_total: grandVal,
-                  sgst: sGstVal,
-                  cgst: cGstVal,
+                  items: catItems,
+                  items_json: catItems,
+                  titleSuffix: `(Split ${c})`,
+                  subtotal: totals.subtotal,
+                  grand_total: totals.grand_total,
+                  sgst: totals.sgst,
+                  cgst: totals.cgst,
                 });
               }
+            }
 
-              if (splitItems.length > 0) {
-                const sub = Number(
-                  splitItems.reduce((s, i) => s + Number(i.line_total || 0), 0).toFixed(2)
-                );
-                const taxRateSum = (sgstPercentage || 0) + (cgstPercentage || 0);
-                const totalTax = splitItems.reduce(
-                  (s, i) => s + Number((Number(i.line_total || 0) * (taxRateSum / 100)).toFixed(2)),
-                  0
-                );
-                const sGstVal = Number((totalTax / 2).toFixed(2));
-                const cGstVal = Number((totalTax / 2).toFixed(2));
-                const grandVal = Number((sub + sGstVal + cGstVal).toFixed(2));
+            // 2. Gather remaining items (category === 0 OR category > splitBillUpto)
+            const remainingItems = allItems.filter((i) => {
+              const cat = i.split_category || 0;
+              return cat === 0 || cat > splitBillUpto;
+            });
 
-                billsToPrint.push({
-                  ...fullBillData,
-                  split: false,
-                  bills: null,
-                  items: splitItems,
-                  items_json: splitItems,
-                  titleSuffix: regularItems.length > 0 ? "(Split)" : "", // Add suffix only if there are regular items
-                  subtotal: sub,
-                  grand_total: grandVal,
-                  sgst: sGstVal,
-                  cgst: cGstVal,
-                });
-              }
+            if (remainingItems.length > 0) {
+              const totals = computeSplitBillTotals(remainingItems, sgstPercentage, cgstPercentage);
+              billsToPrint.push({
+                ...fullBillData,
+                split: false,
+                bills: null,
+                items: remainingItems,
+                items_json: remainingItems,
+                titleSuffix: hasAnySplits ? "(Main)" : "",
+                subtotal: totals.subtotal,
+                grand_total: totals.grand_total,
+                sgst: totals.sgst,
+                cgst: totals.cgst,
+              });
+            }
 
+            if (billsToPrint.length > 0) {
               printPayload = {
                 ...fullBillData,
                 split: true,
@@ -932,26 +964,22 @@ export default function Billing({
           }
 
           try {
-            let settings = settingsCache;
-            if (!settings) {
-              const clerk = userInitials || activeShift?.clerk_initials || "CLK";
-              const settingsRes = await api.get(`/settings?clerk=${clerk}`);
-              settings = settingsRes.data;
-            }
+            // Always fetch fresh settings from API to reflect updates instantly
+            const clerk = userInitials || activeShift?.clerk_initials || "CLK";
+            const settingsRes = await api.get(`/settings?clerk=${clerk}`);
+            const settings = settingsRes.data;
 
-            let rawText = "";
             if (printPayload.split && printPayload.bills) {
-              printPayload.bills.forEach((b, idx) => {
-                if (idx > 0) {
-                  rawText += "\r\n"; // at most 1 line gap
-                }
-                rawText += generateAsciiReceipt(b, settings);
-              });
+              // Print each split bill as a separate print request in a loop
+              // This guarantees that the printer's feed lines are run after each bill
+              for (const b of printPayload.bills) {
+                const rawText = generateAsciiReceipt(b, settings);
+                await api.post(`/printer/print`, { text: rawText });
+              }
             } else {
-              rawText = generateAsciiReceipt(printPayload, settings);
+              const rawText = generateAsciiReceipt(printPayload, settings);
+              await api.post(`/printer/print`, { text: rawText });
             }
-
-            await api.post(`/printer/print`, { text: rawText });
             toast.success("Bill sent directly to POS printer!");
           } catch (err) {
             console.error("Direct print failed:", err);
@@ -1022,7 +1050,7 @@ export default function Billing({
       setQty,
       tableNoRef,
       setPrintData,
-      isSplitBillMode,
+      splitBillUpto,
       sgstPercentage,
       cgstPercentage,
     ],
@@ -1123,6 +1151,7 @@ export default function Billing({
           numeric_code: itemNumericCode,
           alpha_code: itemAlphaCode,
           is_separate: !!item.is_separate,
+          split_category: item.split_category || 0,
         };
 
         const payload = {
@@ -1139,6 +1168,7 @@ export default function Billing({
           item_code: newLine.alpha_code,
           numeric_item_code: newLine.numeric_code,
           bill_date: billingDate, // Use the session date for the order
+          split_category: newLine.split_category,
         };
 
         const orderRes = await createOrder(payload);
@@ -1228,70 +1258,57 @@ export default function Billing({
         // --- SPLIT BILL PRINTING LOGIC ---
         let printPayload = fullBillData;
 
-        if (isSplitBillMode) {
+        if (splitBillUpto > 0) {
           const allItems = safeArray(
             fullBillData.items_json || fullBillData.items,
           );
-          const splitItems = allItems.filter(
-            (i) =>
-              i.is_separate === true ||
-              String(i.is_separate) === "true" ||
-              i.is_separate === 1,
-          );
-          const regularItems = allItems.filter(
-            (i) =>
-              !i.is_separate ||
-              String(i.is_separate) === "false" ||
-              i.is_separate === 0,
-          );
+          const billsToPrint = [];
 
-          if (splitItems.length > 0 || regularItems.length > 0) {
-            const billsToPrint = [];
-
-            if (regularItems.length > 0) {
-              const sub = Number(
-                regularItems.reduce((s, i) => s + Number(i.line_total || 0), 0).toFixed(2)
-              );
-              const sGstVal = Number((sub * (sgstPercentage / 100)).toFixed(2));
-              const cGstVal = Number((sub * (cgstPercentage / 100)).toFixed(2));
-              const grandVal = sub;
-
+          // 1. Gather all split bills for categories 1 to splitBillUpto
+          let hasAnySplits = false;
+          for (let c = 1; c <= splitBillUpto; c++) {
+            const catItems = allItems.filter((i) => (i.split_category || 0) === c);
+            if (catItems.length > 0) {
+              hasAnySplits = true;
+              const totals = computeSplitBillTotals(catItems, sgstPercentage, cgstPercentage);
               billsToPrint.push({
                 ...fullBillData,
                 split: false,
                 bills: null,
-                items: regularItems,
-                items_json: regularItems,
-                titleSuffix: splitItems.length > 0 ? "(Main)" : "",
-                subtotal: sub,
-                grand_total: grandVal,
-                sgst: sGstVal,
-                cgst: cGstVal,
+                items: catItems,
+                items_json: catItems,
+                titleSuffix: `(Split ${c})`,
+                subtotal: totals.subtotal,
+                grand_total: totals.grand_total,
+                sgst: totals.sgst,
+                cgst: totals.cgst,
               });
             }
+          }
 
-            if (splitItems.length > 0) {
-              const sub = Number(
-                splitItems.reduce((s, i) => s + Number(i.line_total || 0), 0).toFixed(2)
-              );
-              const sGstVal = Number((sub * (sgstPercentage / 100)).toFixed(2));
-              const cGstVal = Number((sub * (cgstPercentage / 100)).toFixed(2));
-              const grandVal = sub;
+          // 2. Gather remaining items (category === 0 OR category > splitBillUpto)
+          const remainingItems = allItems.filter((i) => {
+            const cat = i.split_category || 0;
+            return cat === 0 || cat > splitBillUpto;
+          });
 
-              billsToPrint.push({
-                ...fullBillData,
-                split: false,
-                bills: null,
-                items: splitItems,
-                items_json: splitItems,
-                titleSuffix: regularItems.length > 0 ? "(Split)" : "",
-                subtotal: sub,
-                grand_total: grandVal,
-                sgst: sGstVal,
-                cgst: cGstVal,
-              });
-            }
+          if (remainingItems.length > 0) {
+            const totals = computeSplitBillTotals(remainingItems, sgstPercentage, cgstPercentage);
+            billsToPrint.push({
+              ...fullBillData,
+              split: false,
+              bills: null,
+              items: remainingItems,
+              items_json: remainingItems,
+              titleSuffix: hasAnySplits ? "(Main)" : "",
+              subtotal: totals.subtotal,
+              grand_total: totals.grand_total,
+              sgst: totals.sgst,
+              cgst: totals.cgst,
+            });
+          }
 
+          if (billsToPrint.length > 0) {
             printPayload = {
               ...fullBillData,
               split: true,
@@ -1309,26 +1326,22 @@ export default function Billing({
         }
 
         try {
-          let settings = settingsCache;
-          if (!settings) {
-            const clerk = userInitials || activeShift?.clerk_initials || "CLK";
-            const settingsRes = await api.get(`/settings?clerk=${clerk}`);
-            settings = settingsRes.data;
-          }
+          // Always fetch fresh settings from API to reflect updates instantly
+          const clerk = userInitials || activeShift?.clerk_initials || "CLK";
+          const settingsRes = await api.get(`/settings?clerk=${clerk}`);
+          const settings = settingsRes.data;
 
-          let rawText = "";
           if (printPayload.split && printPayload.bills) {
-            printPayload.bills.forEach((b, idx) => {
-              if (idx > 0) {
-                rawText += "\r\n"; // at most 1 line gap
-              }
-              rawText += generateAsciiReceipt(b, settings);
-            });
+            // Print each split bill as a separate print request in a loop
+            // This guarantees that the printer's feed lines are run after each bill
+            for (const b of printPayload.bills) {
+              const rawText = generateAsciiReceipt(b, settings);
+              await api.post(`/printer/print`, { text: rawText });
+            }
           } else {
-            rawText = generateAsciiReceipt(printPayload, settings);
+            const rawText = generateAsciiReceipt(printPayload, settings);
+            await api.post(`/printer/print`, { text: rawText });
           }
-
-          await api.post(`/printer/print`, { text: rawText });
           toast.success("Bill sent directly to POS printer!");
         } catch (err) {
           console.error("Direct print failed:", err);
@@ -1392,6 +1405,7 @@ export default function Billing({
               numeric_code: order.numeric_item_code,
               alpha_code: order.item_code,
               is_separate: !!order.is_separate,
+              split_category: order.split_category || 0,
             }));
           }
         }
@@ -1428,7 +1442,7 @@ export default function Billing({
     setLoading,
     setPrintData,
     tableNoRef,
-    isSplitBillMode,
+    splitBillUpto,
     sgstPercentage,
     cgstPercentage,
   ]);
@@ -1646,10 +1660,10 @@ export default function Billing({
         (event.shiftKey && event.altKey && (event.key.toLowerCase() === "s" || code === "KeyS"))
       ) {
         event.preventDefault();
-        setIsSplitBillMode((prev) => {
-          const newState = !prev;
-          toast.success(`SPLIT BILL MODE ${newState ? "ENABLED" : "DISABLED"}`);
-          return newState;
+        setSplitBillUpto((prev) => {
+          const nextIndex = (prev + 1) % (maxSplitCategoryFromMenu + 1);
+          toast.success(`SPLIT BILL CATEGORY SET TO: ${nextIndex === 0 ? "Off" : nextIndex}`);
+          return nextIndex;
         });
       }
     };
@@ -1658,7 +1672,7 @@ export default function Billing({
     return () => {
       window.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [handlePrintBill, helpTab, showF4Popup, setCurrentTable, setCurrentParty, setIsSplitBillMode]);
+  }, [handlePrintBill, helpTab, showF4Popup, setCurrentTable, setCurrentParty, setSplitBillUpto, maxSplitCategoryFromMenu]);
 
   const tempBillNumber = useMemo(() => {
     const existingBillNum = safeGet(currentDraft, "header.bill_number");
@@ -1818,47 +1832,38 @@ export default function Billing({
                   <Input value={displayBillNumber || "..."} readOnly />
                 </div>
               </div>
-              <div className="flex flex-col items-end justify-center gap-1 flex-none bg-zinc-900/40 border border-zinc-800/80 rounded-lg px-3 py-1.5 mb-0.5">
+              <div className="flex flex-col items-end justify-center gap-1 flex-none bg-zinc-900/40 border border-zinc-800/80 rounded-lg px-3 py-1 mb-0.5">
                 <span className="text-[10px] font-black text-zinc-500 tracking-wider">DATE: {billingDate}</span>
-                <div className="flex items-center gap-2 select-none mt-0.5">
+                <div className="flex items-center gap-2 select-none">
                   <span className="text-xs font-black text-zinc-300">SPLIT BILL</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isSplitBillMode}
-                    onClick={() => {
-                      setIsSplitBillMode(!isSplitBillMode);
+                  <select
+                    value={splitBillUpto}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10) || 0;
+                      setSplitBillUpto(val);
                       setTimeout(() => {
                         if (itemCodeRef.current) itemCodeRef.current.focus();
                       }, 50);
                     }}
                     style={{
-                      position: "relative",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      width: "2.75rem",
-                      height: "1.5rem",
-                      borderRadius: "9999px",
-                      border: "none",
-                      cursor: "pointer",
-                      transition: "background 0.2s",
-                      background: isSplitBillMode ? "#f97316" : "#4b5563",
-                      flexShrink: 0,
+                      background: "#18181b",
+                      color: "white",
+                      border: "1px solid #3f3f46",
+                      borderRadius: "0.375rem",
+                      padding: "0.15rem 0.4rem",
+                      fontSize: "0.85rem",
+                      fontWeight: "bold",
                       outline: "none",
+                      cursor: "pointer",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                     }}
                   >
-                    <span
-                      style={{
-                        position: "absolute",
-                        width: "1.1rem",
-                        height: "1.1rem",
-                        borderRadius: "50%",
-                        background: "white",
-                        transition: "left 0.2s",
-                        left: isSplitBillMode ? "calc(100% - 1.25rem)" : "0.2rem",
-                      }}
-                    />
-                  </button>
+                    {dropdownOptions.map((opt) => (
+                      <option key={opt} value={opt} style={{ color: "black" }}>
+                        {opt === 0 ? "Off (0)" : `Upto ${opt}`}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
@@ -1966,18 +1971,26 @@ export default function Billing({
                         <span className="mr-3 text-lg font-bold text-black tracking-wide">
                           {safeGet(l, "name", "Unknown Item")}
                         </span>
-                        {isSplitBillMode && (
-                          <button
-                            onClick={() => toggleLineSplit(idx)}
-                            className={`ml-2 px-3 py-0.5 text-xs font-bold rounded shadow-sm border-2 transition-all cursor-pointer ${
-                              l.is_separate
-                                ? "bg-green-100 text-green-700 border-green-500"
-                                : "bg-gray-100 text-gray-400 border-gray-300 hover:bg-gray-200"
+                        {splitBillUpto > 0 && (
+                          <select
+                            value={l.split_category || 0}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10) || 0;
+                              updateLineSplitCategory(idx, val);
+                            }}
+                            className={`ml-2 px-1.5 py-0.5 text-xs font-bold rounded shadow-sm border transition-all cursor-pointer ${
+                              (l.split_category || 0) > 0
+                                ? "bg-green-100 text-green-700 border-green-500 font-bold"
+                                : "bg-gray-800 text-zinc-400 border-zinc-700 hover:bg-gray-700 font-normal"
                             }`}
-                            title="Toggle Split Status"
+                            style={{ outline: "none" }}
                           >
-                            SPLIT
-                          </button>
+                            {dropdownOptions.map((opt) => (
+                              <option key={opt} value={opt} style={{ color: "black", background: "white" }}>
+                                {opt === 0 ? "Main" : `Split ${opt}`}
+                              </option>
+                            ))}
+                          </select>
                         )}
                         <div className="flex space-x-1.5 ml-4">
                           <Button

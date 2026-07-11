@@ -105,7 +105,8 @@ router.post("/bulk-update", requireAdminFull, async (req, res) => {
           price_general: parseFloat(itemData.price_general) !== undefined && !isNaN(parseFloat(itemData.price_general)) ? parseFloat(itemData.price_general) : existingItem.price_general,
           price_ac: parseFloat(itemData.price_ac) !== undefined && !isNaN(parseFloat(itemData.price_ac)) ? parseFloat(itemData.price_ac) : existingItem.price_ac,
           category: existingItem.category,
-          is_separate: existingItem.is_separate,
+          is_separate: itemData.is_separate !== undefined ? itemData.is_separate : existingItem.is_separate,
+          split_category: itemData.split_category !== undefined ? parseInt(itemData.split_category, 10) : (existingItem.split_category || 0),
         };
         const updated = await ItemModel.updateItem(existingItem.id, payload);
         results.push(updated);
@@ -118,7 +119,8 @@ router.post("/bulk-update", requireAdminFull, async (req, res) => {
           price_general: parseFloat(itemData.price_general) || 0,
           price_ac: parseFloat(itemData.price_ac) || 0,
           category: { qty: 1, name: "General" },
-          is_separate: false,
+          is_separate: itemData.is_separate === true || (parseInt(itemData.split_category, 10) > 0),
+          split_category: parseInt(itemData.split_category, 10) || 0,
         };
         const inserted = await ItemModel.createItem(payload);
         results.push(inserted);
@@ -162,6 +164,23 @@ router.patch("/:id/separate", requireAdminFull, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: "Failed to update item separate status",
+      details: error.message,
+    });
+  }
+});
+
+router.patch("/:id/split-category", requireAdminFull, async (req, res) => {
+  try {
+    const { split_category } = req.body;
+    const catVal = parseInt(split_category, 10);
+    if (isNaN(catVal) || catVal < 0) {
+      return res.status(400).json({ error: "Invalid split category" });
+    }
+    const item = await ItemModel.updateItemSplitCategory(req.params.id, catVal);
+    res.json(item);
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to update item split category",
       details: error.message,
     });
   }

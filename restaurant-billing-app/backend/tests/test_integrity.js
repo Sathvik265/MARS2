@@ -1,5 +1,5 @@
-const { roundMoney, verifyBillIntegrity } = require("./src/utils/billingIntegrity");
-const SettingsModel = require("./src/models/settingsModel");
+const { roundMoney, verifyBillIntegrity } = require("../src/utils/billingIntegrity");
+const SettingsModel = require("../src/models/settingsModel");
 
 // mock settings model
 SettingsModel.getSettings = async () => ({

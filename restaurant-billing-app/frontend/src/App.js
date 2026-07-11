@@ -433,7 +433,7 @@ function App() {
           )}
           {mode !== "none" && billingDate && (
             <div className={`${activeTab === "billing" ? "mt-1" : "mt-2"} text-sm text-gray-300`}>
-              Date: {billingDate} | {track === "`" ? "I (`)" : track === "``" ? "II (``)" : (track || "Default")}
+              Date: {billingDate} | {track === "`" ? "I (`)" : track === "``" ? "II (``)" : (track || "Default")} | Clerk: {userInitials}
               <span className="ml-4 inline-flex gap-2">
                 <Button
                   variant="outline"

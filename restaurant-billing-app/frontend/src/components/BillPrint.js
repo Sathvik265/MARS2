@@ -48,12 +48,12 @@ const BillContent = ({ data, settings, isLast = true }) => {
     const clean = String(t || "").trim();
     if (clean === "`") return "I";
     if (clean === "``") return "II";
-    if (clean.toLowerCase() === "rbs1") return "R";
-    if (clean.toLowerCase() === "rbs 2" || clean.toLowerCase() === "rbs2") return "R2";
+    if (clean.toLowerCase() === "rbs") return "R";
+    if (clean.toLowerCase() === "rbs1" || clean.toLowerCase() === "rbs 1") return "R1";
     return "";
   };
   const trackLetter = getTrackLetter(trackVal);
-  const section = safeGet(mergedData, "section", "L");
+  const section = safeGet(settings, "section") || safeGet(data, "section") || "L";
   const sectionChar = (section === "P" || section.toUpperCase() === "PARCEL") ? "P" : "L";
   const hotelNameWithSection = `${hotelName} ${sectionChar}`;
 

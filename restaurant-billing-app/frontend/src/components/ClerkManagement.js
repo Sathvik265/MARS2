@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../services/api";
 import {
   Card,
   CardHeader,
@@ -18,7 +18,7 @@ import {
   TableHead,
   TableCell,
 } from "./ui/Table";
-import { API, toast, safeGet, safeArray } from "../utils/helpers";
+import { toast, safeGet, safeArray } from "../utils/helpers";
 
 export default function ClerkManagement() {
   const [clerks, setClerks] = useState([]);
@@ -29,7 +29,7 @@ export default function ClerkManagement() {
   const loadClerks = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/settings/clerks`);
+      const res = await api.get("/settings/clerks");
       setClerks(safeArray(res.data));
     } catch (e) {
       console.error("Failed to load clerks:", e);
@@ -52,8 +52,8 @@ export default function ClerkManagement() {
       return;
     }
 
-    if (initials.length > 3) {
-      toast.error("Clerk initials must be 3 characters or less");
+    if (initials.length > 10) {
+      toast.error("Clerk initials must be 10 characters or less");
       return;
     }
 
@@ -64,9 +64,8 @@ export default function ClerkManagement() {
 
     setCreating(true);
     try {
-      // Create settings entry for the new clerk
-      // The backend will auto-provision settings based on CLK template
-      await axios.get(`${API}/settings?clerk=${initials}`);
+      // Create settings entry for the new clerk using the POST endpoint
+      await api.post("/settings/clerk", { clerk: initials });
 
       toast.success(`Clerk ${initials} created successfully`);
       setNewClerkInitials("");
@@ -91,14 +90,14 @@ export default function ClerkManagement() {
             <h3 className="font-semibold mb-3">Create New Clerk</h3>
             <div className="flex gap-2">
               <div className="flex-1">
-                <Label>Clerk Initials (max 3 characters)</Label>
+                <Label>Clerk Initials (max 10 characters)</Label>
                 <Input
                   value={newClerkInitials}
                   onChange={(e) =>
                     setNewClerkInitials(e.target.value.toUpperCase())
                   }
-                  maxLength={3}
-                  placeholder="e.g., ABC"
+                  maxLength={10}
+                  placeholder="e.g., HARISH"
                   className="mt-1"
                 />
               </div>

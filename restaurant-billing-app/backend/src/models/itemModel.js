@@ -33,17 +33,20 @@ const ItemModel = {
       price_ac,
       category,
       is_separate = false,
+      split_category = 0,
     } = itemData;
 
     // Ensure category is a valid JSON array or object string if passed as string
     // If it's already an object/array, pg will handle it for JSONB
 
+    const finalIsSeparate = split_category > 0 || is_separate;
+
     const result = await pool.query(
       `INSERT INTO items (
         name, alpha_code, numeric_code, price_fixed, 
-        price_general, price_ac, category, is_separate
+        price_general, price_ac, category, is_separate, split_category
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         name,
@@ -53,7 +56,8 @@ const ItemModel = {
         price_general,
         price_ac,
         category,
-        is_separate,
+        finalIsSeparate,
+        split_category,
       ],
     );
     return result.rows[0];
@@ -70,14 +74,17 @@ const ItemModel = {
       price_ac,
       category,
       is_separate,
+      split_category = 0,
     } = itemData;
+
+    const finalIsSeparate = split_category > 0 || is_separate;
 
     const result = await pool.query(
       `UPDATE items 
        SET name = $1, alpha_code = $2, numeric_code = $3,
            price_fixed = $4, price_general = $5, price_ac = $6,
-           category = $7, is_separate = $8
-       WHERE id = $9
+           category = $7, is_separate = $8, split_category = $9
+       WHERE id = $10
        RETURNING *`,
       [
         name,
@@ -87,7 +94,8 @@ const ItemModel = {
         price_general,
         price_ac,
         category,
-        is_separate,
+        finalIsSeparate,
+        split_category,
         id,
       ],
     );
@@ -96,9 +104,20 @@ const ItemModel = {
 
   // Update item separate status
   async updateItemSeparate(id, is_separate) {
+    const split_category = is_separate ? 1 : 0;
     const result = await pool.query(
-      `UPDATE items SET is_separate = $1 WHERE id = $2 RETURNING *`,
-      [is_separate, id],
+      `UPDATE items SET is_separate = $1, split_category = $2 WHERE id = $3 RETURNING *`,
+      [is_separate, split_category, id],
+    );
+    return result.rows[0];
+  },
+
+  // Update item split category
+  async updateItemSplitCategory(id, split_category) {
+    const is_separate = split_category > 0;
+    const result = await pool.query(
+      `UPDATE items SET split_category = $1, is_separate = $2 WHERE id = $3 RETURNING *`,
+      [split_category, is_separate, id],
     );
     return result.rows[0];
   },

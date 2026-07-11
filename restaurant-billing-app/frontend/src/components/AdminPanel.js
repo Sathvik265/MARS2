@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+
 import {
   Card,
   CardHeader,
@@ -30,7 +30,7 @@ import {
   ShiftReport,
   ItemReport,
 } from "./Reports";
-import { API, toast, safeGet, safeArray, safeObject } from "../utils/helpers";
+import { toast, safeGet, safeArray, safeObject } from "../utils/helpers";
 import ClerkManagement from "./ClerkManagement";
 import SplitBillSettings from "./Admin/SplitBillSettings";
 import TrackControl from "./Admin/TrackControl";
@@ -426,30 +426,43 @@ function TopItemsDashboard({ sessionId, billingDate }) {
 
 // ================== SETTINGS EDITOR ==================
 
-function SettingsEditor({ settings, onChange, clerk }) {
+function SettingsEditor({ settings, onChange, clerk, isValidClerk }) {
   const [form, setForm] = useState(safeObject(settings));
   const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [saveStatusColor, setSaveStatusColor] = useState("");
 
   useEffect(() => {
     setForm(safeObject(settings));
+    setSaveStatus("");
   }, [settings]);
 
   const save = async () => {
+    if (!isValidClerk) {
+      setSaveStatus("This isn't a valid clerk name");
+      setSaveStatusColor("text-rose-500");
+      toast.error("This isn't a valid clerk name");
+      return;
+    }
     setLoading(true);
+    setSaveStatus("");
     try {
-      const res = await axios.put(
-        `${API}/settings?clerk=${clerk || "CLK"}`,
+      const res = await api.put(
+        `/settings?clerk=${clerk || "CLK"}`,
         form,
       );
       if (onChange) {
         onChange(res.data);
       }
-      toast.success("Settings saved");
+      toast.success("Settings updated");
+      setSaveStatus("Settings updated");
+      setSaveStatusColor("text-emerald-500");
     } catch (e) {
       console.error("Settings save error:", e);
-      toast.error(
-        safeGet(e, "response.data.detail", "Failed to save settings"),
-      );
+      const errDetail = safeGet(e, "response.data.detail", "Failed to save settings");
+      toast.error(errDetail);
+      setSaveStatus(errDetail === "This isn't a valid clerk name" ? "This isn't a valid clerk name" : "Failed to save settings");
+      setSaveStatusColor("text-rose-500");
     } finally {
       setLoading(false);
     }
@@ -538,10 +551,13 @@ function SettingsEditor({ settings, onChange, clerk }) {
             </TableRow>
           </TableBody>
         </Table>
-        <div className="mt-4">
-          <Button onClick={save} disabled={loading} className="w-full">
+        <div className="mt-4 flex flex-col gap-2">
+          <Button onClick={save} disabled={loading || !isValidClerk} className="w-full">
             {loading ? <Loader2 size={16} className="mr-2" /> : "Save Settings"}
           </Button>
+          {saveStatus && (
+            <p className={`text-sm font-semibold text-center mt-1 ${saveStatusColor}`}>{saveStatus}</p>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -556,6 +572,7 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
   const [adminActiveTab, setAdminActiveTab] = useState("dashboard");
   const [reportsInnerTab, setReportsInnerTab] = useState("time-range");
   const [settingsClerk, setSettingsClerk] = useState("CLK");
+  const [clerksList, setClerksList] = useState([]);
 
   useEffect(() => {
     if (jumpTarget) {
@@ -573,6 +590,9 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
     try {
       const res = await api.get(`/settings?clerk=${settingsClerk}`);
       setSettings(safeObject(res.data));
+      
+      const clerksRes = await api.get("/settings/clerks");
+      setClerksList(safeArray(clerksRes.data));
     } catch (e) {
       console.error("Failed to load settings:", e);
       toast.error("Failed to load settings");
@@ -687,15 +707,26 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
             <ClerkManagement />
 
             {/* Receipt Settings Section */}
-            <div className="flex items-center gap-2 mb-4">
-              <Label>Settings for Clerk:</Label>
-              <Input
-                value={settingsClerk}
-                onChange={(e) => setSettingsClerk(e.target.value.toUpperCase())}
-                maxLength={3}
-                className="w-24"
-                placeholder="CLK"
-              />
+            <div className="flex flex-col gap-1 mb-4">
+              <div className="flex items-center gap-2">
+                <Label>Settings for Clerk:</Label>
+                <Input
+                  value={settingsClerk}
+                  onChange={(e) => setSettingsClerk(e.target.value.toUpperCase())}
+                  maxLength={10}
+                  className="w-36"
+                  placeholder="CLK"
+                />
+              </div>
+              <div className="text-xs min-h-[16px] pl-2">
+                {settingsClerk && (
+                  (settingsClerk === "CLK" || clerksList.some(c => c.clerk_initials === settingsClerk)) ? (
+                    <span className="text-emerald-500 font-medium">✓ Valid clerk initials</span>
+                  ) : (
+                    <span className="text-rose-500 font-medium">✗ This isn't a valid clerk name</span>
+                  )
+                )}
+              </div>
             </div>
             {loading ? (
               <Card>
@@ -709,6 +740,7 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
                 settings={settings}
                 onChange={setSettings}
                 clerk={settingsClerk}
+                isValidClerk={settingsClerk === "CLK" || clerksList.some(c => c.clerk_initials === settingsClerk)}
               />
             )}
           </div>

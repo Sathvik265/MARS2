@@ -18,6 +18,7 @@ const OrderModel = {
       line_total,
       created_at, // IMPORTANT: Must enable passing this to match Bill's timestamp (FK)
       is_separate,
+      split_category = 0,
     } = orderData;
 
     // Default bill_date to current date if not provided
@@ -28,8 +29,7 @@ const OrderModel = {
       day: '2-digit'
     }).format(new Date());
 
-    // If created_at is provided, we MUST use it. Otherwise default to database default (which might fail FK if no matching bill exists)
-    // We include it in columns.
+    const finalIsSeparate = split_category > 0 || is_separate === true;
 
     // Check if created_at is passed. If so, insert it.
     let query, params;
@@ -37,7 +37,31 @@ const OrderModel = {
     if (created_at) {
       query = `INSERT INTO orders (
             track, clerk_initials, table_no, party_no, bill_number, bill_date,
-            item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate
+            item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate, split_category
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          RETURNING *`;
+      params = [
+        track,
+        clerk_initials,
+        table_no,
+        party_no,
+        bill_number,
+        finalBillDate,
+        item_code,
+        numeric_item_code,
+        item_name,
+        quantity,
+        unit_price,
+        line_total,
+        created_at,
+        finalIsSeparate,
+        split_category,
+      ];
+    } else {
+      query = `INSERT INTO orders (
+            track, clerk_initials, table_no, party_no, bill_number, bill_date,
+            item_code, numeric_item_code, item_name, quantity, unit_price, line_total, is_separate, split_category
           )
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
           RETURNING *`;
@@ -54,30 +78,8 @@ const OrderModel = {
         quantity,
         unit_price,
         line_total,
-        created_at,
-        is_separate === true,
-      ];
-    } else {
-      query = `INSERT INTO orders (
-            track, clerk_initials, table_no, party_no, bill_number, bill_date,
-            item_code, numeric_item_code, item_name, quantity, unit_price, line_total, is_separate
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-          RETURNING *`;
-      params = [
-        track,
-        clerk_initials,
-        table_no,
-        party_no,
-        bill_number,
-        finalBillDate,
-        item_code,
-        numeric_item_code,
-        item_name,
-        quantity,
-        unit_price,
-        line_total,
-        is_separate === true,
+        finalIsSeparate,
+        split_category,
       ];
     }
 
@@ -103,22 +105,23 @@ const OrderModel = {
     for (const orderData of ordersArray) {
       const {
         track, clerk_initials, table_no, party_no = "1", bill_number, bill_date,
-        item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate
+        item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate, split_category = 0
       } = orderData;
 
       const dateToUse = bill_date || finalBillDate;
+      const finalIsSeparate = split_category > 0 || is_separate === true;
 
       if (created_at) {
-        values.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
+        values.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
         params.push(
           track, clerk_initials, table_no, party_no, bill_number, dateToUse,
-          item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate === true
+          item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, finalIsSeparate, split_category
         );
       } else {
-        values.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, DEFAULT, $${paramIndex++})`);
+        values.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, DEFAULT, $${paramIndex++}, $${paramIndex++})`);
         params.push(
           track, clerk_initials, table_no, party_no, bill_number, dateToUse,
-          item_code, numeric_item_code, item_name, quantity, unit_price, line_total, is_separate === true
+          item_code, numeric_item_code, item_name, quantity, unit_price, line_total, finalIsSeparate, split_category
         );
       }
     }
@@ -126,7 +129,7 @@ const OrderModel = {
     const query = `
       INSERT INTO orders (
         track, clerk_initials, table_no, party_no, bill_number, bill_date,
-        item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate
+        item_code, numeric_item_code, item_name, quantity, unit_price, line_total, created_at, is_separate, split_category
       )
       VALUES ${values.join(', ')}
       RETURNING *
@@ -176,13 +179,15 @@ const OrderModel = {
   },
 
   // Update order quantity and split status
-  async updateOrder(orderId, newQuantity, newLineTotal, is_separate) {
+  async updateOrder(orderId, newQuantity, newLineTotal, is_separate, split_category) {
+    const finalIsSeparate = split_category > 0 || is_separate === true;
+    const finalSplitCategory = split_category !== undefined ? split_category : (is_separate === true ? 1 : 0);
     const result = await pool.query(
       `UPDATE orders 
-       SET quantity = $1, line_total = $2, is_separate = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4
+       SET quantity = $1, line_total = $2, is_separate = $3, split_category = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5
        RETURNING *`,
-      [newQuantity, newLineTotal, is_separate === true, orderId]
+      [newQuantity, newLineTotal, finalIsSeparate, finalSplitCategory, orderId]
     );
     return result.rows[0];
   },

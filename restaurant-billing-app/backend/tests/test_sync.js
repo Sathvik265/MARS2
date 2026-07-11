@@ -1,4 +1,4 @@
-const pool = require('./src/db');
+const pool = require('../src/db');
 (async () => {
   const r1 = await pool.query('SELECT * FROM running_bills');
   console.log('running_bills:', r1.rows);

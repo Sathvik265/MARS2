@@ -1,4 +1,4 @@
-const pool = require('./src/db');
+const pool = require('../src/db');
 async function run() {
   const code = '100';
   const result = await pool.query(

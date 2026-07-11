@@ -1,4 +1,4 @@
-const pool = require('./src/db');
+const pool = require('../src/db');
 async function test() {
   const result = await pool.query("SELECT id, bill_date FROM orders ORDER BY id DESC LIMIT 1");
   const d = result.rows[0].bill_date;
