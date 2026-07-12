@@ -19,7 +19,7 @@ import {
   TableHead,
   TableCell,
 } from "./ui/Table";
-import { API, toast, safeGet, safeArray } from "../utils/helpers";
+import { API, toast, safeGet, safeArray, formatDateToDDMMYYYY } from "../utils/helpers";
 import { generateAsciiReport } from "../utils/receiptGenerator";
 
 const fetchSettings = async () => {
@@ -243,7 +243,7 @@ export function DateRangeReport({ sessionId }) {
         { header: "Bill", accessor: (r) => r.bill_number, width: 6 },
         {
           header: "Date",
-          accessor: (r) => new Date(r.bill_date).toLocaleDateString("en-GB").substring(0, 5),
+          accessor: (r) => formatDateToDDMMYYYY(r.bill_date).substring(0, 5),
           width: 6,
         },
         { header: "Tbl", accessor: (r) => r.table_no, width: 4 },
@@ -330,7 +330,7 @@ export function DateRangeReport({ sessionId }) {
                       <TableRow key={bill.id}>
                         <TableCell>{bill.bill_number}</TableCell>
                         <TableCell>
-                          {new Date(bill.bill_date).toLocaleDateString()}
+                          {formatDateToDDMMYYYY(bill.bill_date)}
                         </TableCell>
                         <TableCell>{bill.table_no}</TableCell>
                         <TableCell>
@@ -358,7 +358,7 @@ export function ShiftReport({ sessionId }) {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     date: new Date().toISOString().split("T")[0],
-    shiftName: "`",
+    shiftName: "",
   });
   const [activeReportType, setActiveReportType] = useState("list");
   const [summaryReport, setSummaryReport] = useState(null);
@@ -594,7 +594,7 @@ export function ShiftReport({ sessionId }) {
   const handleGenerateDetailed = async () => {
     if (!filters.shiftName || filters.shiftName.trim() === "") {
       toast.error(
-        "Please enter a valid shift name (e.g. RBS1) for detailed report",
+        "Please enter a shift name for detailed report",
       );
       return;
     }
@@ -655,7 +655,7 @@ export function ShiftReport({ sessionId }) {
   const handleGenerateShiftOnly = async () => {
     if (!filters.shiftName || filters.shiftName.trim() === "") {
       toast.error(
-        "Please enter a valid shift name (e.g. RBS1) for shift only report",
+        "Please enter a shift name for shift only report",
       );
       return;
     }
@@ -745,7 +745,7 @@ export function ShiftReport({ sessionId }) {
                 onChange={(e) =>
                   setFilters({ ...filters, shiftName: e.target.value })
                 }
-                placeholder="`, ``, RBS1, RBS2"
+                placeholder="Enter Shift Name"
               />
             </div>
           </div>
@@ -1152,7 +1152,6 @@ export function ItemReport({ sessionId }) {
                   <TableRow>
                     <TableHead>Item Name</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Shift</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead>Amount</TableHead>
                   </TableRow>
@@ -1164,7 +1163,6 @@ export function ItemReport({ sessionId }) {
                         {item.itemName}
                       </TableCell>
                       <TableCell>{item.category || "N/A"}</TableCell>
-                      <TableCell>{item.shiftName}</TableCell>
                       <TableCell className="font-bold">
                         {item.totalQuantity}
                       </TableCell>
@@ -1179,6 +1177,266 @@ export function ItemReport({ sessionId }) {
           {report.length === 0 && !loading && (
             <div className="text-center py-8 text-gray-500">
               No data available for the selected date range
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function CategoryReport({ sessionId }) {
+  const [report, setReport] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [dropdownsLoaded, setDropdownsLoaded] = useState(false);
+  const [filters, setFilters] = useState({
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: new Date().toISOString().split("T")[0],
+    category: "",
+  });
+
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        const categoriesRes = await axios.get(`${API}/items/categories/all`);
+        setCategories(safeArray(categoriesRes.data));
+        setDropdownsLoaded(true);
+      } catch (e) {
+        console.error("Failed to fetch categories list:", e);
+        setDropdownsLoaded(false);
+      }
+    };
+    fetchDropdownData();
+  }, []);
+
+  const generateReport = async () => {
+    setLoading(true);
+    try {
+      const params = {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      };
+      if (filters.category) params.category = filters.category;
+
+      const res = await axios.get(`${API}/reports/category-report`, {
+        params,
+      });
+      setReport(safeArray(res.data));
+      toast.success("Category report generated successfully");
+    } catch (e) {
+      console.error("Failed to generate category report:", e);
+      toast.error(
+        safeGet(e, "response.data.detail", "Failed to generate category report")
+      );
+      setReport([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    if (!report || report.length === 0) return;
+    const isAllCategories = !filters.category;
+    const columns = isAllCategories
+      ? [
+          { header: "Category", accessor: (r) => r.categoryName, width: 20 },
+          { header: "Qty", accessor: (r) => r.totalQuantity, width: 6 },
+          {
+            header: "Amount",
+            accessor: (r) => Number(r.totalAmount).toFixed(2),
+            width: 12,
+            align: "right",
+          },
+        ]
+      : [
+          { header: "Item", accessor: (r) => r.itemName, width: 17 },
+          { header: "Cat", accessor: (r) => r.categoryName, width: 7 },
+          { header: "Qty", accessor: (r) => r.totalQuantity, width: 4 },
+          {
+            header: "Amount",
+            accessor: (r) => Number(r.totalAmount).toFixed(2),
+            width: 10,
+            align: "right",
+          },
+        ];
+
+    sendToPosPrinter(
+      `Category Sales (${filters.startDate.slice(5)} to ${filters.endDate.slice(5)})`,
+      columns,
+      report
+    );
+  };
+
+  useEffect(() => {
+    const handleCtrlP = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
+        if (report && report.length > 0) {
+          e.preventDefault();
+          handlePrint();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleCtrlP);
+    return () => window.removeEventListener("keydown", handleCtrlP);
+  }, [report]);
+
+  const totalCategorySum = report.reduce((sum, item) => sum + parseInt(item.totalQuantity || 0), 0);
+  const totalAmountSum = report.reduce((sum, item) => sum + parseFloat(item.totalAmount || 0), 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Category Sales Report</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Start Date</Label>
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) =>
+                  setFilters({ ...filters, startDate: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>End Date</Label>
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) =>
+                  setFilters({ ...filters, endDate: e.target.value })
+                }
+              />
+            </div>
+            <div className="col-span-2">
+              <Label>Category</Label>
+              {dropdownsLoaded && categories.length > 0 ? (
+                <select
+                  className="w-full p-2 border rounded text-white bg-black"
+                  value={filters.category}
+                  onChange={(e) =>
+                    setFilters({ ...filters, category: e.target.value })
+                  }
+                >
+                  <option value="">All Categories</option>
+                  {categories.map((cat, index) => (
+                    <option key={index} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  type="text"
+                  placeholder="Type category..."
+                  value={filters.category}
+                  onChange={(e) =>
+                    setFilters({ ...filters, category: e.target.value })
+                  }
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={generateReport} disabled={loading}>
+              {loading ? <Loader2 size={16} className="mr-2" /> : null}
+              Generate Report
+            </Button>
+            {report.length > 0 && (
+              <Button onClick={handlePrint} variant="outline">
+                Print Report
+              </Button>
+            )}
+          </div>
+
+          {report.length > 0 && (
+            <div className="mt-6 space-y-4">
+              <h4 className="font-medium mb-2">
+                {!filters.category ? "All Categories Sales Summary" : "Category Sales Breakdown"}
+              </h4>
+              <Table>
+                <TableHeader>
+                  {!filters.category ? (
+                    <TableRow>
+                      <TableHead>Category Name</TableHead>
+                      <TableHead className="text-right">Total Items (Quantity)</TableHead>
+                      <TableHead className="text-right">Total Value (Amount)</TableHead>
+                    </TableRow>
+                  ) : (
+                    <TableRow>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  )}
+                </TableHeader>
+                <TableBody>
+                  {report.map((item, index) => (
+                    <TableRow key={index}>
+                      {!filters.category ? (
+                        <>
+                          <TableCell className="font-semibold">
+                            {item.categoryName}
+                          </TableCell>
+                          <TableCell className="font-bold text-right">
+                            {item.totalQuantity}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ₹{item.totalAmount?.toFixed(2)}
+                          </TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="font-medium">
+                            {item.itemName}
+                          </TableCell>
+                          <TableCell>{item.categoryName}</TableCell>
+                          <TableCell className="font-bold text-right">
+                            {item.totalQuantity}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ₹{item.totalAmount?.toFixed(2)}
+                          </TableCell>
+                        </>
+                      )}
+                    </TableRow>
+                  ))}
+                  {/* Totals Row */}
+                  <TableRow className="font-bold bg-zinc-900">
+                    {!filters.category ? (
+                      <>
+                        <TableCell>Total</TableCell>
+                        <TableCell className="text-right">{totalCategorySum}</TableCell>
+                        <TableCell className="text-right">₹{totalAmountSum.toFixed(2)}</TableCell>
+                      </>
+                    ) : (
+                      <>
+                        <TableCell>Total</TableCell>
+                        <TableCell>—</TableCell>
+                        <TableCell className="text-right">{totalCategorySum}</TableCell>
+                        <TableCell className="text-right">₹{totalAmountSum.toFixed(2)}</TableCell>
+                      </>
+                    )}
+                  </TableRow>
+                </TableBody>
+              </Table>
+              
+              <div className="p-4 bg-zinc-900 border rounded-lg flex justify-between items-center text-lg font-bold">
+                <span>Total Category Quantity Sum:</span>
+                <span className="text-emerald-400">{totalCategorySum}</span>
+              </div>
+            </div>
+          )}
+
+          {report.length === 0 && !loading && (
+            <div className="text-center py-8 text-gray-500">
+              No category data available for the selected range/category
             </div>
           )}
         </div>

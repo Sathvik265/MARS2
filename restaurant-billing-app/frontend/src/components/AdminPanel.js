@@ -29,11 +29,10 @@ import {
   DateRangeReport,
   ShiftReport,
   ItemReport,
+  CategoryReport,
 } from "./Reports";
-import { toast, safeGet, safeArray, safeObject } from "../utils/helpers";
-import ClerkManagement from "./ClerkManagement";
+import { toast, safeGet, safeArray, safeObject, getFriendlyShiftName, getCustomShortcuts, saveCustomShortcuts, validateShortcut, getShortcutActionLabel } from "../utils/helpers";
 import SplitBillSettings from "./Admin/SplitBillSettings";
-import TrackControl from "./Admin/TrackControl";
 
 // ================== RECONCILIATION ==================
 
@@ -280,11 +279,7 @@ function HourlySalesDashboard({ billingDate }) {
       </CardHeader>
       <CardContent className="p-6 space-y-6">
         {/* Metric Cards Row */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="p-3 bg-zinc-905 bg-zinc-900/40 border border-zinc-850 rounded-lg">
-            <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Total Sales</div>
-            <div className="text-xl font-extrabold text-emerald-400 mt-1">₹{summary.totalSales.toFixed(2)}</div>
-          </div>
+        <div className="grid grid-cols-2 gap-4">
           <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-lg">
             <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Total Bills</div>
             <div className="text-xl font-extrabold text-indigo-400 mt-1">{summary.totalBills}</div>
@@ -631,9 +626,7 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
           <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="split-bill">Split Bill</TabsTrigger>
-          {mode === "admin-full" && (
-            <TabsTrigger value="track-control">Track Control</TabsTrigger>
-          )}
+
           {mode === "admin-full" && (
             <TabsTrigger
               value="purge"
@@ -670,6 +663,7 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
                 <TabsTrigger value="date-range">Date Range</TabsTrigger>
                 <TabsTrigger value="shift-report">Shift Report</TabsTrigger>
                 <TabsTrigger value="item-report">Item Report</TabsTrigger>
+                <TabsTrigger value="category-report">Category Report</TabsTrigger>
               </TabsList>
 
               <TabsContent value="time-range">
@@ -687,6 +681,10 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
               <TabsContent value="item-report">
                 <ItemReport sessionId={sessionId} />
               </TabsContent>
+
+              <TabsContent value="category-report">
+                <CategoryReport sessionId={sessionId} />
+              </TabsContent>
             </Tabs>
           </div>
         </TabsContent>
@@ -703,9 +701,6 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
 
         <TabsContent value="settings">
           <div className="space-y-6">
-            {/* Clerk Management Section */}
-            <ClerkManagement />
-
             {/* Receipt Settings Section */}
             <div className="flex flex-col gap-1 mb-4">
               <div className="flex items-center gap-2">
@@ -743,6 +738,9 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
                 isValidClerk={settingsClerk === "CLK" || clerksList.some(c => c.clerk_initials === settingsClerk)}
               />
             )}
+            
+            {/* Customizable Keyboard Shortcuts Section */}
+            <KeyboardShortcutsSettings />
           </div>
         </TabsContent>
 
@@ -750,16 +748,7 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
           <SplitBillSettings />
         </TabsContent>
 
-        {mode === "admin-full" && (
-          <TabsContent value="track-control">
-            <TrackControl
-              onResetComplete={() => {
-                // After EOD reset, navigate back to dashboard if desired
-                setAdminActiveTab("dashboard");
-              }}
-            />
-          </TabsContent>
-        )}
+
       </Tabs>
     </div>
   );
@@ -790,8 +779,7 @@ function ClerkStatsDashboard({ sessionId, billingDate }) {
 
   const { sales = [], history = [] } = stats;
 
-  const totalClerkSales = sales.reduce((acc, s) => acc + parseFloat(s.total_sales || 0), 0);
-  const maxClerkSales = sales.length > 0 ? Math.max(...sales.map(s => parseFloat(s.total_sales || 0))) : 1;
+
 
   return (
     <Card className="border border-zinc-800 bg-zinc-950 text-white rounded-xl shadow-lg">
@@ -801,93 +789,51 @@ function ClerkStatsDashboard({ sessionId, billingDate }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
-        {loading && !sales.length && !history.length ? (
+        {loading && !history.length ? (
           <div className="text-center py-8">
             <Loader2 size={24} className="mb-2 animate-spin text-zinc-500 mx-auto" />
             <p className="text-zinc-500 text-sm">Loading stats...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Sales contribution */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-zinc-450 text-zinc-400 uppercase tracking-widest border-b border-zinc-900 pb-2">
-                Clerk Contribution (Sales)
-              </h4>
-              {sales.length > 0 ? (
-                <div className="space-y-4">
-                  {sales.map((s, i) => {
-                    const salesVal = parseFloat(s.total_sales || 0);
-                    const pctOfMax = (salesVal / maxClerkSales) * 100;
-                    const pctOfTotal = totalClerkSales > 0 ? (salesVal / totalClerkSales) * 100 : 0;
-                    const displayTrack = s.track === "`" ? "I (`)" : s.track === "``" ? "II (``)" : s.track;
-
-                    return (
-                      <div key={i} className="space-y-1">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="font-semibold text-zinc-300">
-                            {s.clerk_initials} <span className="text-xs text-zinc-500">({displayTrack})</span>
-                          </span>
-                          <span className="font-bold text-emerald-400">
-                            ₹{salesVal.toFixed(2)}{" "}
-                            <span className="text-xs text-zinc-500 font-normal">({s.bill_count} bills, {pctOfTotal.toFixed(0)}%)</span>
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-emerald-500 rounded-full transition-all duration-500 ease-out"
-                            style={{ width: `${pctOfMax}%` }}
-                          />
-                        </div>
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-900 pb-2">
+              Session Activity Log
+            </h4>
+            {history.length > 0 ? (
+              <div className="max-h-60 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                {history.map((h, i) => {
+                  const isSessionActive = !h.logout_time;
+                  const displayTrack = getFriendlyShiftName(h.shift_name);
+                  return (
+                    <div key={i} className="flex gap-3 text-xs">
+                      {/* Timeline Node */}
+                      <div className="flex flex-col items-center">
+                        <div className={`w-2.5 h-2.5 rounded-full ${isSessionActive ? "bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse" : "bg-zinc-700"}`} />
+                        {i < history.length - 1 && <div className="w-0.5 flex-1 bg-zinc-900 my-1" />}
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-sm text-zinc-500 py-4">No sales recorded yet today.</div>
-              )}
-            </div>
-
-            {/* Login history timeline */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest border-b border-zinc-900 pb-2">
-                Session Activity Log
-              </h4>
-              {history.length > 0 ? (
-                <div className="max-h-60 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
-                  {history.map((h, i) => {
-                    const isSessionActive = !h.logout_time;
-                    const displayTrack = h.shift_name === "`" ? "I (`)" : h.shift_name === "``" ? "II (``)" : h.shift_name;
-                    return (
-                      <div key={i} className="flex gap-3 text-xs">
-                        {/* Timeline Node */}
-                        <div className="flex flex-col items-center">
-                          <div className={`w-2.5 h-2.5 rounded-full ${isSessionActive ? "bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse" : "bg-zinc-700"}`} />
-                          {i < history.length - 1 && <div className="w-0.5 flex-1 bg-zinc-900 my-1" />}
+                      <div className="flex-1 pb-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-semibold text-zinc-200">
+                            Clerk <span className="text-indigo-400 font-bold">{h.clerk_initials}</span> @ {displayTrack}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isSessionActive ? "bg-emerald-950 text-emerald-400" : "bg-zinc-900 text-zinc-500"}`}>
+                            {isSessionActive ? "Active" : "Finished"}
+                          </span>
                         </div>
-                        <div className="flex-1 pb-2">
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold text-zinc-200">
-                              Clerk <span className="text-indigo-400 font-bold">{h.clerk_initials}</span> @ {displayTrack}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isSessionActive ? "bg-emerald-950 text-emerald-400" : "bg-zinc-900 text-zinc-500"}`}>
-                              {isSessionActive ? "Active" : "Finished"}
-                            </span>
-                          </div>
-                          <p className="text-zinc-500 mt-0.5">
-                            {new Date(h.login_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{" "}
-                            {h.logout_time
-                              ? new Date(h.logout_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                              : "Now"}
-                          </p>
-                        </div>
+                        <p className="text-zinc-500 mt-0.5">
+                          {new Date(h.login_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{" "}
+                          {h.logout_time
+                            ? new Date(h.logout_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : "Now"}
+                        </p>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-sm text-zinc-500 py-4">No session logins recorded yet today.</div>
-              )}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-sm text-zinc-500 py-4">No session logins recorded yet today.</div>
+            )}
           </div>
         )}
       </CardContent>
@@ -911,14 +857,12 @@ function PurgeBillsSection() {
     new Date().toISOString().split("T")[0],
   );
   const [shiftName, setShiftName] = useState("");
+  const [purgePassword, setPurgePassword] = useState("");
+  const [shiftPurgePassword, setShiftPurgePassword] = useState("");
 
   const handlePurge = async () => {
-    const confirmPassword = window.prompt(
-      "Enter admin full password to confirm purge:",
-      "",
-    );
-
-    if (!confirmPassword) {
+    if (!purgePassword) {
+      toast.error("Please enter the admin password.");
       return;
     }
 
@@ -935,9 +879,10 @@ function PurgeBillsSection() {
       const res = await api.post("/billing/bills/purge", {
         startDate,
         endDate,
-        confirmPassword,
+        confirmPassword: purgePassword,
       });
       toast.success(res.data.message);
+      setPurgePassword("");
     } catch (e) {
       console.error("Purge failed", e);
       toast.error(safeGet(e, "response.data.error", "Purge failed"));
@@ -948,16 +893,12 @@ function PurgeBillsSection() {
 
   const handleShiftPurge = async () => {
     if (!shiftName || !shiftName.trim()) {
-      toast.error("Please enter a shift name (e.g. `, ``, RBS1, RBS2)");
+      toast.error("Please enter a shift name.");
       return;
     }
 
-    const confirmPassword = window.prompt(
-      "Enter admin full password to confirm shift purge:",
-      "",
-    );
-
-    if (!confirmPassword) {
+    if (!shiftPurgePassword) {
+      toast.error("Please enter the admin password.");
       return;
     }
 
@@ -975,9 +916,10 @@ function PurgeBillsSection() {
         startDate: shiftStartDate,
         endDate: shiftEndDate,
         shiftName: shiftName.trim(),
-        confirmPassword,
+        confirmPassword: shiftPurgePassword,
       });
       toast.success(res.data.message);
+      setShiftPurgePassword("");
     } catch (e) {
       console.error("Shift purge failed", e);
       toast.error(safeGet(e, "response.data.error", "Shift purge failed"));
@@ -999,7 +941,7 @@ function PurgeBillsSection() {
               within that period (inclusive). This deletes bills for ALL shifts.
             </p>
 
-            <div className="flex gap-4 items-center">
+            <div className="flex gap-4 items-end flex-wrap">
               <div className="flex flex-col gap-1">
                 <Label className="text-red-800">Start Date</Label>
                 <Input
@@ -1016,6 +958,16 @@ function PurgeBillsSection() {
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   className="bg-white"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-red-800">Admin Password</Label>
+                <Input
+                  type="password"
+                  value={purgePassword}
+                  onChange={(e) => setPurgePassword(e.target.value)}
+                  className="bg-white w-48"
+                  placeholder="Enter Password"
                 />
               </div>
             </div>
@@ -1047,7 +999,7 @@ function PurgeBillsSection() {
               Bills from other shifts will NOT be affected.
             </p>
 
-            <div className="flex gap-4 items-center flex-wrap">
+            <div className="flex gap-4 items-end flex-wrap">
               <div className="flex flex-col gap-1">
                 <Label className="text-orange-800">Start Date</Label>
                 <Input
@@ -1072,7 +1024,17 @@ function PurgeBillsSection() {
                   type="text"
                   value={shiftName}
                   onChange={(e) => setShiftName(e.target.value)}
-                  placeholder="`, ``, RBS1, RBS2"
+                  placeholder="Shift Name"
+                  className="bg-white w-40"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-orange-800">Admin Password</Label>
+                <Input
+                  type="password"
+                  value={shiftPurgePassword}
+                  onChange={(e) => setShiftPurgePassword(e.target.value)}
+                  placeholder="Enter Password"
                   className="bg-white w-40"
                 />
               </div>
@@ -1094,5 +1056,143 @@ function PurgeBillsSection() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function KeyboardShortcutsSettings() {
+  const [shortcuts, setShortcuts] = useState({});
+  const [recordingAction, setRecordingAction] = useState(null);
+
+  useEffect(() => {
+    setShortcuts(getCustomShortcuts());
+  }, []);
+
+  const handleRecord = (actionKey) => {
+    setRecordingAction(actionKey);
+  };
+
+  useEffect(() => {
+    if (!recordingAction) return;
+
+    const handleKeydown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const key = e.key;
+
+      // Ignore isolated modifier keys
+      if (["control", "shift", "alt", "meta"].includes(key.toLowerCase())) {
+        return;
+      }
+
+      const parts = [];
+      if (e.ctrlKey) parts.push("ctrl");
+      if (e.altKey) parts.push("alt");
+      if (e.shiftKey) parts.push("shift");
+      if (e.metaKey) parts.push("cmd");
+
+      // Add main key
+      let mainKeyName = key.toLowerCase();
+      if (mainKeyName === " ") {
+        mainKeyName = "space";
+      } else if (mainKeyName === "arrowup") {
+        mainKeyName = "up";
+      } else if (mainKeyName === "arrowdown") {
+        mainKeyName = "down";
+      } else if (mainKeyName === "arrowleft") {
+        mainKeyName = "left";
+      } else if (mainKeyName === "arrowright") {
+        mainKeyName = "right";
+      }
+
+      parts.push(mainKeyName);
+      const combo = parts.join("+");
+
+      // Stop recording
+      setRecordingAction(null);
+
+      // Validate
+      const validation = validateShortcut(combo, recordingAction, shortcuts);
+      if (!validation.valid) {
+        toast.error(validation.reason);
+        return;
+      }
+
+      const updated = { ...shortcuts, [recordingAction]: combo };
+      setShortcuts(updated);
+      saveCustomShortcuts(updated);
+      toast.success(`Shortcut for '${getShortcutActionLabel(recordingAction)}' updated to '${combo}'`);
+    };
+
+    window.addEventListener("keydown", handleKeydown, true);
+    return () => window.removeEventListener("keydown", handleKeydown, true);
+  }, [recordingAction, shortcuts]);
+
+  const handleResetDefaults = () => {
+    const defaults = {
+      activeBills: "alt+1",
+      recentBills: "alt+2",
+      shifts: "alt+3",
+      foodMenu: "alt+4",
+      admin: "alt+5",
+      shortcutsHelp: "f1",
+      activeTables: "f2",
+      itemsSearch: "f4",
+      printBill: "end",
+      focusItemCode: "pagedown",
+      toggleSplit: "f3"
+    };
+    setShortcuts(defaults);
+    saveCustomShortcuts(defaults);
+    toast.success("Shortcuts reset to defaults");
+  };
+
+  const shortcutKeys = Object.keys(shortcuts);
+
+  return (
+    <Card className="border border-zinc-800 bg-zinc-950 text-white rounded-xl shadow-lg mt-6">
+      <CardHeader className="border-b border-zinc-900 pb-4">
+        <CardTitle className="text-xl font-bold tracking-tight text-zinc-100">
+          ⌨ Customize Keyboard Shortcuts
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-6">
+        <div className="space-y-4">
+          <p className="text-sm text-zinc-400">
+            Click "Record" next to any action, then press your desired key combination.
+            System keys (like F1, Alt+Tab, etc.) are restricted.
+          </p>
+
+          <div className="border border-zinc-900 rounded-lg overflow-hidden divide-y divide-zinc-900">
+            {shortcutKeys.map((actionKey) => (
+              <div key={actionKey} className="flex justify-between items-center p-3 text-sm hover:bg-zinc-900/20">
+                <div>
+                  <div className="font-semibold text-zinc-200">{getShortcutActionLabel(actionKey)}</div>
+                  <div className="text-xs text-zinc-550 text-zinc-500">Default key binding is standard</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded font-mono font-bold text-indigo-400">
+                    {recordingAction === actionKey ? "Press any key combo..." : shortcuts[actionKey]}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={recordingAction === actionKey ? "destructive" : "outline"}
+                    onClick={() => handleRecord(actionKey)}
+                  >
+                    {recordingAction === actionKey ? "Cancel" : "Record"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" size="sm" onClick={handleResetDefaults}>
+              Reset to Defaults
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

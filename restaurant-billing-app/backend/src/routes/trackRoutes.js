@@ -9,7 +9,7 @@ const ShiftModel = require("../models/shiftModel");
 const BillingModel = require("../models/billingModel");
 const { requireAuth, requireAdminFull } = require("../middleware/auth");
 
-const VALID_TRACKS = ["`", "``", "RBS1", "RBS2"];
+const VALID_TRACKS = ["`", "``", "RBS", "RBS1"];
 
 // ---------------------------------------------------------------------------
 // GET /api/tracks/status

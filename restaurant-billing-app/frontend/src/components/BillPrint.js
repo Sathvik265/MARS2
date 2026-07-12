@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../services/api";
-import { API, safeGet, safeArray, safeObject } from "../utils/helpers";
+import { API, safeGet, safeArray, safeObject, formatDateToDDMMYYYY } from "../utils/helpers";
 import { useUser } from "../context/UserContext";
 
 // Inline CSS to handle the continuous roll logic
@@ -69,7 +69,7 @@ const BillContent = ({ data, settings, isLast = true }) => {
   const grandTotal = safeGet(data, "grand_total", 0);
 
   const printTime = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
-  const printDate = createdAt ? new Date(createdAt).toLocaleDateString("en-GB") : new Date().toLocaleDateString("en-GB");
+  const printDate = formatDateToDDMMYYYY(createdAt || new Date());
 
   const LINE_WIDTH = 35; // Decreased by exactly 5 characters (~0.5 inch at standard 10 cpi)
 

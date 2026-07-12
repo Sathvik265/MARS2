@@ -142,9 +142,23 @@ app.post("/api/auth/login", async (req, res) => {
       [track],
     );
     if (closedCheck.rows.length > 0 && openCheck.rows.length === 0) {
-      return res
-        .status(403)
-        .json({ detail: "Shift is closed for this track/date" });
+      if (mode === "admin-full") {
+        // Automatically open the shift!
+        await pool.query(
+          `UPDATE sessions 
+           SET status = 'OPEN', 
+               end_time = NULL, 
+               closed_by = NULL, 
+               is_locked = FALSE, 
+               clerk_initials = $1 
+           WHERE shift_name = $2`,
+          [upperStaffCode, track]
+        );
+      } else {
+        return res
+          .status(403)
+          .json({ detail: "Shift is closed for this track/date" });
+      }
     }
 
     // LOCKDOWN CHECK: Only block clerks when the track is locked AND

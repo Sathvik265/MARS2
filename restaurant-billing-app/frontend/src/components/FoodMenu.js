@@ -20,12 +20,100 @@ import {
   TableCell,
 } from "./ui/Table";
 import { updateMenuItem, bulkUpdateMenuItems } from "../services/api";
-import { API, toast, safeGet, safeArray } from "../utils/helpers";
+import { API, toast, safeGet, safeArray, getCategoryName } from "../utils/helpers";
 import * as XLSX from "xlsx";
+
+function CategorySelector({ value, onChange, existingCategories }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState(value || "");
+  const wrapperRef = React.useRef(null);
+
+  useEffect(() => {
+    setSearch(value || "");
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filtered = existingCategories.filter((cat) =>
+    cat.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const showCreateOption = search.trim() !== "" && !existingCategories.some(
+    (cat) => cat.toLowerCase() === search.trim().toLowerCase()
+  );
+
+  return (
+    <div ref={wrapperRef} className="relative w-full">
+      <Input
+        value={search}
+        onFocus={() => setIsOpen(true)}
+        onChange={(e) => {
+          const val = e.target.value;
+          setSearch(val);
+          onChange(val);
+          setIsOpen(true);
+        }}
+        placeholder="Type or select category..."
+        className="w-full text-black"
+      />
+      {isOpen && (filtered.length > 0 || showCreateOption) && (
+        <div 
+          className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg divide-y divide-gray-100"
+          style={{ zIndex: 99999999 }}
+        >
+          {filtered.map((cat) => (
+            <div
+              key={cat}
+              className="px-3 py-2 text-sm text-gray-800 hover:bg-gray-100 cursor-pointer font-medium text-left"
+              onClick={() => {
+                onChange(cat);
+                setSearch(cat);
+                setIsOpen(false);
+              }}
+            >
+              📁 {cat}
+            </div>
+          ))}
+          {showCreateOption && (
+            <div
+              className="px-3 py-2 text-sm text-green-600 hover:bg-green-50 cursor-pointer font-semibold flex items-center gap-1 text-left"
+              onClick={() => {
+                onChange(search.trim());
+                setIsOpen(false);
+              }}
+            >
+              <span>➕ Create new category:</span>
+              <span className="text-gray-900 underline">"{search.trim()}"</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function FoodMenu({ mode }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const existingCategories = React.useMemo(() => {
+    const cats = new Set();
+    items.forEach((item) => {
+      const catName = getCategoryName(safeGet(item, "category"));
+      if (catName) {
+        cats.add(catName);
+      }
+    });
+    return Array.from(cats);
+  }, [items]);
   const [newItem, setNewItem] = useState({
     name: "",
     alpha_code: "",
@@ -234,11 +322,12 @@ export default function FoodMenu({ mode }) {
               </div>
               <div>
                 <Label>Category</Label>
-                <Input
+                <CategorySelector
                   value={editingItem.category}
-                  onChange={(e) =>
-                    setEditingItem({ ...editingItem, category: e.target.value })
+                  onChange={(val) =>
+                    setEditingItem({ ...editingItem, category: val })
                   }
+                  existingCategories={existingCategories}
                 />
               </div>
               <div style={{ display: "flex", gap: 8 }}>
@@ -711,11 +800,12 @@ export default function FoodMenu({ mode }) {
                   </div>
                   <div>
                     <Label>Category</Label>
-                    <Input
-                      name="category"
-                      placeholder="e.g., South Indian"
+                    <CategorySelector
                       value={newItem.category}
-                      onChange={handleNewItemChange}
+                      onChange={(val) =>
+                        setNewItem((prev) => ({ ...prev, category: val }))
+                      }
+                      existingCategories={existingCategories}
                     />
                   </div>
                   <div>
@@ -834,56 +924,7 @@ export default function FoodMenu({ mode }) {
                       {Number(safeGet(item, "price_ac", 0)).toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      {(() => {
-                        const raw = safeGet(item, "category");
-                        if (!raw) return "-";
-
-                        let display = String(raw);
-
-                        if (typeof raw === "object") {
-                          if (Array.isArray(raw) && raw.length > 0) {
-                            display =
-                              raw[0].name || raw[0].item_name || display;
-                          } else if (!Array.isArray(raw)) {
-                            display = raw.name || raw.item_name || display;
-                          }
-                        } else if (typeof raw === "string") {
-                          try {
-                            if (
-                              raw.trim().startsWith("[") ||
-                              raw.trim().startsWith("{")
-                            ) {
-                              const parsed = JSON.parse(raw);
-                              if (Array.isArray(parsed) && parsed.length > 0) {
-                                display =
-                                  parsed[0].name ||
-                                  parsed[0].item_name ||
-                                  display;
-                              } else if (parsed && typeof parsed === "object") {
-                                display =
-                                  parsed.name || parsed.item_name || display;
-                              }
-                            }
-                          } catch (e) {
-                            const match = raw.match(
-                              /["']name["']\s*:\s*["']([^"']+)["']/i,
-                            );
-                            if (match && match[1]) display = match[1];
-                          }
-                        }
-
-                        if (
-                          display.startsWith("[") &&
-                          display.includes("name")
-                        ) {
-                          const match = display.match(
-                            /["']name["']\s*:\s*["']([^"']+)["']/i,
-                          );
-                          if (match && match[1]) display = match[1];
-                        }
-
-                        return display;
-                      })()}
+                      {getCategoryName(safeGet(item, "category")) || "-"}
                     </TableCell>
                     {mode === "admin-full" && (
                       <TableCell>
@@ -904,7 +945,7 @@ export default function FoodMenu({ mode }) {
                                   0,
                                 ),
                                 price_ac: safeGet(item, "price_ac", 0),
-                                category: safeGet(item, "category", ""),
+                                category: getCategoryName(safeGet(item, "category")),
                                 is_separate: safeGet(
                                   item,
                                   "is_separate",

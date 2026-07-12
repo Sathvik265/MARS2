@@ -316,7 +316,6 @@ exports.getItemReport = async (req, res) => {
       `
       WITH FlatItems AS (
           SELECT 
-              b.track as shift_name,
               item->>'item_name' as item_name,
               item->>'category' as legacy_category,
               (item->>'quantity')::integer as qty,
@@ -328,7 +327,6 @@ exports.getItemReport = async (req, res) => {
       ),
       ProcessedItems AS (
           SELECT 
-              shift_name,
               item_name,
               qty,
               amount,
@@ -356,10 +354,9 @@ exports.getItemReport = async (req, res) => {
         item_name,
         category_name as category,
         SUM(qty * multiplier) as total_quantity,
-        SUM(amount) as total_amount,
-        shift_name
+        SUM(amount) as total_amount
       FROM ProcessedItems
-      GROUP BY item_name, category_name, shift_name
+      GROUP BY item_name, category_name
       ORDER BY total_quantity DESC`,
       params,
     );
@@ -369,7 +366,6 @@ exports.getItemReport = async (req, res) => {
       category: row.category,
       totalQuantity: parseInt(row.total_quantity),
       totalAmount: parseFloat(row.total_amount),
-      shiftName: row.shift_name,
     }));
 
     res.json(formattedResult);
@@ -663,5 +659,93 @@ exports.getCategoryTotals = async (req, res) => {
   } catch (error) {
     console.error("Category totals error:", error);
     res.status(500).json({ detail: "Failed to fetch category totals" });
+  }
+};
+
+// GET /api/reports/category-report (detailed items matching selected category)
+exports.getCategoryReport = async (req, res) => {
+  try {
+    const { startDate, endDate, category } = req.query;
+    if (!startDate || !endDate) {
+      return res.status(400).json({ detail: "startDate and endDate are required" });
+    }
+
+    const result = await pool.query(
+      `SELECT items_json, bill_date FROM bills 
+       WHERE bill_date >= $1 AND bill_date <= $2 AND bill_number > 0`,
+      [startDate, endDate]
+    );
+
+    const itemAggregation = {}; // key: item_name::category_name
+
+    result.rows.forEach(row => {
+      const items = row.items_json || [];
+      if (Array.isArray(items)) {
+        items.forEach(item => {
+          let cats = [];
+          if (item.categories) {
+            cats = Array.isArray(item.categories) ? item.categories : [item.categories];
+          } else if (item.category) {
+            try {
+              const parsed = typeof item.category === 'string' ? JSON.parse(item.category) : item.category;
+              cats = Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+              cats = [];
+            }
+          }
+          if (cats.length > 0 && Array.isArray(cats[0])) {
+            cats = cats[0];
+          }
+
+          cats.forEach(cat => {
+            if (cat && cat.name) {
+              const catName = String(cat.name).trim();
+              const catQtyMultiplier = parseInt(cat.qty || cat.quantity) || 1;
+              const itemQty = parseInt(item.quantity || item.qty) || 0;
+              const itemAmount = parseFloat(item.line_total || item.amount) || 0;
+
+              if (!category) {
+                // All categories selected: group and aggregate by category name only
+                const key = catName;
+                const resolvedQty = itemQty * catQtyMultiplier;
+
+                if (!itemAggregation[key]) {
+                  itemAggregation[key] = {
+                    categoryName: catName,
+                    totalQuantity: 0,
+                    totalAmount: 0
+                  };
+                }
+                itemAggregation[key].totalQuantity += resolvedQty;
+                itemAggregation[key].totalAmount += itemAmount;
+              } else {
+                // Specific category selected: group and aggregate by item name + category
+                if (catName.toLowerCase().includes(category.toLowerCase())) {
+                  const key = `${item.item_name || item.name}::${catName}`;
+                  const resolvedQty = itemQty * catQtyMultiplier;
+
+                  if (!itemAggregation[key]) {
+                    itemAggregation[key] = {
+                      itemName: item.item_name || item.name,
+                      categoryName: catName,
+                      totalQuantity: 0,
+                      totalAmount: 0
+                    };
+                  }
+                  itemAggregation[key].totalQuantity += resolvedQty;
+                  itemAggregation[key].totalAmount += itemAmount;
+                }
+              }
+            }
+          });
+        });
+      }
+    });
+
+    const reportData = Object.values(itemAggregation).sort((a, b) => b.totalQuantity - a.totalQuantity);
+    res.json(reportData);
+  } catch (error) {
+    console.error("Category report error:", error);
+    res.status(500).json({ detail: "Failed to generate category report" });
   }
 };

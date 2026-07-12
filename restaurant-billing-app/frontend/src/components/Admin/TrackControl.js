@@ -22,17 +22,17 @@ import {
   TableCell,
 } from "../ui/Table";
 import { getTrackStatuses, setTrackLock, getEODAudit, triggerEODReset } from "../../services/api";
-import { toast, safeArray, safeObject } from "../../utils/helpers";
+import { toast, safeArray, safeObject, formatDateToDDMMYYYY, getFriendlyShiftName } from "../../utils/helpers";
 
 // Friendly display labels for each track identifier
 const TRACK_LABELS = {
-  "`": "Track 1 (Morning / RBS1)",
-  "``": "Track 2 (Afternoon / RBS2)",
-  RBS1: "Track 3 (RBS3)",
-  RBS2: "Track 4 (RBS4)",
+  "`": "Track 1 (Morning)",
+  "``": "Track 2 (Afternoon)",
+  RBS: "Track 3 (Evening)",
+  RBS1: "Track 4 (Night)",
 };
 
-const ALL_TRACKS = ["`", "``", "RBS1", "RBS2"];
+const ALL_TRACKS = ["`", "``", "RBS", "RBS1"];
 
 // ---------------------------------------------------------------------------
 // TrackLockdownPanel
@@ -131,11 +131,7 @@ function TrackLockdownPanel() {
                   <TableRow key={trackId}>
                     <TableCell>
                       <span style={{ fontWeight: 600 }}>
-                        {TRACK_LABELS[trackId] || trackId}
-                      </span>
-                      <br />
-                      <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>
-                        {trackId}
+                        {TRACK_LABELS[trackId] || getFriendlyShiftName(trackId)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -399,7 +395,7 @@ function EODAuditPanel({ onResetComplete }) {
                         paddingBottom: "0.25rem",
                       }}
                     >
-                      {TRACK_LABELS[trackId] || trackId} —{" "}
+                    {TRACK_LABELS[trackId] || getFriendlyShiftName(trackId)} —{" "}
                       <span style={{ fontWeight: 400 }}>
                         {bills.length} unprinted bill{bills.length !== 1 ? "s" : ""}
                       </span>
@@ -423,7 +419,7 @@ function EODAuditPanel({ onResetComplete }) {
                             <TableCell>{bill.clerk_initials}</TableCell>
                             <TableCell>
                               {bill.bill_date
-                                ? new Date(bill.bill_date).toLocaleDateString()
+                                ? formatDateToDDMMYYYY(bill.bill_date)
                                 : "—"}
                             </TableCell>
                             <TableCell>{bill.item_count}</TableCell>

@@ -32,7 +32,7 @@ import {
   updateOrder,
   deleteOrder,
 } from "../services/api";
-import { toast, safeGet, safeArray, safeObject } from "../utils/helpers";
+import { toast, safeGet, safeArray, safeObject, getCustomShortcuts, matchesShortcut } from "../utils/helpers";
 import { generateAsciiReceipt } from "../utils/receiptGenerator";
 
 export const getSectionForTable = (tableNo) => {
@@ -1593,28 +1593,24 @@ export default function Billing({
   useEffect(() => {
     const handleGlobalKeyDown = (event) => {
       const isCmdOrCtrl = event.metaKey || event.ctrlKey;
-      const isAlt = event.altKey;
 
-      const code = event.code;
+      const shortcuts = getCustomShortcuts();
 
-      // F1 or Cmd+1 / Alt+1
-      if (event.key === "F1" || (isCmdOrCtrl && (event.key === "1" || code === "Digit1")) || (isAlt && (event.key === "1" || code === "Digit1"))) {
+      if (matchesShortcut(event, shortcuts.shortcutsHelp)) {
         event.preventDefault();
         setShowF4Popup((prev) => {
           if (prev && helpTab === "shortcuts") return false;
           setHelpTab("shortcuts");
           return true;
         });
-      // F2 or Cmd+2 / Alt+2
-      } else if (event.key === "F2" || (isCmdOrCtrl && (event.key === "2" || code === "Digit2")) || (isAlt && (event.key === "2" || code === "Digit2"))) {
+      } else if (matchesShortcut(event, shortcuts.activeTables)) {
         event.preventDefault();
         setShowF4Popup((prev) => {
           if (prev && helpTab === "active") return false;
           setHelpTab("active");
           return true;
         });
-      // F4 or Cmd+4 / Alt+4
-      } else if (event.key === "F4" || (isCmdOrCtrl && (event.key === "4" || code === "Digit4")) || (isAlt && (event.key === "4" || code === "Digit4"))) {
+      } else if (matchesShortcut(event, shortcuts.itemsSearch)) {
         event.preventDefault();
         setShowF4Popup((prev) => !prev);
       } else if (event.key === "Escape") {
@@ -1630,35 +1626,19 @@ export default function Billing({
             tableNoRef.current.select();
           }
         }, 0);
-      // End/Home or Cmd+Enter / Cmd+P / Ctrl+P
-      } else if (
-        event.key === "End" || 
-        event.key === "Home" || 
-        (isCmdOrCtrl && event.key === "Enter") || 
-        (isCmdOrCtrl && event.key.toLowerCase() === "p")
-      ) {
+      } else if (matchesShortcut(event, shortcuts.printBill)) {
         event.preventDefault();
         handlePrintBill();
-      // PageDown or Cmd+D / Alt+D
-      } else if (event.key === "PageDown" || (isCmdOrCtrl && event.key.toLowerCase() === "d") || (isAlt && event.key.toLowerCase() === "d")) {
+      } else if (matchesShortcut(event, shortcuts.focusItemCode)) {
         event.preventDefault();
         if (itemCodeRef.current) {
           itemCodeRef.current.focus();
         }
-      } else if (
-        isCmdOrCtrl &&
-        (event.key === "f" || event.code === "KeyF")
-      ) {
+      } else if (isCmdOrCtrl && (event.key === "f" || event.code === "KeyF")) {
         event.preventDefault();
         setShowF4Popup(true);
         setHelpTab("shortcuts");
-      // F3 or Cmd+3 / Alt+3 or Shift+Alt+S
-      } else if (
-        event.key === "F3" || 
-        (isCmdOrCtrl && (event.key === "3" || code === "Digit3")) || 
-        (isAlt && (event.key === "3" || code === "Digit3")) ||
-        (event.shiftKey && event.altKey && (event.key.toLowerCase() === "s" || code === "KeyS"))
-      ) {
+      } else if (matchesShortcut(event, shortcuts.toggleSplit)) {
         event.preventDefault();
         setSplitBillUpto((prev) => {
           const nextIndex = (prev + 1) % (maxSplitCategoryFromMenu + 1);
@@ -1672,7 +1652,7 @@ export default function Billing({
     return () => {
       window.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [handlePrintBill, helpTab, showF4Popup, setCurrentTable, setCurrentParty, setSplitBillUpto, maxSplitCategoryFromMenu]);
+  }, [handlePrintBill, helpTab, showF4Popup, setCurrentTable, setCurrentParty, setSplitBillUpto, maxSplitCategoryFromMenu, tableNoRef, itemCodeRef]);
 
   const tempBillNumber = useMemo(() => {
     const existingBillNum = safeGet(currentDraft, "header.bill_number");

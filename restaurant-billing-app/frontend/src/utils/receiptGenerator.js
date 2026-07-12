@@ -1,4 +1,5 @@
-import { safeGet, safeArray, safeObject } from "./helpers";
+import { safeGet, safeArray, safeObject, formatDateToDDMMYYYY } from "./helpers";
+
 
 export function generateAsciiReceipt(data, settings) {
   const header = safeObject(data.header);
@@ -33,7 +34,7 @@ export function generateAsciiReceipt(data, settings) {
   const grandTotal = safeGet(data, "grand_total", 0);
 
   const printTime = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
-  const printDate = createdAt ? new Date(createdAt).toLocaleDateString("en-GB") : new Date().toLocaleDateString("en-GB");
+  const printDate = formatDateToDDMMYYYY(createdAt || new Date());
 
   const LINE_WIDTH = 40; // 40 characters at 12 CPI (Elite) = 3.33 inches — matches old system
 

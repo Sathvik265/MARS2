@@ -25,4 +25,7 @@ router.get("/by-item", reportController.getItemReport);
 // Category totals report
 router.get("/category-totals", reportController.getCategoryTotals);
 
+// Category report (items breakdown by category)
+router.get("/category-report", reportController.getCategoryReport);
+
 module.exports = router;

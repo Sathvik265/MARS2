@@ -16,6 +16,7 @@ import Billing from "./components/BillingScreen";
 import EnhancedAdminPanel from "./components/AdminPanel";
 import PrintPortal from "./components/PrintPortal";
 import { useUser } from "./context/UserContext";
+import { getCustomShortcuts, matchesShortcut } from "./utils/helpers";
 import {
   Button,
   Tabs,
@@ -217,7 +218,7 @@ function App() {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       const code = e.code;
 
-      // Global logout: Alt + Q (Option + Q on Mac maps to code 'KeyQ')
+      // Global logout: Alt + Q
       if (e.altKey && !e.shiftKey && (e.key === "q" || e.key === "Q" || code === "KeyQ")) {
         e.preventDefault();
         handleLogout();
@@ -231,7 +232,7 @@ function App() {
         return;
       }
 
-      // Global search focus: Alt+S, Cmd+S, Alt+F, Cmd+F (Option + S maps to 'KeyS', Cmd is isCmdOrCtrl)
+      // Global search focus: Alt+S, Cmd+S, Alt+F, Cmd+F
       const isSearchShortcut =
         (e.altKey && (e.key === "s" || e.key === "S" || code === "KeyS" || e.key === "f" || e.key === "F" || code === "KeyF")) ||
         (isCmdOrCtrl && (e.key === "s" || e.key === "S" || code === "KeyS" || e.key === "f" || e.key === "F" || code === "KeyF"));
@@ -248,8 +249,28 @@ function App() {
         return;
       }
 
-      // Admin Main Tabs (Ctrl + Alt + Number / Cmd + Option + Number)
-      if (isCmdOrCtrl && e.altKey) {
+      const shortcuts = getCustomShortcuts();
+
+      // Main Tabs Navigation
+      if (matchesShortcut(e, shortcuts.activeBills)) {
+        e.preventDefault();
+        setActiveTab("billing");
+      } else if (matchesShortcut(e, shortcuts.recentBills)) {
+        e.preventDefault();
+        setActiveTab("recent-bills");
+      } else if (matchesShortcut(e, shortcuts.shifts)) {
+        e.preventDefault();
+        setActiveTab("shifts");
+      } else if (matchesShortcut(e, shortcuts.foodMenu)) {
+        e.preventDefault();
+        setActiveTab("menu");
+      } else if (matchesShortcut(e, shortcuts.admin)) {
+        e.preventDefault();
+        if (isAdmin) setActiveTab("admin");
+      }
+      
+      // Admin Main Sub-Tabs navigation
+      else if (isCmdOrCtrl && e.altKey) {
         if (code === "Digit1" || e.key === "1") {
           if (isAdmin) {
             setActiveTab("admin");
@@ -275,11 +296,6 @@ function App() {
             setActiveTab("admin");
             setAdminJumpTarget({ tab: "split-bill" });
           }
-        } else if (code === "Digit6" || e.key === "6") {
-          if (isAdmin) {
-            setActiveTab("admin");
-            setAdminJumpTarget({ tab: "track-control" });
-          }
         } else if (code === "Digit7" || e.key === "7") {
           if (isAdmin) {
             setActiveTab("admin");
@@ -287,9 +303,8 @@ function App() {
           }
         }
       }
-      // Admin Reports Sub-tabs (Ctrl + Shift + Number / Cmd + Shift + Number)
+      // Admin Reports Sub-tabs
       else if (isCmdOrCtrl && e.shiftKey) {
-        // Cmd+Shift+3,4,5 are system screenshot shortcuts on macOS, so we ignore e.metaKey for them
         if (code === "Digit1" || e.key === "1" || e.key === "!") {
           if (isAdmin) {
             setActiveTab("admin");
@@ -310,20 +325,6 @@ function App() {
             setActiveTab("admin");
             setAdminJumpTarget({ tab: "reports", subTab: "item-report" });
           }
-        }
-      }
-      // Main Tabs (Alt + Number / Option + Number)
-      else if (e.altKey) {
-        if (code === "Digit1" || e.key === "1") {
-          setActiveTab("billing");
-        } else if (code === "Digit2" || e.key === "2") {
-          setActiveTab("recent-bills");
-        } else if (code === "Digit3" || e.key === "3") {
-          setActiveTab("shifts");
-        } else if (code === "Digit4" || e.key === "4") {
-          setActiveTab("menu");
-        } else if (code === "Digit5" || e.key === "5") {
-          if (isAdmin) setActiveTab("admin");
         }
       }
     };
@@ -433,7 +434,7 @@ function App() {
           )}
           {mode !== "none" && billingDate && (
             <div className={`${activeTab === "billing" ? "mt-1" : "mt-2"} text-sm text-gray-300`}>
-              Date: {billingDate} | {track === "`" ? "I (`)" : track === "``" ? "II (``)" : (track || "Default")} | Clerk: {userInitials}
+              Date: {billingDate} | {track} | Clerk: {userInitials}
               <span className="ml-4 inline-flex gap-2">
                 <Button
                   variant="outline"

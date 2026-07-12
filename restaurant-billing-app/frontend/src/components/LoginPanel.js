@@ -114,20 +114,20 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
 
   const submit = async () => {
     if (!date || !track) {
-      toast.error("Please enter date and track.");
+      toast.error("Please enter date and shift name.");
       return;
     }
 
     const validTracks = ["`", "``", "RBS", "RBS1"];
     if (!validTracks.includes(track)) {
-      toast.error("Invalid track. Valid tracks are '`', '``', 'RBS', 'RBS1'.");
+      toast.error("Invalid Shift Name entered.");
       return;
     }
 
     // Only block if shift is closed AND the user is not the admin SRIHARI
     if (isShiftClosed && credential.toUpperCase() !== "SRIHARI") {
       toast.error(
-        "This shift is closed and cannot be accessed. Please log in as admin SRIHARI to re-open it from Shift Management."
+        "This shift is closed. Please contact an admin to log in and open it."
       );
       return;
     }
@@ -238,11 +238,11 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-4 items-center">
-                  <Label>Track</Label>
+                  <Label>Shift Name</Label>
                   <Input
                     ref={trackInputRef}
                     type="text"
-                    placeholder="Enter track"
+                    placeholder="Enter Shift Name"
                     className="col-span-2"
                     value={track}
                     onChange={(e) => setTrack(e.target.value)}
@@ -278,9 +278,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
               >
                 <strong>⚠ This shift is closed</strong> and cannot be accessed.
                 <br />
-                An admin must log in with another open shift, re-open this shift
-                from the Shifts section, log out, and then log in with this
-                shift.
+                An admin must log in with this shift and the full admin password to automatically open it.
               </div>
             )}
 
