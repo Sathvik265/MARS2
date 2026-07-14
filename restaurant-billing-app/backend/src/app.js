@@ -671,7 +671,7 @@ app.get("/api/admin/dashboard", requireAdminAny, async (req, res) => {
       vacantTables: vacantTables,
       topSellingItems: topItemsResult.rows.map((item) => ({
         name: item.item_name,
-        quantity: parseInt(item.total_quantity),
+        quantity: parseFloat(item.total_quantity),
         sales: parseFloat(item.total_sales),
       })),
     });

@@ -134,7 +134,7 @@ exports.getShiftDetailedReport = async (req, res) => {
               item->>'item_code' as item_code,
               item->>'item_name' as item_name,
               item->>'category' as legacy_category,
-              (item->>'quantity')::integer as qty,
+              (item->>'quantity')::decimal as qty,
               (item->>'line_total')::decimal as amount,
               COALESCE(item->'categories', '[]'::jsonb) as categories_json
           FROM bills b,
@@ -250,7 +250,7 @@ exports.getItemWiseReport = async (req, res) => {
       `
       SELECT   
         item->>'item_name' as item_name,   
-        SUM((item->>'quantity')::integer) as total_quantity,
+        SUM((item->>'quantity')::numeric) as total_quantity,
         SUM((item->>'line_total')::decimal) as total_amount
       FROM bills b,
       jsonb_array_elements(b.items_json) as item
@@ -318,7 +318,7 @@ exports.getItemReport = async (req, res) => {
           SELECT 
               item->>'item_name' as item_name,
               item->>'category' as legacy_category,
-              (item->>'quantity')::integer as qty,
+              (item->>'quantity')::decimal as qty,
               (item->>'line_total')::decimal as amount,
               COALESCE(item->'categories', '[]'::jsonb) as categories_json
           FROM bills b,
@@ -331,7 +331,7 @@ exports.getItemReport = async (req, res) => {
               qty,
               amount,
               COALESCE(
-                  (SELECT SUM((cat->>'qty')::integer) FROM jsonb_array_elements(
+                  (SELECT SUM((cat->>'qty')::decimal) FROM jsonb_array_elements(
                     CASE 
                       WHEN jsonb_typeof(categories_json->0) = 'array' THEN categories_json->0
                       ELSE categories_json
@@ -364,7 +364,7 @@ exports.getItemReport = async (req, res) => {
     const formattedResult = result.rows.map((row) => ({
       itemName: row.item_name,
       category: row.category,
-      totalQuantity: parseInt(row.total_quantity),
+      totalQuantity: parseFloat(row.total_quantity),
       totalAmount: parseFloat(row.total_amount),
     }));
 
@@ -551,7 +551,7 @@ exports.getTopItems = async (req, res) => {
       if (Array.isArray(items)) {
         items.forEach((item) => {
           const name = item.item_name || item.name || "Unknown";
-          const qty = parseInt(item.quantity || item.qty) || 0;
+          const qty = parseFloat(item.quantity || item.qty) || 0;
 
           if (name !== "Unknown" && qty > 0) {
             if (itemCounts[name]) {
@@ -700,8 +700,8 @@ exports.getCategoryReport = async (req, res) => {
           cats.forEach(cat => {
             if (cat && cat.name) {
               const catName = String(cat.name).trim();
-              const catQtyMultiplier = parseInt(cat.qty || cat.quantity) || 1;
-              const itemQty = parseInt(item.quantity || item.qty) || 0;
+              const catQtyMultiplier = parseFloat(cat.qty || cat.quantity) || 1;
+              const itemQty = parseFloat(item.quantity || item.qty) || 0;
               const itemAmount = parseFloat(item.line_total || item.amount) || 0;
 
               if (!category) {

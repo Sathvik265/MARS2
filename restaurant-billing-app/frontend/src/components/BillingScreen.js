@@ -60,26 +60,34 @@ export default function Billing({
   const [entryCode, setEntryCode] = useState("");
   const [qty, setQty] = useState("1");
   const [loading, setLoading] = useState(false);
-  const [splitBillUpto, setSplitBillUpto] = useState(0);
+  const [splitBillUpto, setSplitBillUptoState] = useState(() => {
+    const saved = localStorage.getItem("rbs_split_bill_upto");
+    return saved !== null ? parseInt(saved, 10) || 0 : 0;
+  });
+
+  const setSplitBillUpto = useCallback((val) => {
+    setSplitBillUptoState((prev) => {
+      const nextVal = typeof val === "function" ? val(prev) : val;
+      localStorage.setItem("rbs_split_bill_upto", nextVal);
+      return nextVal;
+    });
+  }, []);
   const [currentParty, setCurrentParty] = useState("1");
 
   const computeSplitBillTotals = (itemsInSubBill, sgstPct, cgstPct) => {
     const taxRateSum = (sgstPct || 0) + (cgstPct || 0);
-    const scalingFactor = 1 / (1 + taxRateSum / 100);
 
     const sub = Number(
       itemsInSubBill.reduce((sum, item) => {
         const valPrice = item.unit_price || item.actual_price || item.fixed_price || 0;
-        const unitPriceScaled = Number((Number(valPrice) * scalingFactor).toFixed(2));
-        const lineTotalScaled = Number((unitPriceScaled * Number(item.quantity || 0)).toFixed(2));
+        const lineTotalScaled = Number((Number(valPrice) * Number(item.quantity || 0)).toFixed(2));
         return sum + lineTotalScaled;
       }, 0).toFixed(2)
     );
 
     const totalTax = itemsInSubBill.reduce((sum, item) => {
       const valPrice = item.unit_price || item.actual_price || item.fixed_price || 0;
-      const unitPriceScaled = Number((Number(valPrice) * scalingFactor).toFixed(2));
-      const lineTotalScaled = Number((unitPriceScaled * Number(item.quantity || 0)).toFixed(2));
+      const lineTotalScaled = Number((Number(valPrice) * Number(item.quantity || 0)).toFixed(2));
       const itemTax = Number((lineTotalScaled * (taxRateSum / 100)).toFixed(2));
       return sum + itemTax;
     }, 0);
@@ -1133,7 +1141,15 @@ export default function Billing({
         }
 
         const quantityNum = parseFloat(qty);
-        if (isNaN(quantityNum) || quantityNum <= 0) {
+        if (quantityNum === 0) {
+          toast.error("0 quantity isn't allowed to be entered");
+          if (qtyRef.current) {
+            qtyRef.current.focus();
+            qtyRef.current.select();
+          }
+          return null;
+        }
+        if (isNaN(quantityNum) || quantityNum < 0) {
           toast.error("Quantity must be greater than 0");
           if (qtyRef.current) {
             qtyRef.current.focus();
@@ -1885,7 +1901,7 @@ export default function Billing({
               <Input
                 ref={qtyRef}
                 type="number"
-                min="0.001"
+                min="0"
                 step="any"
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
@@ -1908,7 +1924,7 @@ export default function Billing({
                 className="w-full border border-green-700 rounded-md bg-green-950 flex items-center justify-end px-3 text-4xl font-black text-green-400 overflow-hidden whitespace-nowrap grand-total-display"
                 style={{ height: "60px" }}
               >
-                ₹{total.toFixed(2)}
+                ₹{Math.round(total).toFixed(2)}
               </div>
             </div>
           </div>
