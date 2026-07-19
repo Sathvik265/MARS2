@@ -462,13 +462,13 @@ export default function Billing({
     if (e.key === "Enter") {
       e.preventDefault();
       addItem();
-    } else if (e.key === "PageDown" || (isCmdOrCtrl && e.key.toLowerCase() === "d") || (isAlt && e.key.toLowerCase() === "d")) {
+    } else if (e.key === "PageDown" || (isCmdOrCtrl && e.key.toLowerCase() === "d") || (isAlt && e.key.toLowerCase() === "d") || e.key === "ArrowDown") {
       e.preventDefault();
       if (itemQtyRefs.current[0]) {
         itemQtyRefs.current[0].focus();
         itemQtyRefs.current[0].select();
       }
-    } else if (e.key === "Escape") {
+    } else if (e.key === "Escape" || e.key === "ArrowLeft" || e.key === "ArrowUp") {
       e.preventDefault();
       if (itemCodeRef.current) {
         itemCodeRef.current.focus();

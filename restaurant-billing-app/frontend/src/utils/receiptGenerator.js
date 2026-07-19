@@ -1,6 +1,5 @@
 import { safeGet, safeArray, safeObject, formatDateToDDMMYYYY } from "./helpers";
 
-
 export function generateAsciiReceipt(data, settings) {
   const header = safeObject(data.header);
   const items = safeArray(data.items_json || data.items);
@@ -33,10 +32,9 @@ export function generateAsciiReceipt(data, settings) {
   const cgstPercentage = safeGet(mergedData, "cgst_percentage", 2.5);
   const grandTotal = safeGet(data, "grand_total", 0);
 
-  const printTime = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
   const printDate = formatDateToDDMMYYYY(createdAt || new Date());
 
-  const LINE_WIDTH = 40; // 40 characters at 12 CPI (Elite) = 3.33 inches — matches old system
+  const LINE_WIDTH = 40; // 40 characters at 12 CPI (Elite) = 3.33 inches
 
   const padRight = (str, len) => {
     let s = String(str);
@@ -69,45 +67,55 @@ export function generateAsciiReceipt(data, settings) {
   const hotelHeading = trackLetter ? `${hotelNameWithSection} ${trackLetter}` : hotelNameWithSection;
   const displayHotelName = titleSuffix ? `${hotelHeading} ${titleSuffix}` : hotelHeading;
 
-  // Header (Hotel Name, Address, Phone, GST)
-  ascii += centerText(`${displayHotelName} (${clerkInitials})`, LINE_WIDTH) + "\r\n";
-  if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
-  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
-  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
+  // ── HEADER GENERATOR ──
+  const buildHeader = () => {
+    let h = "";
+    h += centerText(displayHotelName, LINE_WIDTH) + "\r\n";
+    if (address) h += centerText(address, LINE_WIDTH) + "\r\n";
+    if (phone) h += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
+    if (gstin) h += centerText(`GST:${gstin}`, LINE_WIDTH) + "\r\n";
+    h += "\r\n";
+    return h;
+  };
+
+  // Check if header is already pre-printed on the roll
+  const isPreprinted = typeof window !== "undefined" && window.sessionStorage && window.sessionStorage.getItem("rbs_header_preprinted") === "true";
+
+  if (!isPreprinted) {
+    ascii += buildHeader();
+  }
+
+  // Bill number + track + date
+  const billAndTrack = trackLetter ? `${billNumber} ${trackLetter}` : String(billNumber);
+  ascii += padRight(billAndTrack, LINE_WIDTH - printDate.length) + printDate + "\r\n";
   ascii += separator + "\r\n";
 
-  // Meta Info
-  const timeAndBill = `${printTime} #${billNumber}`;
-  const dateStr = printDate;
-  ascii += padRight(timeAndBill, LINE_WIDTH - dateStr.length) + dateStr + "\r\n";
-
-  ascii += separator + "\r\n";
-
-  // Items header (24, 5, 11)
-  ascii += padRight("Item", 24) + padLeft("Qty", 5) + padLeft("Total", 11) + "\r\n";
-  ascii += separator + "\r\n";
+  // Items
+  const NAME_W = 29;
+  const QTY_W  = 3;
+  const AMT_W  = 8;
 
   if (items.length === 0) {
     ascii += centerText("No Items", LINE_WIDTH) + "\r\n";
   } else {
     items.forEach(item => {
-      const name = String(item.item_name || item.name);
-
+      const name = String(item.item_name || item.name || "");
       const nameLines = [];
       let temp = name;
       while (temp.length > 0) {
-        nameLines.push(temp.substring(0, 24));
-        temp = temp.substring(24);
+        nameLines.push(temp.substring(0, NAME_W));
+        temp = temp.substring(NAME_W);
       }
 
-      const qty = String(item.quantity || item.qty);
-      const total = Number(item.line_total || item.amount).toFixed(2);
+      const rawQty = Number(item.quantity ?? item.qty ?? 0);
+      const qtyStr = String(rawQty);
+      const amtStr = Number(item.line_total || item.amount || 0).toFixed(2);
 
       nameLines.forEach((line, i) => {
         if (i === 0) {
-          ascii += padRight(line, 24) + padLeft(qty, 5) + padLeft(total, 11) + "\r\n";
+          ascii += padRight(line, NAME_W) + padLeft(qtyStr, QTY_W) + padLeft(amtStr, AMT_W) + "\r\n";
         } else {
-          ascii += padRight(line, 24) + " ".repeat(16) + "\r\n";
+          ascii += padRight(line, NAME_W) + " ".repeat(QTY_W + AMT_W) + "\r\n";
         }
       });
     });
@@ -115,29 +123,41 @@ export function generateAsciiReceipt(data, settings) {
 
   ascii += separator + "\r\n";
 
-  // Totals
+  // Taxes
+  const fmtPct = (p) => Number(p || 0).toFixed(2);
+  const fmtAmt = (a) => Number(a || 0).toFixed(2);
 
-  const cgstLabel = `CGST (${Number(cgstPercentage || 0).toFixed(1)}%)`;
-  const cgstStr = Number(cgst || 0).toFixed(2);
-  ascii += padRight(cgstLabel, LINE_WIDTH - cgstStr.length) + cgstStr + "\r\n";
+  const sgstLabel = `SGST(${fmtPct(sgstPercentage)}%)`;
+  const sgstAmtStr = `Rs. ${fmtAmt(sgst)}`;
+  ascii += padRight(sgstLabel, LINE_WIDTH - sgstAmtStr.length) + sgstAmtStr + "\r\n";
 
-  const sgstLabel = `SGST (${Number(sgstPercentage || 0).toFixed(1)}%)`;
-  const sgstStr = Number(sgst || 0).toFixed(2);
-  ascii += padRight(sgstLabel, LINE_WIDTH - sgstStr.length) + sgstStr + "\r\n";
+  const cgstLabel = `CGST(${fmtPct(cgstPercentage)}%)`;
+  const cgstAmtStr = `Rs. ${fmtAmt(cgst)}`;
+  ascii += padRight(cgstLabel, LINE_WIDTH - cgstAmtStr.length) + cgstAmtStr + "\r\n";
+
+  ascii += separator + "\r\n";
+
+  // Grand Total
+  const payableStr = `Rs. ${Math.round(Number(grandTotal)).toFixed(2)}`;
+  ascii += padRight("Payable(Rounded)", LINE_WIDTH - payableStr.length) + payableStr + "\r\n";
 
   ascii += separator + "\r\n";
 
-  const totalStr = `Rs. ${Math.round(Number(grandTotal)).toFixed(2)}`;
-  ascii += padRight("TOTAL", LINE_WIDTH - totalStr.length) + totalStr + "\r\n";
-
-  ascii += separator + "\r\n";
-  ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\r\n";
+  // Footer
+  ascii += `Table:${tableNo} Party: ${partyNo} Waiter: ${clerkInitials}` + "\r\n";
   ascii += separator + "\r\n";
 
-  // 2-inch gap for mechanical paper feed tear-off (approx 12 lines)
-  /* for (let i = 0; i < 12; i++) {
-     ascii += ".\r\n";
-   }*/
+  // ── TEAR FEED & PRE-PRINT NEXT HEADER ──
+  // 1. Feed lines to roll the footer past the tear-off bar
+  ascii += "\r\n".repeat(6);
+
+  // 2. Pre-print the next header on the roll
+  ascii += buildHeader();
+
+  // 3. Mark in session storage that the header is pre-printed for the next bill
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    window.sessionStorage.setItem("rbs_header_preprinted", "true");
+  }
 
   return ascii;
 }
@@ -146,7 +166,7 @@ export function generateAsciiReport(title, columns, data, settings) {
   const mergedData = { ...settings };
   const hotelName = safeGet(mergedData, "hotel_name", "Udupi Anand Bhavan");
   const clerkInitials = safeGet(mergedData, "clerk_initials", "CLK");
-  const LINE_WIDTH = 32; // Standard continuous paper width (32 columns)
+  const LINE_WIDTH = 32;
 
   const padRight = (str, len) => {
     let s = String(str || "");
@@ -170,10 +190,8 @@ export function generateAsciiReport(title, columns, data, settings) {
 
   let ascii = "";
 
-  // Header Title
   ascii += centerText(`${hotelName} (${clerkInitials})`, LINE_WIDTH) + "\r\n";
 
-  // Wrap very long report titles onto two lines perfectly
   const titleLines = [];
   let tempTitle = title;
   while (tempTitle.length > 0) {
@@ -186,7 +204,6 @@ export function generateAsciiReport(title, columns, data, settings) {
 
   ascii += separator + "\r\n";
 
-  // Build Column Headers
   let headerLine = [];
   columns.forEach(c => {
     let t = c.header;
@@ -198,15 +215,13 @@ export function generateAsciiReport(title, columns, data, settings) {
   if (!data || data.length === 0) {
     ascii += centerText("No Data", LINE_WIDTH) + "\r\n";
   } else {
-    // Build Rows
     data.forEach(row => {
       let rLine = [];
-      let nextLineOverrides = null; // for wrapping row text manually
+      let nextLineOverrides = null;
 
       columns.forEach(c => {
         let val = String(c.accessor(row) || "");
 
-        // Custom wrap for the first primary column if text is too long (usually item desc)
         if (val.length > c.width && !c.align) {
           if (!nextLineOverrides) nextLineOverrides = [];
           nextLineOverrides.push({ col: c, text: val.substring(c.width) });
@@ -217,7 +232,6 @@ export function generateAsciiReport(title, columns, data, settings) {
       });
       ascii += rLine.join(" ") + "\r\n";
 
-      // Print stacked multi-line row if needed
       if (nextLineOverrides) {
         let subLine = [];
         columns.forEach(c => {
@@ -235,7 +249,6 @@ export function generateAsciiReport(title, columns, data, settings) {
   ascii += centerText(`End of Rpt | ${printTime}`, LINE_WIDTH) + "\r\n";
   ascii += separator + "\r\n";
 
-  // Minimal mechanical feed loop
   for (let i = 0; i < 2; i++) {
     ascii += ".\r\n";
   }

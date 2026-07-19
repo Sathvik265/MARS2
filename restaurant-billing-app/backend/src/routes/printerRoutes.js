@@ -290,9 +290,10 @@ router.post("/print", async (req, res) => {
     //
     const ESC = 0x1B;
     const escPrefix = Buffer.from([
-      0x0D,                     // CR — flush any partial line
-      ESC, 0x78, 0x00,          // ESC x 0 — Draft quality (FAST)
-      ESC, 0x4D,                // ESC M   — 12 CPI (Elite, matches old system)
+      ESC, 0x40,                // ESC @   — Reset printer (clears any stuck state)
+      0x0D,                     // CR      — Flush any partial line
+      ESC, 0x78, 0x00,          // ESC x 0 — Draft quality (fast)
+      ESC, 0x4D,                // ESC M   — 12 CPI (Elite pitch)
       ESC, 0x32,                // ESC 2   — 1/6-inch line spacing
       ESC, 0x6C, 0x00,          // ESC l 0 — Left margin = 0
     ]);
