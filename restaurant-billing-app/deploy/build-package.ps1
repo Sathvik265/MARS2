@@ -53,7 +53,11 @@ New-Item -ItemType Directory -Path "$OutputDir\frontend" -Force | Out-Null
 
 Copy-Item "$root\backend\dist\rbs-backend.exe" "$OutputDir\backend\"
 Copy-Item "$root\backend\.env.example" "$OutputDir\backend\.env"
-Copy-Item "$root\Final_Dump_Fixed.sql" "$OutputDir\backend\" -ErrorAction SilentlyContinue
+if (Test-Path "$root\Final_Dump_Fixed.sql") {
+    Copy-Item "$root\Final_Dump_Fixed.sql" "$OutputDir\backend\"
+} elseif (Test-Path "$root\backend\Final_Dump_Fixed.sql") {
+    Copy-Item "$root\backend\Final_Dump_Fixed.sql" "$OutputDir\backend\"
+}
 
 Copy-Item "$fsDir\dist\rbs-frontend.exe" "$OutputDir\frontend\"
 

@@ -34,7 +34,7 @@ export const safeObject = (obj, defaultValue = {}) => {
     : defaultValue;
 };
 
-// Date formatter helper: DD-MM-YYYY
+// Date formatter helper: DD/MM/YYYY
 export const formatDateToDDMMYYYY = (dateInput) => {
   if (!dateInput) return "";
   const d = new Date(dateInput);
@@ -42,7 +42,7 @@ export const formatDateToDDMMYYYY = (dateInput) => {
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
-  return `${day}-${month}-${year}`;
+  return `${day}/${month}/${year}`;
 };
 
 // Shift name friendly label mapping

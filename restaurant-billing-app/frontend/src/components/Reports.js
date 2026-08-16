@@ -79,7 +79,7 @@ export function TimeRangeReport({ sessionId }) {
   const handlePrint = () => {
     if (!report || report.length === 0) return;
     sendToPosPrinter(
-      `Time Range Report`,
+      `TIME RANGE REPORT (${formatDateToDDMMYYYY(filters.date)})`,
       [
         { header: "Bill", accessor: (r) => r.bill_number, width: 6 },
         { header: "Tbl", accessor: (r) => r.table_no, width: 4 },
@@ -238,7 +238,7 @@ export function DateRangeReport({ sessionId }) {
   const handlePrint = () => {
     if (!report || report.length === 0) return;
     sendToPosPrinter(
-      `Date Range Report (${filters.startDate.slice(5)} to ${filters.endDate.slice(5)})`,
+      `DATE RANGE REPORT (${formatDateToDDMMYYYY(filters.startDate)} to ${formatDateToDDMMYYYY(filters.endDate)})`,
       [
         { header: "Bill", accessor: (r) => r.bill_number, width: 6 },
         {
@@ -418,33 +418,13 @@ export function ShiftReport({ sessionId }) {
   };
 
   const handlePrint = () => {
-    if (!report || report.length === 0) return;
-    sendToPosPrinter(
-      `Shift Bills (${filters.date.slice(5)} - ${filters.shiftName})`,
-      [
-        { header: "Bill", accessor: (r) => r.bill_number, width: 6 },
-        { header: "Tbl", accessor: (r) => r.table_no, width: 4 },
-        {
-          header: "Amount",
-          accessor: (r) => Number(r.grand_total).toFixed(2),
-          width: 9,
-          align: "right",
-        },
-        {
-          header: "Time",
-          accessor: (r) => new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-          width: 9,
-          align: "right",
-        },
-      ],
-      report
-    );
+    triggerActiveReportPrint();
   };
 
   const triggerActiveReportPrint = () => {
     if (activeReportType === "list" && report && report.length > 0) {
       sendToPosPrinter(
-        `Shift Bills (${filters.date.slice(5)} - ${filters.shiftName})`,
+        `SHIFT BILL LIST REPORT (${filters.shiftName} - ${formatDateToDDMMYYYY(filters.date)})`,
         [
           { header: "Bill", accessor: (r) => r.bill_number, width: 6 },
           { header: "Tbl", accessor: (r) => r.table_no, width: 4 },
@@ -465,7 +445,7 @@ export function ShiftReport({ sessionId }) {
       );
     } else if (activeReportType === "summary" && summaryReport && summaryReport.length > 0) {
       sendToPosPrinter(
-        `Shift Summary (${filters.date})`,
+        `SHIFT SUMMARY REPORT (${formatDateToDDMMYYYY(filters.date)})`,
         [
           { header: "Shift Name", accessor: (r) => r.shift_name, width: 14 },
           {
@@ -485,7 +465,7 @@ export function ShiftReport({ sessionId }) {
       );
     } else if (activeReportType === "detailed" && detailedReport && detailedReport.length > 0) {
       sendToPosPrinter(
-        `Detailed Shift Rpt (${filters.shiftName})`,
+        `DETAILED SHIFT REPORT (${filters.shiftName} - ${formatDateToDDMMYYYY(filters.date)})`,
         [
           { header: "Item Desc", accessor: (r) => r.item_name, width: 19 },
           { header: "Qty", accessor: (r) => r.total_quantity, width: 4 },
@@ -506,7 +486,7 @@ export function ShiftReport({ sessionId }) {
         { label: "GST Amount", value: `Rs. ${Number(shiftOnlyReport.gst_amount || 0).toFixed(2)}` },
       ];
       sendToPosPrinter(
-        `Shift Only (${filters.shiftName} - ${filters.date})`,
+        `SHIFT ONLY REPORT (${filters.shiftName} - ${formatDateToDDMMYYYY(filters.date)})`,
         [
           { header: "Field", accessor: (r) => r.label, width: 15 },
           {
@@ -1018,10 +998,10 @@ export function ItemReport({ sessionId }) {
   const handlePrint = () => {
     if (!report || report.length === 0) return;
     sendToPosPrinter(
-      `Item Sales (${filters.startDate.slice(5)} to ${filters.endDate.slice(5)})`,
+      `ITEM SALES REPORT (${formatDateToDDMMYYYY(filters.startDate)} to ${formatDateToDDMMYYYY(filters.endDate)})`,
       [
         { header: "Item", accessor: (r) => r.itemName, width: 17 },
-        { header: "Qty", accessor: (r) => r.totalQuantity, width: 4 },
+        { header: "Qty", accessor: (r) => r.totalQuantity, width: 5 },
         {
           header: "Amount",
           accessor: (r) => Number(r.totalAmount).toFixed(2),
@@ -1103,7 +1083,7 @@ export function ItemReport({ sessionId }) {
               )}
             </div>
             <div>
-              <Label>Category (optional)</Label>
+              <Label>Category (optional filter)</Label>
               {dropdownsLoaded && categories.length > 0 ? (
                 <select
                   className="w-full p-2 border rounded"
@@ -1151,9 +1131,8 @@ export function ItemReport({ sessionId }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Item Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Amount</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Amount (Price)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1162,11 +1141,10 @@ export function ItemReport({ sessionId }) {
                       <TableCell className="font-medium">
                         {item.itemName}
                       </TableCell>
-                      <TableCell>{item.category || "N/A"}</TableCell>
-                      <TableCell className="font-bold">
+                      <TableCell className="font-bold text-right">
                         {item.totalQuantity}
                       </TableCell>
-                      <TableCell>₹{item.totalAmount?.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">₹{item.totalAmount?.toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1194,6 +1172,7 @@ export function CategoryReport({ sessionId }) {
     startDate: new Date().toISOString().split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
     category: "",
+    shiftName: "",
   });
 
   useEffect(() => {
@@ -1218,6 +1197,7 @@ export function CategoryReport({ sessionId }) {
         endDate: filters.endDate,
       };
       if (filters.category) params.category = filters.category;
+      if (filters.shiftName) params.shift_name = filters.shiftName;
 
       const res = await axios.get(`${API}/reports/category-report`, {
         params,
@@ -1240,29 +1220,30 @@ export function CategoryReport({ sessionId }) {
     const isAllCategories = !filters.category;
     const columns = isAllCategories
       ? [
-          { header: "Category", accessor: (r) => r.categoryName, width: 20 },
-          { header: "Qty", accessor: (r) => r.totalQuantity, width: 6 },
-          {
-            header: "Amount",
-            accessor: (r) => Number(r.totalAmount).toFixed(2),
-            width: 12,
-            align: "right",
-          },
-        ]
+        { header: "Category", accessor: (r) => r.categoryName, width: 20 },
+        { header: "Qty", accessor: (r) => r.totalQuantity, width: 6 },
+        {
+          header: "Amount",
+          accessor: (r) => Number(r.totalAmount).toFixed(2),
+          width: 12,
+          align: "right",
+        },
+      ]
       : [
-          { header: "Item", accessor: (r) => r.itemName, width: 17 },
-          { header: "Cat", accessor: (r) => r.categoryName, width: 7 },
-          { header: "Qty", accessor: (r) => r.totalQuantity, width: 4 },
-          {
-            header: "Amount",
-            accessor: (r) => Number(r.totalAmount).toFixed(2),
-            width: 10,
-            align: "right",
-          },
-        ];
+        { header: "Item", accessor: (r) => r.itemName, width: 17 },
+        { header: "Cat", accessor: (r) => r.categoryName, width: 7 },
+        { header: "Qty", accessor: (r) => r.totalQuantity, width: 4 },
+        {
+          header: "Amount",
+          accessor: (r) => Number(r.totalAmount).toFixed(2),
+          width: 10,
+          align: "right",
+        },
+      ];
 
+    const shiftSuffix = filters.shiftName ? ` [Shift: ${filters.shiftName}]` : "";
     sendToPosPrinter(
-      `Category Sales (${filters.startDate.slice(5)} to ${filters.endDate.slice(5)})`,
+      `CATEGORY SALES REPORT${shiftSuffix} (${formatDateToDDMMYYYY(filters.startDate)} to ${formatDateToDDMMYYYY(filters.endDate)})`,
       columns,
       report
     );
@@ -1312,8 +1293,19 @@ export function CategoryReport({ sessionId }) {
                 }
               />
             </div>
-            <div className="col-span-2">
-              <Label>Category</Label>
+            <div>
+              <Label>Shift Name (optional)</Label>
+              <Input
+                type="text"
+                // placeholder="Filter by shift (e.g. RBS1)..."
+                value={filters.shiftName}
+                onChange={(e) =>
+                  setFilters({ ...filters, shiftName: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label>Category (optional)</Label>
               {dropdownsLoaded && categories.length > 0 ? (
                 <select
                   className="w-full p-2 border rounded text-white bg-black"
@@ -1426,7 +1418,7 @@ export function CategoryReport({ sessionId }) {
                   </TableRow>
                 </TableBody>
               </Table>
-              
+
               <div className="p-4 bg-zinc-900 border rounded-lg flex justify-between items-center text-lg font-bold">
                 <span>Total Category Quantity Sum:</span>
                 <span className="text-emerald-400">{totalCategorySum}</span>

@@ -7,7 +7,7 @@ import {
   Button,
 } from "./ui/UIComponents";
 import api from "../services/api";
-import { toast } from "../utils/helpers";
+import { toast, formatDateToDDMMYYYY } from "../utils/helpers";
 import { useUser } from "../context/UserContext";
 
 export default function ShiftTab({ mode, sessionId, currentShift, currentDate, onLogout, onCloseShiftAndLogout }) {
@@ -87,7 +87,7 @@ export default function ShiftTab({ mode, sessionId, currentShift, currentDate, o
             </div>
             <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
               <span className="text-sm font-medium text-zinc-400">Business Date</span>
-              <span className="text-lg font-bold text-indigo-400">{currentDate || "—"}</span>
+              <span className="text-lg font-bold text-indigo-400">{formatDateToDDMMYYYY(currentDate) || currentDate || "—"}</span>
             </div>
           </div>
 

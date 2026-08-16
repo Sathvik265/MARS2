@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { getBillsByDate, getBillById } from "../services/api";
 import { useUser } from "../context/UserContext";
+import { formatDateToDDMMYYYY } from "../utils/helpers";
 import "../styles/RecentBills.css";
 
 function RecentBills({ billingDate }) {
@@ -236,7 +237,7 @@ function RecentBills({ billingDate }) {
   return (
     <div className="recent-bills-wrapper">
       <div className="recent-bills-header">
-        <h2>Billing for {billingDate}</h2>
+        <h2>Billing for {formatDateToDDMMYYYY(billingDate) || billingDate}</h2>
         <div className="search-inline">
           <input
             id="recent-bills-search"

@@ -16,7 +16,7 @@ import Billing from "./components/BillingScreen";
 import EnhancedAdminPanel from "./components/AdminPanel";
 import PrintPortal from "./components/PrintPortal";
 import { useUser } from "./context/UserContext";
-import { getCustomShortcuts, matchesShortcut } from "./utils/helpers";
+import { getCustomShortcuts, matchesShortcut, formatDateToDDMMYYYY } from "./utils/helpers";
 import {
   Button,
   Tabs,
@@ -434,7 +434,7 @@ function App() {
           )}
           {mode !== "none" && billingDate && (
             <div className={`${activeTab === "billing" ? "mt-1" : "mt-2"} text-sm text-gray-300`}>
-              Date: {billingDate} | {track} | Clerk: {userInitials}
+              Date: {formatDateToDDMMYYYY(billingDate) || billingDate} | {track} | {userInitials}
               <span className="ml-4 inline-flex gap-2">
                 <Button
                   variant="outline"

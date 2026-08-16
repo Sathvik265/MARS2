@@ -293,7 +293,6 @@ exports.getItemReport = async (req, res) => {
     }
 
     if (category) {
-      // Check both top-level category (legacy) and inside categories array
       whereConditions.push(`(
         item->>'category' ILIKE $${paramIndex} OR
         EXISTS (
@@ -313,59 +312,22 @@ exports.getItemReport = async (req, res) => {
     const whereClause = whereConditions.join(" AND ");
 
     const result = await pool.query(
-      `
-      WITH FlatItems AS (
-          SELECT 
-              item->>'item_name' as item_name,
-              item->>'category' as legacy_category,
-              (item->>'quantity')::decimal as qty,
-              (item->>'line_total')::decimal as amount,
-              COALESCE(item->'categories', '[]'::jsonb) as categories_json
-          FROM bills b,
-          jsonb_array_elements(b.items_json) as item
-          WHERE ${whereClause}
-      ),
-      ProcessedItems AS (
-          SELECT 
-              item_name,
-              qty,
-              amount,
-              COALESCE(
-                  (SELECT SUM((cat->>'qty')::decimal) FROM jsonb_array_elements(
-                    CASE 
-                      WHEN jsonb_typeof(categories_json->0) = 'array' THEN categories_json->0
-                      ELSE categories_json
-                    END
-                  ) cat),
-                  1
-              ) as multiplier,
-              COALESCE(
-                  (SELECT cat->>'name' FROM jsonb_array_elements(
-                    CASE 
-                      WHEN jsonb_typeof(categories_json->0) = 'array' THEN categories_json->0
-                      ELSE categories_json
-                    END
-                  ) cat LIMIT 1),
-                  legacy_category
-              ) as category_name
-          FROM FlatItems
-      )
-      SELECT   
-        item_name,
-        category_name as category,
-        SUM(qty * multiplier) as total_quantity,
-        SUM(amount) as total_amount
-      FROM ProcessedItems
-      GROUP BY item_name, category_name
+      `SELECT   
+        item->>'item_name' as item_name,
+        SUM((item->>'quantity')::decimal) as total_quantity,
+        SUM((item->>'line_total')::decimal) as total_amount
+      FROM bills b,
+      jsonb_array_elements(b.items_json) as item
+      WHERE ${whereClause}
+      GROUP BY item->>'item_name'
       ORDER BY total_quantity DESC`,
       params,
     );
 
     const formattedResult = result.rows.map((row) => ({
       itemName: row.item_name,
-      category: row.category,
-      totalQuantity: parseFloat(row.total_quantity),
-      totalAmount: parseFloat(row.total_amount),
+      totalQuantity: parseFloat(row.total_quantity || 0),
+      totalAmount: parseFloat(row.total_amount || 0),
     }));
 
     res.json(formattedResult);
@@ -662,19 +624,24 @@ exports.getCategoryTotals = async (req, res) => {
   }
 };
 
-// GET /api/reports/category-report (detailed items matching selected category)
+// GET /api/reports/category-report (detailed items matching selected category, with optional shift filter)
 exports.getCategoryReport = async (req, res) => {
   try {
-    const { startDate, endDate, category } = req.query;
+    const { startDate, endDate, category, shift_name, shift } = req.query;
     if (!startDate || !endDate) {
       return res.status(400).json({ detail: "startDate and endDate are required" });
     }
 
-    const result = await pool.query(
-      `SELECT items_json, bill_date FROM bills 
-       WHERE bill_date >= $1 AND bill_date <= $2 AND bill_number > 0`,
-      [startDate, endDate]
-    );
+    const shiftFilter = shift_name || shift;
+    let queryText = `SELECT items_json, bill_date, track FROM bills WHERE bill_date >= $1 AND bill_date <= $2 AND bill_number > 0`;
+    let queryParams = [startDate, endDate];
+
+    if (shiftFilter && shiftFilter.trim() !== "") {
+      queryText += ` AND track = $3`;
+      queryParams.push(shiftFilter.trim());
+    }
+
+    const result = await pool.query(queryText, queryParams);
 
     const itemAggregation = {}; // key: item_name::category_name
 

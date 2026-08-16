@@ -1,0 +1,38 @@
+name: Build Windows Package
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+  workflow_dispatch:
+
+jobs:
+  build-windows-package:
+    name: Build Windows Executable Package
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build Windows Executables & Package Zip
+        shell: powershell
+        run: |
+          if (Test-Path ".\restaurant-billing-app\deploy\build-package.ps1") {
+            Set-Location -Path "restaurant-billing-app"
+          }
+          .\deploy\build-package.ps1
+
+      - name: Upload Zip Package Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbs-deploy-package-windows
+          path: |
+            **/rbs-deploy-package.zip
+          retention-days: 30
