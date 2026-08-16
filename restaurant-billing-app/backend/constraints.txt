@@ -1,0 +1,26 @@
+CONSTRAINTS:
+Name: bills_bill_number_bill_date_key
+Definition: UNIQUE (bill_number, bill_date)
+
+Name: bills_pkey
+Definition: PRIMARY KEY (id)
+
+Name: fk_bills_tables
+Definition: FOREIGN KEY (table_no) REFERENCES tables(table_id) ON UPDATE CASCADE ON DELETE SET NULL
+
+INDEXES:
+Name: bills_pkey
+Definition: CREATE UNIQUE INDEX bills_pkey ON public.bills USING btree (id)
+
+Name: bills_bill_number_bill_date_key
+Definition: CREATE UNIQUE INDEX bills_bill_number_bill_date_key ON public.bills USING btree (bill_number, bill_date)
+
+Name: idx_bills_date_number
+Definition: CREATE INDEX idx_bills_date_number ON public.bills USING btree (bill_date, bill_number)
+
+Name: idx_bills_items_json
+Definition: CREATE INDEX idx_bills_items_json ON public.bills USING gin (items_json)
+
+Name: idx_bills_table_no
+Definition: CREATE INDEX idx_bills_table_no ON public.bills USING btree (table_no)
+

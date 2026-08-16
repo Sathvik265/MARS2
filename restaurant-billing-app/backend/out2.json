@@ -1,0 +1,95 @@
+[
+  {
+    "id": 125,
+    "bill_date": "2026-02-25T18:30:00.000Z",
+    "items_json": [
+      {
+        "quantity": 1,
+        "item_name": "PAV BAJI",
+        "categories": [
+          []
+        ],
+        "line_total": 60,
+        "fixed_price": 60,
+        "is_separate": false,
+        "actual_price": 60,
+        "item_code_alpha": "PBJ",
+        "item_code_numeric": "201"
+      },
+      {
+        "quantity": 1,
+        "item_name": "RASAM IDLY",
+        "categories": [
+          [
+            {
+              "qty": 2,
+              "name": "Idli",
+              "category_old": "idli"
+            }
+          ]
+        ],
+        "line_total": 41,
+        "fixed_price": 41,
+        "is_separate": false,
+        "actual_price": 41,
+        "item_code_alpha": "RAI",
+        "item_code_numeric": "105"
+      }
+    ]
+  },
+  {
+    "id": 124,
+    "bill_date": "2026-02-25T18:30:00.000Z",
+    "items_json": [
+      {
+        "quantity": 1,
+        "item_name": "IDLY",
+        "categories": [
+          [
+            {
+              "qty": 2,
+              "name": "Idli",
+              "category_old": "idli"
+            }
+          ]
+        ],
+        "line_total": 34,
+        "fixed_price": 34,
+        "is_separate": false,
+        "actual_price": 34,
+        "item_code_alpha": "IDL",
+        "item_code_numeric": "101"
+      }
+    ]
+  },
+  {
+    "id": 123,
+    "bill_date": "2026-02-25T18:30:00.000Z",
+    "items_json": [
+      {
+        "quantity": 1,
+        "item_name": "S.IDLI S.WADA",
+        "categories": [
+          [
+            {
+              "qty": 1,
+              "name": "Idli",
+              "category_old": "idli"
+            },
+            {
+              "qty": 1,
+              "name": "wada",
+              "category_old": "wada"
+            }
+          ]
+        ],
+        "line_total": 46,
+        "fixed_price": 46,
+        "is_separate": false,
+        "actual_price": 46,
+        "item_code_alpha": "SIV",
+        "item_code_numeric": "102"
+      }
+    ]
+  }
+]

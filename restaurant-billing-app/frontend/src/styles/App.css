@@ -1,0 +1,1528 @@
+/* Restaurant Billing System - COMPREHENSIVE UI COLOR FIX */
+/* Global Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
+    "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #000000;
+  color: #ffffff;
+  min-height: 100vh;
+}
+
+code {
+  font-family:
+    source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+/* ==================== COMPREHENSIVE UI COLOR INVERSION ==================== */
+/* CRITICAL: ALL input elements must have white background with black text */
+
+/* ALL INPUT TYPES - COMPREHENSIVE LIST */
+input,
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"],
+input[type="color"],
+input[type="file"],
+select,
+textarea {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  border: 1px solid #404040 !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+}
+
+/* Specific class-based selectors for React components */
+.input-field,
+input.form-control,
+input.form-input,
+.form-input,
+.text-input,
+input.w-full,
+input.px-3,
+input.py-2,
+select.w-full,
+textarea.w-full {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  border: 1px solid #404040 !important;
+}
+
+/* Focus states - maintain white background */
+input:focus,
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="tel"]:focus,
+input[type="url"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime-local"]:focus,
+input[type="month"]:focus,
+input[type="week"]:focus,
+select:focus,
+textarea:focus,
+.input-field:focus,
+input.w-full:focus,
+select.w-full:focus,
+textarea.w-full:focus {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Placeholder text - visible on white background */
+input::placeholder,
+textarea::placeholder,
+input::-webkit-input-placeholder,
+input::-moz-placeholder,
+input:-ms-input-placeholder,
+input:-moz-placeholder {
+  color: #9ca3af !important;
+  opacity: 1 !important;
+}
+
+/* Select dropdown options */
+select option,
+select optgroup {
+  background-color: #262626 !important;
+  color: #ffffff !important;
+}
+
+/* Disabled states */
+input:disabled,
+textarea:disabled,
+select:disabled {
+  background-color: #171717 !important;
+  color: #6b7280 !important;
+  border-color: #404040 !important;
+  cursor: not-allowed !important;
+}
+
+/* Readonly states */
+input[readonly],
+textarea[readonly] {
+  background-color: #171717 !important;
+  color: #9ca3af !important;
+  border-color: #404040 !important;
+}
+
+/* Hover states for inputs */
+input:hover:not(:disabled):not([readonly]),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled):not([readonly]) {
+  background-color: #333333 !important;
+  color: #ffffff !important;
+  border-color: #6b7280 !important;
+}
+
+/* ================= END COMPREHENSIVE UI COLOR INVERSION ================= */
+
+.sticky-sidebar {
+  position: sticky;
+  top: 1rem;
+  align-self: start;
+}
+
+/* Utility Classes */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+.gap-1 {
+  gap: 0.25rem;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-3 {
+  gap: 0.75rem;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.gap-6 {
+  gap: 1.5rem;
+}
+
+.space-y-1>*+* {
+  margin-top: 0.25rem;
+}
+
+.space-y-2>*+* {
+  margin-top: 0.5rem;
+}
+
+.space-y-3>*+* {
+  margin-top: 0.75rem;
+}
+
+.space-y-4>*+* {
+  margin-top: 1rem;
+}
+
+/* Grid Classes */
+.grid {
+  display: grid;
+}
+
+.grid-cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid-cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.grid-cols-7 {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.grid-cols-12 {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.col-span-2 {
+  grid-column: span 2 / span 2;
+}
+
+.col-span-4 {
+  grid-column: span 4 / span 4;
+}
+
+.col-span-5 {
+  grid-column: span 5 / span 5;
+}
+
+.col-span-8 {
+  grid-column: span 8 / span 8;
+}
+
+/* Layout Classes */
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.min-h-50vh {
+  min-height: 50vh;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.h-12 {
+  height: 3rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.w-8 {
+  width: 2rem;
+}
+
+.w-12 {
+  width: 3rem;
+}
+
+.w-16 {
+  width: 4rem;
+}
+
+.w-48 {
+  width: 12rem;
+}
+
+.max-w-md {
+  max-width: 28rem;
+}
+
+.max-w-3xl {
+  max-width: 48rem;
+}
+
+.max-w-7xl {
+  max-width: 80rem;
+}
+
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Padding and Margin */
+.p-1 {
+  padding: 0.25rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.px-2 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.px-3 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.px-5 {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.px-6 {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.py-0,
+.\!py-0 {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.py-1 {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.py-3 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.py-4 {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.py-8 {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
+
+.pt-2 {
+  padding-top: 0.5rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.25rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mb-6 {
+  margin-bottom: 1.5rem;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mt-6 {
+  margin-top: 1.5rem;
+}
+
+/* Text Classes */
+.text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.text-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+.text-xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.text-2xl {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.tracking-tight {
+  letter-spacing: -0.025em;
+}
+
+.uppercase {
+  text-transform: uppercase;
+}
+
+/* Color Classes */
+.text-gray-500 {
+  color: #9ca3af;
+}
+
+.text-gray-600 {
+  color: #d1d5db;
+}
+
+.text-gray-700 {
+  color: #e5e5e5;
+}
+
+.text-gray-800 {
+  color: #f3f4f6;
+}
+
+.text-gray-900 {
+  color: #ffffff;
+}
+
+.text-white {
+  color: #ffffff;
+}
+
+.text-blue-500 {
+  color: #3b82f6;
+}
+
+.text-blue-600 {
+  color: #2563eb;
+}
+
+.text-blue-700 {
+  color: #1d4ed8;
+}
+
+.text-blue-800 {
+  color: #1e40af;
+}
+
+.text-blue-900 {
+  color: #60a5fa;
+}
+
+.text-green-600 {
+  color: #4ade80;
+}
+
+.text-green-700 {
+  color: #22c55e;
+}
+
+.text-green-800 {
+  color: #86efac;
+}
+
+.text-red-600 {
+  color: #f87171;
+}
+
+.text-red-700 {
+  color: #fca5a5;
+}
+
+.text-red-800 {
+  color: #fecaca;
+}
+
+.text-orange-500 {
+  color: #f97316;
+}
+
+.text-yellow-600 {
+  color: #ca8a04;
+}
+
+.text-yellow-800 {
+  color: #92400e;
+}
+
+.bg-white {
+  background-color: #1a1a1a;
+}
+
+.bg-gray-50 {
+  background-color: #000000;
+}
+
+.bg-gray-100 {
+  background-color: #262626;
+}
+
+.bg-gray-200 {
+  background-color: #404040;
+}
+
+.bg-blue-50 {
+  background-color: #0f172a;
+}
+
+.bg-blue-100 {
+  background-color: #172554;
+}
+
+.bg-blue-600 {
+  background-color: #2563eb;
+}
+
+.bg-green-50 {
+  background-color: #052e16;
+}
+
+.bg-green-100 {
+  background-color: #064e3b;
+}
+
+.bg-green-600 {
+  background-color: #16a34a;
+}
+
+.bg-red-50 {
+  background-color: #450a0a;
+}
+
+.bg-red-100 {
+  background-color: #7f1d1d;
+}
+
+.bg-red-600 {
+  background-color: #dc2626;
+}
+
+.bg-yellow-50 {
+  background-color: #422006;
+}
+
+.bg-yellow-100 {
+  background-color: #713f12;
+}
+
+/* Border Classes */
+.border {
+  border-width: 1px;
+}
+
+.border-0 {
+  border-width: 0;
+}
+
+.border-b {
+  border-bottom-width: 1px;
+}
+
+.border-t {
+  border-top-width: 1px;
+}
+
+.border-gray-200 {
+  border-color: #333333;
+}
+
+.border-gray-300 {
+  border-color: #444444;
+}
+
+/* Added for Dark Mode Compatibility */
+.border-blue-200 {
+  border-color: #1e40af;
+}
+
+.border-red-200 {
+  border-color: #991b1b;
+}
+
+.divide-y>*+* {
+  border-top-width: 1px;
+}
+
+.divide-gray-200>*+* {
+  border-color: #333333;
+}
+
+/* Border Radius */
+.rounded {
+  border-radius: 0.5rem;
+}
+
+.rounded-md {
+  border-radius: 0.75rem;
+}
+
+.rounded-lg {
+  border-radius: 1rem;
+}
+
+.rounded-text-xs {
+  border-radius: 0.25rem;
+}
+
+/* Shadow */
+.shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.shadow-md {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-xl {
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* States */
+.hover\\:bg-gray-50:hover {
+  background-color: #f9fafb;
+}
+
+.hover\\:bg-gray-100:hover {
+  background-color: #f3f4f6;
+}
+
+.hover\\:bg-gray-200:hover {
+  background-color: #e5e7eb;
+}
+
+.hover\\:bg-blue-700:hover {
+  background-color: #1d4ed8;
+}
+
+.hover\\:bg-green-700:hover {
+  background-color: #15803d;
+}
+
+.hover\\:bg-red-700:hover {
+  background-color: #b91c1c;
+}
+
+.hover\\:text-gray-900:hover {
+  color: #111827;
+}
+
+.focus\\:outline-none:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.focus\\:ring-2:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+.focus\\:ring-blue-500:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+.focus\\:ring-green-500:focus {
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.5);
+}
+
+.focus\\:ring-red-500:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.5);
+}
+
+.focus\\:ring-offset-2:focus {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px rgba(59, 130, 246, 0.5);
+}
+
+.focus\\:border-blue-500:focus {
+  border-color: #3b82f6;
+}
+
+.disabled\\:opacity-50:disabled {
+  opacity: 0.5;
+}
+
+.disabled\\:cursor-not-allowed:disabled {
+  cursor: not-allowed;
+}
+
+/* Transitions */
+.transition-colors {
+  transition-property: color, background-color, border-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Lists */
+.list-disc {
+  list-style-type: disc;
+}
+
+.list-inside {
+  list-style-position: inside;
+}
+
+/* Tables */
+.min-w-full {
+  min-width: 100%;
+}
+
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
+.divide-y>*+* {
+  border-top-width: 1px;
+}
+
+/* Overflow */
+.overflow-x-auto {
+  overflow-x: auto;
+}
+
+.overflow-y-auto {
+  overflow-y: auto;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+/* Position */
+.sticky {
+  position: sticky;
+}
+
+.top-0 {
+  top: 0;
+}
+
+/* Cursor */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.cursor-not-allowed {
+  cursor: not-allowed;
+}
+
+/* Opacity */
+.opacity-50 {
+  opacity: 0.5;
+}
+
+/* Display */
+.hidden {
+  display: none;
+}
+
+.inline-block {
+  display: inline-block;
+}
+
+.block {
+  display: block;
+}
+
+/* Animation */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Print Styles */
+/* Optimized Print Styles for Dot-Matrix Continuous Feed */
+@media print {
+
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    position: relative !important;
+    padding: 0;
+  }
+
+  .print-receipt-container {
+    height: fit-content !important;
+    position: relative !important;
+    page-break-after: avoid !important;
+  }
+
+  @page {
+    margin: 0;
+  }
+
+  /* Reset body for printing */
+  body {
+    background-color: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    visibility: hidden;
+  }
+
+  /* Only show the receipt container */
+  .print-receipt-container,
+  .print-receipt-container * {
+    visibility: visible;
+  }
+
+  .print-receipt-container {
+    position: static;
+    /* Changed from absolute to allow auto-height calculation */
+    display: block !important;
+    width: 100%;
+    max-width: 100mm;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-receipt {
+    font-family: "Courier New", monospace;
+    font-size: 13px;
+    font-weight: bold;
+    color: black;
+    /* This prevents the browser from adding extra blank space at the bottom */
+    page-break-after: avoid;
+    overflow: visible;
+  }
+
+  /* Ensure background colors don't print (saves ink/ribbon) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide UI elements that shouldn't be on the bill */
+  .help-panel,
+  .active-bills-list,
+  button {
+    display: none !important;
+  }
+}
+
+/* Custom Component Styles */
+.bg-gradient-to-b {
+  background: linear-gradient(to bottom, var(--tw-gradient-stops));
+}
+
+.from-amber-50 {
+  --tw-gradient-from: #1c1917;
+  --tw-gradient-stops:
+    var(--tw-gradient-from), var(--tw-gradient-to, rgba(28, 25, 23, 0));
+}
+
+.to-orange-50 {
+  --tw-gradient-to: #0c0a09;
+}
+
+/* Responsive Design */
+@media (min-width: 640px) {
+  .sm\\:px-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .lg\\:px-8 {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Focus styles for keyboard navigation */
+*:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* High contrast for better visibility */
+.high-contrast input,
+.high-contrast button,
+.high-contrast select {
+  border: 2px solid #000;
+}
+
+.high-contrast button:focus,
+.high-contrast input:focus {
+  outline: 3px solid #ff0000;
+}
+
+/* Accessibility improvements */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Error states */
+.error {
+  border-color: #ef4444 !important;
+  color: #ef4444;
+}
+
+.success {
+  border-color: #10b981 !important;
+  color: #10b981;
+}
+
+/* Loading states */
+.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Help Panel Styles */
+.help-panel {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.help-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #333;
+  background: #262626;
+}
+
+.help-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.help-tab-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #d1d5db;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.help-tab-btn:hover {
+  background: #404040;
+  color: #ffffff;
+}
+
+.help-tab-btn.active {
+  background: #404040;
+  color: #60a5fa;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+}
+
+.close-help {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.close-help:hover {
+  color: #ef4444;
+}
+
+.help-content {
+  padding: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.help-hint {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin-bottom: 1rem;
+}
+
+.shortcut-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.shortcut-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #333;
+  font-size: 0.875rem;
+  color: #e5e5e5;
+}
+
+.shortcut-list li:last-child {
+  border-bottom: none;
+}
+
+kbd {
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #ffffff;
+}
+
+/* Active Bills Styles */
+.active-bills-list {
+  min-height: 200px;
+}
+
+.no-active-bills {
+  text-align: center;
+  color: #9ca3af;
+  padding: 2rem 0;
+}
+
+.active-bills-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.active-bills-table th {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  color: #9ca3af;
+  font-weight: 500;
+  border-bottom: 1px solid #333;
+}
+
+.active-bills-table td {
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid #333;
+  color: #ffffff;
+}
+
+.time-running {
+  color: #60a5fa;
+  font-weight: 500;
+  font-family: monospace;
+}
+
+.time-ago {
+  color: #ef4444;
+  font-size: 0.75rem;
+}
+
+.search-results-table {
+  margin-top: 0.5rem;
+  border: 1px solid #333;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+/* ==================== BILLING SCREEN NO-SCROLL LAYOUT FIX ==================== */
+/* Prevent vertical scroll for the whole page when billing screen is shown */
+.billing-tab-active {
+  height: 100vh !important;
+  min-height: 100vh !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.billing-tab-active > .max-w-7xl {
+  height: 100vh !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* The title section */
+.billing-tab-active .text-center {
+  flex-shrink: 0 !important;
+  margin-bottom: 0.25rem !important;
+  padding: 0.5rem 1rem 0 !rem;
+}
+
+.billing-tab-active .text-center h1 {
+  font-size: 1.5rem !important; /* Slightly smaller to fit layout */
+}
+
+/* Tabs & space-y-6 container */
+.billing-tab-active .space-y-6 {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  margin-top: 0 !important;
+  gap: 0 !important;
+}
+
+.billing-tab-active .space-y-6 > .w-full {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* Tabs Trigger Header */
+.billing-tab-active .space-y-6 > .w-full > .flex {
+  flex-shrink: 0 !important;
+  margin-bottom: 0.5rem !important;
+  padding: 0 1rem;
+}
+
+/* Active tab content wrapper */
+.billing-tab-active .space-y-6 > .w-full > div:not(.flex) {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 0 1rem 1rem 1rem;
+}
+
+/* The grid element in BillingScreen */
+.billing-tab-active .grid-cols-12 {
+  flex: 1 !important;
+  display: grid !important;
+  grid-template-rows: 1fr !important;
+  overflow: hidden !important;
+  height: 100% !important;
+  margin-bottom: 0 !important;
+}
+
+/* The left side column */
+.billing-tab-active .col-span-8 {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.billing-tab-active .col-span-8 > .bg-white {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.billing-tab-active .col-span-8 > .bg-white > div:first-child {
+  flex-shrink: 0 !important;
+}
+
+.billing-tab-active .col-span-8 > .bg-white > div.px-6.flex {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* The elements inside CardContent (grid, info panel, inputs) */
+.billing-tab-active .col-span-8 > .bg-white > div.px-6.flex > div.flex-none {
+  flex-shrink: 0 !important;
+}
+
+/* The Table container wrapper */
+.billing-tab-active .col-span-8 > .bg-white > div.px-6.flex > div.overflow-y-auto {
+  flex: 1 !important;
+  height: auto !important; /* Override the style="height: 500px" */
+  min-height: 150px !important;
+}
+
+/* ==================== GLOBAL TYPOGRAPHY OVERHAUL ==================== */
+.billing-screen-overhaul {
+  font-size: 1.1rem !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.billing-screen-overhaul *,
+.billing-screen-overhaul input,
+.billing-screen-overhaul select,
+.billing-screen-overhaul button,
+.billing-screen-overhaul label,
+.billing-screen-overhaul span,
+.billing-screen-overhaul div,
+.billing-screen-overhaul th,
+.billing-screen-overhaul td {
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.billing-screen-overhaul input {
+  font-size: 1.2rem !important;
+}
+
+.billing-screen-overhaul label {
+  font-size: 1rem !important;
+  color: #f3f4f6 !important;
+}
+
+.billing-screen-overhaul .card-title,
+.billing-screen-overhaul h1,
+.billing-screen-overhaul h2,
+.billing-screen-overhaul h3,
+.billing-screen-overhaul h4 {
+  font-size: 1.5rem !important;
+}
+
+/* ==================== CENTERED F4 POPUP MODAL OVERLAY ==================== */
+.f4-popup-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(5px) !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1.5rem !important;
+}
+
+.f4-popup-content {
+  background-color: #111827 !important; /* dark slate bg-gray-900 */
+  border: 4px solid #374151 !important; /* grey border-gray-700 */
+  border-radius: 0.75rem !important;
+  padding: 2rem !important;
+  width: 100% !important;
+  max-width: 900px !important;
+  max-height: 85vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+  color: #ffffff !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+  animation: f4PopupZoomIn 0.2s ease-out !important;
+}
+
+@keyframes f4PopupZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.f4-popup-close {
+  position: absolute !important;
+  top: 1rem !important;
+  right: 1.5rem !important;
+  background: transparent !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-size: 2.5rem !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+  transition: color 0.15s ease !important;
+}
+
+.f4-popup-close:hover {
+  color: #ef4444 !important; /* Red hover */
+}
+
+.f4-popup-tabs {
+  display: flex !important;
+  gap: 1rem !important;
+  border-bottom: 2px solid #374151 !important;
+  padding-bottom: 0.75rem !important;
+  margin-bottom: 1.25rem !important;
+  flex-shrink: 0 !important;
+}
+
+.f4-popup-tab-btn {
+  padding: 0.5rem 1.25rem !important;
+  font-size: 1.1rem !important;
+  font-weight: 900 !important;
+  border: 2px solid #4b5563 !important;
+  border-radius: 0.375rem !important;
+  background-color: transparent !important;
+  color: #9ca3af !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.f4-popup-tab-btn:hover {
+  background-color: #1f2937 !important;
+  color: #ffffff !important;
+}
+
+.f4-popup-tab-btn.active {
+  background-color: #2563eb !important; /* Blue-600 */
+  border-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+.f4-popup-body {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding-right: 0.5rem !important;
+}
+
+/* Scrollbar styles for the popup body */
+.f4-popup-body::-webkit-scrollbar {
+  width: 8px;
+}
+.f4-popup-body::-webkit-scrollbar-track {
+  background: #1f2937;
+  border-radius: 4px;
+}
+.f4-popup-body::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+.f4-popup-body::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+.f4-search-results {
+  margin-top: 1rem !important;
+  border: 1px solid #374151 !important;
+  border-radius: 0.375rem !important;
+  overflow: hidden !important;
+}
+
+.f4-shortcut-list {
+  list-style: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.f4-shortcut-list li {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 0.75rem 0.5rem !important;
+  border-bottom: 1px solid #1f2937 !important;
+}
+
+.f4-shortcut-list kbd {
+  background-color: #1f2937 !important;
+  border: 1px solid #4b5563 !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 0.25rem !important;
+  font-family: monospace !important;
+  font-size: 0.9rem !important;
+  color: #60a5fa !important;
+}
+
+.f4-active-bills-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+}
+
+.f4-active-bills-table th {
+  text-align: left !important;
+  padding: 0.75rem 1rem !important;
+  border-bottom: 2px solid #374151 !important;
+  color: #9ca3af !important;
+}
+
+.f4-active-bills-table td {
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid #1f2937 !important;
+}
+
+.f4-active-bills-table tr:hover {
+  background-color: #1f2937 !important;
+  cursor: pointer !important;
+}
+
+/* ==================== BILLING TABLE AND GRAND TOTAL ENHANCEMENTS ==================== */
+
+/* S.No header, Item Name header, Qty, Rate, Amount headers */
+.billing-screen-overhaul th {
+  font-size: 1.35rem !important;
+  font-weight: 800 !important;
+  padding: 14px 10px !important;
+}
+
+/* S.No cell */
+.billing-screen-overhaul td:first-child {
+  font-size: 1.8rem !important;
+  font-weight: 950 !important;
+}
+
+/* Item Name text */
+.billing-screen-overhaul td .tracking-wide {
+  font-size: 1.7rem !important;
+  font-weight: 950 !important;
+  line-height: 1.2 !important;
+}
+
+/* Table Quantity input box */
+.billing-screen-overhaul td input[type="text"] {
+  font-size: 2rem !important;
+  font-weight: 950 !important;
+  width: 90px !important;
+  height: 48px !important;
+  border-radius: 6px !important;
+  text-align: center !important;
+}
+
+/* Rate and Amount cells */
+.billing-screen-overhaul td:nth-child(4),
+.billing-screen-overhaul td:nth-child(5) {
+  font-size: 2rem !important;
+  font-weight: 950 !important;
+}
+
+/* Specifically style the line total (Amount) cell in table */
+.billing-screen-overhaul td:nth-child(5) {
+  color: #ffffff !important; /* White text color for high contrast */
+}
+
+/* Move button and split button spacing adjustment */
+.billing-screen-overhaul td button {
+  font-size: 0.9rem !important;
+  padding: 4px 10px !important;
+  height: auto !important;
+}
+
+/* Grand Total Display Box styling */
+.grand-total-display {
+  font-size: 2.6rem !important;
+  font-weight: 950 !important;
+  height: 60px !important;
+  padding: 0 16px !important;
+  line-height: 60px !important;
+  border-width: 3px !important;
+}
+
+/* Adjust layout space for the larger items table */
+.billing-screen-overhaul .overflow-y-auto.flex-1 {
+  border-width: 2px !important;
+}

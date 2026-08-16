@@ -1,2 +1,14 @@
+<<<<<<< HEAD
 node_modules/ 
 .env* 
+=======
+﻿**/node_modules
+**/.bin
+**/build
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+**/*.tmp
+**/*.bak
+>>>>>>> origin/3.26

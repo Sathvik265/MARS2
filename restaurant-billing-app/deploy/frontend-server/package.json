@@ -1,0 +1,26 @@
+{
+  "name": "rbs-frontend-server",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "bin": "server.js",
+  "pkg": {
+    "assets": [
+      "build/**/*"
+    ],
+    "targets": [
+      "node22-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "build:exe": "pkg . --output dist/rbs-frontend.exe"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.21.0"
+  }
+}

@@ -1,0 +1,1800 @@
+{
+  "shifts": [
+    {
+      "id": 1,
+      "shift_name": "`",
+      "created_at": "2026-06-21T07:32:49.425Z"
+    },
+    {
+      "id": 2,
+      "shift_name": "``",
+      "created_at": "2026-06-21T07:32:49.425Z"
+    },
+    {
+      "id": 3,
+      "shift_name": "RBS1",
+      "created_at": "2026-06-21T07:32:49.425Z"
+    },
+    {
+      "id": 4,
+      "shift_name": "RBS2",
+      "created_at": "2026-06-21T07:32:49.425Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": 1,
+      "session_id": "33380d6f-ef36-46b9-a029-444b4868c921",
+      "shift_name": "`",
+      "clerk_initials": "SYS",
+      "session_date": "2026-06-20T18:30:00.000Z",
+      "start_time": "2026-06-21T07:32:49.521Z",
+      "end_time": null,
+      "status": "OPEN",
+      "closed_by": null,
+      "is_locked": false,
+      "last_bill_number": 0,
+      "created_at": "2026-06-21T07:32:49.521Z"
+    },
+    {
+      "id": 2,
+      "session_id": "c261123a-ec92-4f05-a15b-f0cc7bced274",
+      "shift_name": "``",
+      "clerk_initials": "SYS",
+      "session_date": "2026-06-20T18:30:00.000Z",
+      "start_time": "2026-06-21T07:32:49.521Z",
+      "end_time": null,
+      "status": "OPEN",
+      "closed_by": null,
+      "is_locked": false,
+      "last_bill_number": 0,
+      "created_at": "2026-06-21T07:32:49.521Z"
+    },
+    {
+      "id": 3,
+      "session_id": "7c7200ce-7094-4910-93b8-5a3bdb250410",
+      "shift_name": "RBS1",
+      "clerk_initials": "SYS",
+      "session_date": "2026-06-20T18:30:00.000Z",
+      "start_time": "2026-06-21T07:32:49.521Z",
+      "end_time": null,
+      "status": "OPEN",
+      "closed_by": null,
+      "is_locked": false,
+      "last_bill_number": 0,
+      "created_at": "2026-06-21T07:32:49.521Z"
+    },
+    {
+      "id": 4,
+      "session_id": "9045ac8f-9038-4583-9335-3360526827f1",
+      "shift_name": "RBS2",
+      "clerk_initials": "SYS",
+      "session_date": "2026-06-20T18:30:00.000Z",
+      "start_time": "2026-06-21T07:32:49.521Z",
+      "end_time": null,
+      "status": "OPEN",
+      "closed_by": null,
+      "is_locked": false,
+      "last_bill_number": 0,
+      "created_at": "2026-06-21T07:32:49.521Z"
+    }
+  ],
+  "tables": [
+    {
+      "table_id": 1,
+      "section_name": "Parcel",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 2,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 3,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 4,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 5,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 6,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 7,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 8,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 9,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 10,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 11,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 12,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 13,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 14,
+      "section_name": "General",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 15,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 16,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 17,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 18,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 19,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 20,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 21,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 22,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 23,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 24,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 25,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 26,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 27,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 28,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 29,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    },
+    {
+      "table_id": 30,
+      "section_name": "AC",
+      "created_at": "2026-06-21T07:32:49.457Z",
+      "updated_at": "2026-06-21T07:32:49.457Z"
+    }
+  ],
+  "settings": [
+    {
+      "id": 1,
+      "hotel_name": "Udupi Anand Bhavan",
+      "address": "Default Address",
+      "phone": "123-456-7890",
+      "gstin": "GST123456789",
+      "clerk_initials": "CLK",
+      "sgst_percentage": "2.50",
+      "cgst_percentage": "2.50",
+      "created_at": "2026-06-21T07:32:49.393Z"
+    }
+  ],
+  "items": [
+    {
+      "id": 1,
+      "name": "Unknown",
+      "alpha_code": "TES",
+      "numeric_code": "0",
+      "price_fixed": "2.00",
+      "price_general": "0.00",
+      "price_ac": "2.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 2,
+      "name": "Unknown",
+      "alpha_code": "TBY",
+      "numeric_code": "0A",
+      "price_fixed": "2.00",
+      "price_general": "0.00",
+      "price_ac": "2.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 3,
+      "name": "Unknown",
+      "alpha_code": "O",
+      "numeric_code": "0B",
+      "price_fixed": "2.00",
+      "price_general": "0.00",
+      "price_ac": "2.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 4,
+      "name": "Unknown",
+      "alpha_code": "UTP",
+      "numeric_code": "0C",
+      "price_fixed": "2.00",
+      "price_general": "0.00",
+      "price_ac": "2.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 5,
+      "name": "Unknown",
+      "alpha_code": "ABU",
+      "numeric_code": "0D",
+      "price_fixed": "2.00",
+      "price_general": "0.00",
+      "price_ac": "2.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 6,
+      "name": "S.I.W Sambar",
+      "alpha_code": "SRW",
+      "numeric_code": "100",
+      "price_fixed": "54.00",
+      "price_general": "52.00",
+      "price_ac": "56.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "Idli",
+          "category_old": "idli"
+        },
+        {
+          "qty": 1,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 7,
+      "name": "IDLY",
+      "alpha_code": "IDL",
+      "numeric_code": "101",
+      "price_fixed": "36.00",
+      "price_general": "34.00",
+      "price_ac": "38.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "Idli",
+          "category_old": "idli"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 8,
+      "name": "S.IDLI S.WADA",
+      "alpha_code": "SIV",
+      "numeric_code": "102",
+      "price_fixed": "48.00",
+      "price_general": "46.00",
+      "price_ac": "50.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "Idli",
+          "category_old": "idli"
+        },
+        {
+          "qty": 1,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 9,
+      "name": "IDLI S.WADA",
+      "alpha_code": "ISV",
+      "numeric_code": "103",
+      "price_fixed": "65.00",
+      "price_general": "63.00",
+      "price_ac": "67.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "Idli",
+          "category_old": "idli"
+        },
+        {
+          "qty": 1,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 10,
+      "name": "WADA",
+      "alpha_code": "WAD",
+      "numeric_code": "104",
+      "price_fixed": "54.00",
+      "price_general": "52.00",
+      "price_ac": "56.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 11,
+      "name": "RASAM IDLY",
+      "alpha_code": "RAI",
+      "numeric_code": "105",
+      "price_fixed": "43.00",
+      "price_general": "41.00",
+      "price_ac": "45.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "Idli",
+          "category_old": "idli"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 12,
+      "name": "RASAM WADA",
+      "alpha_code": "RAW",
+      "numeric_code": "106",
+      "price_fixed": "60.00",
+      "price_general": "58.00",
+      "price_ac": "63.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 13,
+      "name": "POORI",
+      "alpha_code": "POO",
+      "numeric_code": "107",
+      "price_fixed": "57.00",
+      "price_general": "55.00",
+      "price_ac": "59.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "puri",
+          "category_old": "puri"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 14,
+      "name": "PLAIN DOSA",
+      "alpha_code": "PLD",
+      "numeric_code": "108",
+      "price_fixed": "56.00",
+      "price_general": "54.00",
+      "price_ac": "58.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 15,
+      "name": "MASALA DOSA",
+      "alpha_code": "MAS",
+      "numeric_code": "109",
+      "price_fixed": "56.00",
+      "price_general": "54.00",
+      "price_ac": "58.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 16,
+      "name": "RAVA DOSA",
+      "alpha_code": "RAD",
+      "numeric_code": "110",
+      "price_fixed": "69.00",
+      "price_general": "67.00",
+      "price_ac": "71.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 17,
+      "name": "ONION DOSA",
+      "alpha_code": "OND",
+      "numeric_code": "111",
+      "price_fixed": "77.00",
+      "price_general": "75.00",
+      "price_ac": "81.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 18,
+      "name": "AB SP IDLY",
+      "alpha_code": "SPI",
+      "numeric_code": "112",
+      "price_fixed": "47.00",
+      "price_general": "45.00",
+      "price_ac": "49.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "Idli",
+          "category_old": "idli"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 19,
+      "name": "70.MM.DOSA",
+      "alpha_code": "MMM",
+      "numeric_code": "113",
+      "price_fixed": "104.00",
+      "price_general": "102.00",
+      "price_ac": "106.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 20,
+      "name": "AB SPL DOSA",
+      "alpha_code": "JER",
+      "numeric_code": "114",
+      "price_fixed": "97.00",
+      "price_general": "95.00",
+      "price_ac": "99.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 21,
+      "name": "AB SPL DOSA",
+      "alpha_code": "ABD",
+      "numeric_code": "114A",
+      "price_fixed": "94.00",
+      "price_general": "92.00",
+      "price_ac": "96.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 22,
+      "name": "GHEE KARAM DOSA",
+      "alpha_code": "CCM",
+      "numeric_code": "115",
+      "price_fixed": "97.00",
+      "price_general": "95.00",
+      "price_ac": "99.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 23,
+      "name": "TOMATO BATH",
+      "alpha_code": "TOB",
+      "numeric_code": "116",
+      "price_fixed": "35.00",
+      "price_general": "33.00",
+      "price_ac": "37.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 24,
+      "name": "TOMOTO.RICE",
+      "alpha_code": "CAP",
+      "numeric_code": "117",
+      "price_fixed": "62.00",
+      "price_general": "60.00",
+      "price_ac": "64.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 25,
+      "name": "VEG.BERYANI",
+      "alpha_code": "VEB",
+      "numeric_code": "118",
+      "price_fixed": "62.00",
+      "price_general": "60.00",
+      "price_ac": "64.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 26,
+      "name": "PAPER DOSA",
+      "alpha_code": "PAD",
+      "numeric_code": "119",
+      "price_fixed": "104.00",
+      "price_general": "102.00",
+      "price_ac": "106.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 27,
+      "name": "DAHI WADA",
+      "alpha_code": "DHW",
+      "numeric_code": "120",
+      "price_fixed": "57.00",
+      "price_general": "55.00",
+      "price_ac": "59.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 28,
+      "name": "SET DOSA",
+      "alpha_code": "SED",
+      "numeric_code": "121",
+      "price_fixed": "69.00",
+      "price_general": "67.00",
+      "price_ac": "71.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 29,
+      "name": "MURKUL/MIXTURE",
+      "alpha_code": "MUM",
+      "numeric_code": "122",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 30,
+      "name": "MYSORE BAJJI",
+      "alpha_code": "MYB",
+      "numeric_code": "123",
+      "price_fixed": "46.00",
+      "price_general": "44.00",
+      "price_ac": "48.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 31,
+      "name": "ALU BONDA",
+      "alpha_code": "ALU",
+      "numeric_code": "124",
+      "price_fixed": "35.00",
+      "price_general": "33.00",
+      "price_ac": "37.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 32,
+      "name": "VEG.HALEEM",
+      "alpha_code": "HAL",
+      "numeric_code": "125",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 33,
+      "name": "S.I.W Rasam",
+      "alpha_code": "RSM",
+      "numeric_code": "126",
+      "price_fixed": "52.00",
+      "price_general": "50.00",
+      "price_ac": "54.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "Idli",
+          "category_old": "idli"
+        },
+        {
+          "qty": 1,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 34,
+      "name": "PAROTA",
+      "alpha_code": "PAR",
+      "numeric_code": "128",
+      "price_fixed": "52.00",
+      "price_general": "50.00",
+      "price_ac": "54.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 35,
+      "name": "Chapathi",
+      "alpha_code": "CHA",
+      "numeric_code": "129",
+      "price_fixed": "52.00",
+      "price_general": "50.00",
+      "price_ac": "54.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 36,
+      "name": "ONION RAVA DOSA",
+      "alpha_code": "ORD",
+      "numeric_code": "130",
+      "price_fixed": "79.00",
+      "price_general": "77.00",
+      "price_ac": "81.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 37,
+      "name": "Open Dosa",
+      "alpha_code": "OPD",
+      "numeric_code": "131",
+      "price_fixed": "69.00",
+      "price_general": "67.00",
+      "price_ac": "71.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 38,
+      "name": "UTTAPA",
+      "alpha_code": "UTA",
+      "numeric_code": "132",
+      "price_fixed": "81.00",
+      "price_general": "79.00",
+      "price_ac": "83.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 39,
+      "name": "FILTR COFFEE",
+      "alpha_code": "COF",
+      "numeric_code": "133",
+      "price_fixed": "29.00",
+      "price_general": "27.00",
+      "price_ac": "30.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "coffee",
+          "category_old": "coffee"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 40,
+      "name": "TEA",
+      "alpha_code": "TEA",
+      "numeric_code": "134",
+      "price_fixed": "27.00",
+      "price_general": "25.00",
+      "price_ac": "28.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "tea",
+          "category_old": "tea"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 41,
+      "name": "TEA + CUP",
+      "alpha_code": "AGH",
+      "numeric_code": "135",
+      "price_fixed": "22.00",
+      "price_general": "20.00",
+      "price_ac": "23.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "tea",
+          "category_old": "tea"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 42,
+      "name": "TEA+CUP",
+      "alpha_code": "TEC",
+      "numeric_code": "135A",
+      "price_fixed": "28.00",
+      "price_general": "26.00",
+      "price_ac": "29.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "tea",
+          "category_old": "tea"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 43,
+      "name": "BOURNVITA",
+      "alpha_code": "BOU",
+      "numeric_code": "136",
+      "price_fixed": "29.00",
+      "price_general": "27.00",
+      "price_ac": "30.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 44,
+      "name": "EMPTY CUP",
+      "alpha_code": "EMP",
+      "numeric_code": "137",
+      "price_fixed": "3.00",
+      "price_general": "1.00",
+      "price_ac": "3.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 45,
+      "name": "SAMBARID.WADA",
+      "alpha_code": "SAW",
+      "numeric_code": "138",
+      "price_fixed": "91.00",
+      "price_general": "89.00",
+      "price_ac": "93.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "Idli",
+          "category_old": "idli"
+        },
+        {
+          "qty": 2,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 46,
+      "name": "VEG F.RICE",
+      "alpha_code": "VFR",
+      "numeric_code": "142",
+      "price_fixed": "62.00",
+      "price_general": "60.00",
+      "price_ac": "64.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 47,
+      "name": "SUGARLESS COFFE",
+      "alpha_code": "SLC",
+      "numeric_code": "143",
+      "price_fixed": "29.00",
+      "price_general": "27.00",
+      "price_ac": "30.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "coffee",
+          "category_old": "coffee"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 48,
+      "name": "JAMOON",
+      "alpha_code": "JUJ",
+      "numeric_code": "151",
+      "price_fixed": "33.00",
+      "price_general": "31.00",
+      "price_ac": "34.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 49,
+      "name": "SAMBAR WADA",
+      "alpha_code": "SAR",
+      "numeric_code": "152",
+      "price_fixed": "61.00",
+      "price_general": "59.00",
+      "price_ac": "63.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 50,
+      "name": "SAMBAR WADA",
+      "alpha_code": "SWD",
+      "numeric_code": "152A",
+      "price_fixed": "61.00",
+      "price_general": "59.00",
+      "price_ac": "63.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 51,
+      "name": "SAMBAR IDLY",
+      "alpha_code": "SBR",
+      "numeric_code": "153",
+      "price_fixed": "43.00",
+      "price_general": "41.00",
+      "price_ac": "45.00",
+      "category": [
+        {
+          "qty": 2,
+          "name": "Idli",
+          "category_old": "idli"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 52,
+      "name": "Coconut Halwaa",
+      "alpha_code": "OKM",
+      "numeric_code": "155",
+      "price_fixed": "32.00",
+      "price_general": "30.00",
+      "price_ac": "34.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 53,
+      "name": "PLATE MEAL",
+      "alpha_code": "PLM",
+      "numeric_code": "167",
+      "price_fixed": "92.00",
+      "price_general": "90.00",
+      "price_ac": "94.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 54,
+      "name": "SPL MEAL",
+      "alpha_code": "SPM",
+      "numeric_code": "168",
+      "price_fixed": "137.00",
+      "price_general": "135.00",
+      "price_ac": "139.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 55,
+      "name": "FRUID SALAD",
+      "alpha_code": "FTS",
+      "numeric_code": "169",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 56,
+      "name": "FRIUT WITH ICE",
+      "alpha_code": "FTC",
+      "numeric_code": "170",
+      "price_fixed": "67.00",
+      "price_general": "65.00",
+      "price_ac": "69.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 57,
+      "name": "CURD RICE",
+      "alpha_code": "CUR",
+      "numeric_code": "171",
+      "price_fixed": "57.00",
+      "price_general": "55.00",
+      "price_ac": "59.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 58,
+      "name": "PARCEL JUICE",
+      "alpha_code": "JUI",
+      "numeric_code": "172",
+      "price_fixed": "37.00",
+      "price_general": "35.00",
+      "price_ac": "39.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "juice",
+          "category_old": "juice"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 59,
+      "name": "TEST",
+      "alpha_code": "PCO",
+      "numeric_code": "175",
+      "price_fixed": "2.00",
+      "price_general": "0.00",
+      "price_ac": "2.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 60,
+      "name": "MILK SHAKE",
+      "alpha_code": "BDM",
+      "numeric_code": "179",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 61,
+      "name": "CD",
+      "alpha_code": "SLI",
+      "numeric_code": "180",
+      "price_fixed": "22.00",
+      "price_general": "20.00",
+      "price_ac": "22.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 62,
+      "name": "MAAZA",
+      "alpha_code": "CDP",
+      "numeric_code": "181",
+      "price_fixed": "27.00",
+      "price_general": "25.00",
+      "price_ac": "28.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 63,
+      "name": "MOSAMBI",
+      "alpha_code": "MSB",
+      "numeric_code": "182",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 64,
+      "name": "P APPLE JUICE",
+      "alpha_code": "FRJ",
+      "numeric_code": "183",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "juice",
+          "category_old": "juice"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 65,
+      "name": "LASSI",
+      "alpha_code": "LAS",
+      "numeric_code": "184",
+      "price_fixed": "47.00",
+      "price_general": "45.00",
+      "price_ac": "49.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 66,
+      "name": "BUTRMILK",
+      "alpha_code": "BTR",
+      "numeric_code": "185",
+      "price_fixed": "27.00",
+      "price_general": "25.00",
+      "price_ac": "29.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 67,
+      "name": "EXTRA SAMBAR.",
+      "alpha_code": "EXS",
+      "numeric_code": "186",
+      "price_fixed": "5.00",
+      "price_general": "3.00",
+      "price_ac": "5.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 68,
+      "name": "PAPAD",
+      "alpha_code": "PPD",
+      "numeric_code": "187",
+      "price_fixed": "10.00",
+      "price_general": "8.00",
+      "price_ac": "10.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 69,
+      "name": "EXTRA RICE",
+      "alpha_code": "EXR",
+      "numeric_code": "188",
+      "price_fixed": "32.00",
+      "price_general": "30.00",
+      "price_ac": "34.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 70,
+      "name": "EXTRA MISC",
+      "alpha_code": "MIS",
+      "numeric_code": "189",
+      "price_fixed": "2.00",
+      "price_general": "0.00",
+      "price_ac": "2.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 71,
+      "name": "WATER BOTAL",
+      "alpha_code": "W13",
+      "numeric_code": "190",
+      "price_fixed": "22.00",
+      "price_general": "20.00",
+      "price_ac": "22.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 72,
+      "name": "JAWAR ROTI",
+      "alpha_code": "JAR",
+      "numeric_code": "193",
+      "price_fixed": "35.00",
+      "price_general": "33.00",
+      "price_ac": "37.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "roti",
+          "category_old": "roti"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 73,
+      "name": "DAHI PURI...",
+      "alpha_code": "DPP",
+      "numeric_code": "199",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "puri",
+          "category_old": "puri"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 74,
+      "name": "DHAI PAPDY",
+      "alpha_code": "DHP",
+      "numeric_code": "200",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 75,
+      "name": "PAV BAJI",
+      "alpha_code": "PBJ",
+      "numeric_code": "201",
+      "price_fixed": "62.00",
+      "price_general": "60.00",
+      "price_ac": "64.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 76,
+      "name": "SAMOSA RAGADA",
+      "alpha_code": "SAM",
+      "numeric_code": "202",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 77,
+      "name": "CUTLETRAGADA",
+      "alpha_code": "CUT",
+      "numeric_code": "203",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 78,
+      "name": "PLAIN SAMOSA",
+      "alpha_code": "PSA",
+      "numeric_code": "204",
+      "price_fixed": "22.00",
+      "price_general": "20.00",
+      "price_ac": "24.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 79,
+      "name": "EXTRA PAV",
+      "alpha_code": "PAV",
+      "numeric_code": "205",
+      "price_fixed": "22.00",
+      "price_general": "20.00",
+      "price_ac": "22.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 80,
+      "name": "BEL PURI",
+      "alpha_code": "BEP",
+      "numeric_code": "206",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "puri",
+          "category_old": "puri"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 81,
+      "name": "SAVE PURI",
+      "alpha_code": "SAP",
+      "numeric_code": "207",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "puri",
+          "category_old": "puri"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 82,
+      "name": "PANI PURI",
+      "alpha_code": "PAP",
+      "numeric_code": "208",
+      "price_fixed": "32.00",
+      "price_general": "30.00",
+      "price_ac": "34.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "puri",
+          "category_old": "puri"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 83,
+      "name": "SMBR MASALADOSA",
+      "alpha_code": "MDS",
+      "numeric_code": "209",
+      "price_fixed": "59.00",
+      "price_general": "57.00",
+      "price_ac": "61.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "dosa",
+          "category_old": "dosa"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 84,
+      "name": "TOMATO CHAT",
+      "alpha_code": "TOM",
+      "numeric_code": "210",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 85,
+      "name": "MSL PAVBAJI",
+      "alpha_code": "SPJ",
+      "numeric_code": "211",
+      "price_fixed": "77.00",
+      "price_general": "75.00",
+      "price_ac": "79.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "pavbhaji",
+          "category_old": "pavbhaji"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 86,
+      "name": "MSL PAVBHAJI",
+      "alpha_code": "MSL",
+      "numeric_code": "211A",
+      "price_fixed": "64.00",
+      "price_general": "62.00",
+      "price_ac": "64.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "pavbhaji",
+          "category_old": "pavbhaji"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 87,
+      "name": "MASALA POORI",
+      "alpha_code": "WDP",
+      "numeric_code": "212",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "puri",
+          "category_old": "puri"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 88,
+      "name": "SPL LASSI",
+      "alpha_code": "LSW",
+      "numeric_code": "284",
+      "price_fixed": "72.00",
+      "price_general": "70.00",
+      "price_ac": "74.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 89,
+      "name": "EXTRA BHAJI",
+      "alpha_code": "BHA",
+      "numeric_code": "299",
+      "price_fixed": "37.00",
+      "price_general": "35.00",
+      "price_ac": "39.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 90,
+      "name": "VANILLA CUP",
+      "alpha_code": "VAT",
+      "numeric_code": "300",
+      "price_fixed": "12.00",
+      "price_general": "10.00",
+      "price_ac": "14.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 91,
+      "name": "CUPS",
+      "alpha_code": "STR",
+      "numeric_code": "301",
+      "price_fixed": "12.00",
+      "price_general": "10.00",
+      "price_ac": "14.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 92,
+      "name": "B.SCOTCH CUP",
+      "alpha_code": "FTR",
+      "numeric_code": "302",
+      "price_fixed": "22.00",
+      "price_general": "20.00",
+      "price_ac": "24.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 93,
+      "name": "FUN TREAT CUP",
+      "alpha_code": "GRN",
+      "numeric_code": "303",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 94,
+      "name": "BAR",
+      "alpha_code": "BSH",
+      "numeric_code": "304",
+      "price_fixed": "22.00",
+      "price_general": "20.00",
+      "price_ac": "24.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 95,
+      "name": "FUSION BAR",
+      "alpha_code": "KSH",
+      "numeric_code": "305",
+      "price_fixed": "32.00",
+      "price_general": "30.00",
+      "price_ac": "34.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 96,
+      "name": "BAR",
+      "alpha_code": "CCC",
+      "numeric_code": "306",
+      "price_fixed": "22.00",
+      "price_general": "20.00",
+      "price_ac": "24.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 97,
+      "name": "CONES",
+      "alpha_code": "DRY",
+      "numeric_code": "309",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 98,
+      "name": "KULFI STICK",
+      "alpha_code": "STP",
+      "numeric_code": "311",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 99,
+      "name": "MATKA KULFI",
+      "alpha_code": "BNP",
+      "numeric_code": "312",
+      "price_fixed": "42.00",
+      "price_general": "40.00",
+      "price_ac": "44.00",
+      "category": [],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 100,
+      "name": "S.WADA",
+      "alpha_code": "WWW",
+      "numeric_code": "500",
+      "price_fixed": "31.00",
+      "price_general": "29.00",
+      "price_ac": "33.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    },
+    {
+      "id": 101,
+      "name": "SSAMMBAR.WADA",
+      "alpha_code": "SSW",
+      "numeric_code": "501",
+      "price_fixed": "37.00",
+      "price_general": "35.00",
+      "price_ac": "39.00",
+      "category": [
+        {
+          "qty": 1,
+          "name": "wada",
+          "category_old": "wada"
+        }
+      ],
+      "is_separate": false,
+      "created_at": "2026-06-21T07:32:49.556Z"
+    }
+  ],
+  "bills": [],
+  "orders": [],
+  "running_bills": [
+    {
+      "id": 1,
+      "track_morning": 0,
+      "track_afternoon": 0,
+      "track_rbs1": 0,
+      "track_rbs2": 0
+    }
+  ],
+  "audit_log": [],
+  "debug_logs": [],
+  "bill_items": []
+}

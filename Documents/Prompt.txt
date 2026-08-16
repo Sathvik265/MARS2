@@ -1,0 +1,358 @@
+Of course. This is a multi-faceted request involving backend automation, new APIs, significant frontend changes for different user roles, and a global UI overhaul. To ensure the AI executes this perfectly, a highly descriptive, detailed, and instructive prompt is essential.
+Here is a definitive prompt structured like a professional software development specification. You can copy it and paste your database script into the designated section.
+
+Role
+
+Act as an expert, senior full-stack developer with mastery in Node.js, Express.js, React, database integration, task scheduling (cron jobs), and CSS refactoring. You will be modifying an existing, complex application.
+
+Primary Objective
+
+Your mission is to meticulously implement a comprehensive Shift Management system, build an advanced and multi-faceted Reporting module, enhance the Reconciliation feature, and perform a complete UI color-scheme inversion on a live Restaurant Billing System. All work will be performed on the specified branch of the provided repository.
+
+Core Assets
+
+Target Codebase:
+Repository: https://github.com/Sathvik265/rbs.git
+Branch: You must base all work on the version-1 branch.
+Database Schema (Source of Truth):
+The database has been pre-updated to support these new features. You must write all backend queries and logic to conform to the schema defined in the script below. You are not to alter the schema itself.
+Database Creation Script:
+SQL
+-- PASTE YOUR COMPLETE DATABASE SCRIPT HERE.
+-- This script is the definitive guide for all database interactions.
+-- -- Restaurant Billing System Database Schema with Shift Management
+-- Updated for PostgreSQL 17.6 compatibility
+-- This script creates all required tables and functions for the shift management system
+DROP TABLE IF EXISTS 
+    settings, 
+    items, 
+    shifts, 
+    sessions, 
+    bill_sequences, 
+    bills, 
+    bill_items, 
+    audit_log 
+CASCADE;
+-- Enable UUID extension if not exists
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 1. Settings table for system configuration
+CREATE TABLE IF NOT EXISTS settings (
+    id SERIAL PRIMARY KEY,
+    hotel_name VARCHAR(255) DEFAULT 'Restaurant Name',
+    address TEXT,
+    phone VARCHAR(20),
+    gstin VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert default settings if empty
+INSERT INTO settings (hotel_name, address, phone, gstin) 
+SELECT 'Udupi Anand Bhavan', 'Default Address', '123-456-7890', 'GST123456789'
+WHERE NOT EXISTS (SELECT 1 FROM settings);
+
+-- 2. Items/Menu table
+CREATE TABLE IF NOT EXISTS items (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    alpha_code VARCHAR(20) UNIQUE,
+    numeric_code VARCHAR(20) UNIQUE,
+    price_fixed DECIMAL(10,2) DEFAULT 0,
+    price_general DECIMAL(10,2) DEFAULT 0,
+    price_ac DECIMAL(10,2) DEFAULT 0,
+    category VARCHAR(100),
+    item_group VARCHAR(50) DEFAULT 'regular',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. NEW: Shifts table for shift management
+CREATE TABLE IF NOT EXISTS shifts (
+    shift_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    shift_name VARCHAR(20) NOT NULL CHECK (
+        shift_name IN ('`', '``', 'RBS1', 'RBS2')
+    ),
+    date DATE NOT NULL,
+    start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    end_time TIMESTAMP,
+    status VARCHAR(10) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED')),
+    closed_by VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(shift_name, date)
+);
+
+
+-- 4. Sessions table (existing)
+CREATE TABLE IF NOT EXISTS sessions (
+    id SERIAL PRIMARY KEY,
+    clerk_initials VARCHAR(10) NOT NULL,
+    shift_code VARCHAR(20) NOT NULL,
+    session_date DATE NOT NULL,
+    login_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    end_timestamp TIMESTAMP,
+    session_id UUID DEFAULT uuid_generate_v4() UNIQUE,
+    is_active BOOLEAN DEFAULT true,
+    UNIQUE(clerk_initials, shift_code, session_date, login_timestamp)
+);
+
+-- 5. Bill number sequence table
+CREATE TABLE IF NOT EXISTS bill_sequences (
+    bill_date DATE PRIMARY KEY,
+    last_number INTEGER DEFAULT 0
+);
+
+-- 6. Bills table with shift_id foreign key
+CREATE TABLE IF NOT EXISTS bills (
+    id SERIAL PRIMARY KEY,
+    bill_number INTEGER NOT NULL,
+    bill_date DATE NOT NULL,
+    table_no VARCHAR(20),
+    party_no VARCHAR(20) DEFAULT '1',
+    section VARCHAR(10) DEFAULT 'G',
+    track VARCHAR(20),
+    clerk_initials VARCHAR(10),
+    session_id UUID REFERENCES sessions(session_id),
+    shift_id UUID REFERENCES shifts(shift_id),
+    subtotal DECIMAL(10,2) DEFAULT 0,
+    sgst DECIMAL(10,2) DEFAULT 0,
+    cgst DECIMAL(10,2) DEFAULT 0,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    grand_total DECIMAL(10,2) DEFAULT 0,
+    modified_from_bill_id INTEGER REFERENCES bills(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(bill_number, bill_date)
+);
+
+-- Add shift_id column to existing bills table if it doesn't exist
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='bills' AND column_name='shift_id'
+    ) THEN
+        ALTER TABLE bills ADD COLUMN shift_id UUID REFERENCES shifts(shift_id);
+    END IF;
+END $$;
+
+-- 7. Bill items table
+CREATE TABLE IF NOT EXISTS bill_items (
+    id SERIAL PRIMARY KEY,
+    bill_id INTEGER REFERENCES bills(id) ON DELETE CASCADE,
+    item_code VARCHAR(20),
+    item_name VARCHAR(255),
+    quantity INTEGER DEFAULT 1,
+    unit_price DECIMAL(10,2) DEFAULT 0,
+    line_total DECIMAL(10,2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 8. Audit log table for tracking all actions
+CREATE TABLE IF NOT EXISTS audit_log (
+    id SERIAL PRIMARY KEY,
+    event_id UUID DEFAULT uuid_generate_v4(),
+    timestamp_utc TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    performed_by_user_id VARCHAR(50),
+    performed_by_user_name VARCHAR(100),
+    user_role VARCHAR(20),
+    action_type VARCHAR(50),
+    resource_type VARCHAR(50),
+    resource_id VARCHAR(50),
+    session_id UUID,
+    ip_address INET,
+    payload JSONB,
+    correlation_id UUID
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_bills_date_number ON bills(bill_date, bill_number);
+CREATE INDEX IF NOT EXISTS idx_bills_session ON bills(session_id);
+CREATE INDEX IF NOT EXISTS idx_bills_shift ON bills(shift_id);
+CREATE INDEX IF NOT EXISTS idx_items_codes ON items(alpha_code, numeric_code);
+CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(is_active, session_date);
+CREATE INDEX IF NOT EXISTS idx_shifts_date_status ON shifts(date, status);
+CREATE INDEX IF NOT EXISTS idx_shifts_name_date ON shifts(shift_name, date);
+
+-- Insert sample menu items
+INSERT INTO items (name, alpha_code, numeric_code, price_fixed, price_general, price_ac, category) VALUES
+('Idli (2 pcs)', 'IDL', '101', 25.00, 30.00, 35.00, 'South Indian'),
+('Dosa Plain', 'DOS', '102', 35.00, 40.00, 45.00, 'South Indian'),
+('Vada (2 pcs)', 'VAD', '103', 30.00, 35.00, 40.00, 'South Indian'),
+('Coffee', 'COF', '201', 15.00, 20.00, 25.00, 'Beverages'),
+('Tea', 'TEA', '202', 12.00, 15.00, 18.00, 'Beverages'),
+('Samosa (2 pcs)', 'SAM', '301', 20.00, 25.00, 30.00, 'Snacks'),
+('Puri Bhaji', 'PUR', '401', 45.00, 50.00, 55.00, 'North Indian'),
+('Rice', 'RIC', '501', 35.00, 40.00, 45.00, 'Rice Items')
+ON CONFLICT (alpha_code) DO NOTHING;
+
+-- Functions and triggers for updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $trigger_body$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$trigger_body$ LANGUAGE plpgsql;
+
+-- Apply triggers
+DROP TRIGGER IF EXISTS update_settings_updated_at ON settings;
+CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_items_updated_at ON items;
+CREATE TRIGGER update_items_updated_at BEFORE UPDATE ON items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_bills_updated_at ON bills;
+CREATE TRIGGER update_bills_updated_at BEFORE UPDATE ON bills FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_shifts_updated_at ON shifts;
+CREATE TRIGGER update_shifts_updated_at BEFORE UPDATE ON shifts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Helper function to get current open shift for a given shift type and date
+-- This function is corrected for PostgreSQL 17.6 compatibility
+CREATE OR REPLACE FUNCTION get_current_shift_id(
+    shift_type VARCHAR DEFAULT NULL, 
+    target_date DATE DEFAULT NULL
+) RETURNS UUID AS $function_body$
+DECLARE
+    shift_id UUID;
+    func_date DATE;
+    func_time TIME;
+BEGIN
+    -- Use provided date or current date
+    func_date := COALESCE(target_date, CURRENT_DATE);
+    func_time := CURRENT_TIME;
+    
+    -- If shift_type is not specified, determine based on current time
+    IF shift_type IS NULL THEN
+        IF func_time BETWEEN TIME '06:00:00' AND TIME '11:59:59' THEN
+            shift_type := '`';
+        ELSIF func_time BETWEEN TIME '12:00:00' AND TIME '17:59:59' THEN
+            shift_type := '``';
+        ELSIF func_time BETWEEN TIME '18:00:00' AND TIME '21:59:59' THEN
+            shift_type := 'RBS1';
+        ELSE
+            shift_type := 'RBS2';
+        END IF;
+    END IF;
+    
+    -- Get the shift ID for the specified type and date where status is OPEN
+    SELECT s.shift_id INTO shift_id
+    FROM shifts s
+    WHERE s.shift_name = shift_type 
+      AND s.date = func_date 
+      AND s.status = 'OPEN'
+    LIMIT 1;
+    
+    -- If no open shift found, try to find any shift for that day/type
+    IF shift_id IS NULL THEN
+        SELECT s.shift_id INTO shift_id
+        FROM shifts s
+        WHERE s.shift_name = shift_type 
+          AND s.date = func_date
+        LIMIT 1;
+    END IF;
+    
+    RETURN shift_id;
+END;
+$function_body$ LANGUAGE plpgsql;
+
+-- Initialize shifts for today (run once)
+DO $init_shifts$
+BEGIN
+    INSERT INTO shifts (shift_name, date, start_time, status) 
+    SELECT '`', CURRENT_DATE, CURRENT_TIMESTAMP, 'OPEN'
+    WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE shift_name = '`' AND date = CURRENT_DATE);
+    
+    INSERT INTO shifts (shift_name, date, start_time, status) 
+    SELECT '``', CURRENT_DATE, CURRENT_TIMESTAMP, 'OPEN'
+    WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE shift_name = '``' AND date = CURRENT_DATE);
+    
+    INSERT INTO shifts (shift_name, date, start_time, status) 
+    SELECT 'RBS1', CURRENT_DATE, CURRENT_TIMESTAMP, 'OPEN'
+    WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE shift_name = 'RBS1' AND date = CURRENT_DATE);
+    
+    INSERT INTO shifts (shift_name, date, start_time, status) 
+    SELECT 'RBS2', CURRENT_DATE, CURRENT_TIMESTAMP, 'OPEN'
+    WHERE NOT EXISTS (SELECT 1 FROM shifts WHERE shift_name = 'RBS2' AND date = CURRENT_DATE);
+END;
+$init_shifts$;
+
+-- Verification queries (optional - can be removed in production)
+SELECT 'Database schema updated successfully with shift management' AS status;
+SELECT COUNT(*) AS total_shifts_created FROM shifts WHERE date = CURRENT_DATE;
+
+
+
+Non-Negotiable Execution Doctrine
+
+You will execute this plan in the precise order specified.
+
+Phase 1: Backend Logic & Automation (Foundation)
+
+1.1. Shift Context from Login:
+The login screen has three fields: Initials, date, and track.
+You must interpret the track field as the active shift. The exact string values for the shifts are: " ", " ", "RBS1", "RBS2".
+When a user logs in, the application's backend state must register the value from track as the currently running shift for that user's session. All subsequent operations (creating bills, etc.) performed by this user must be associated with this active shift in the database.
+1.2. Automated Shift Scheduler (node-cron):
+Implement a scheduler that performs two critical daily tasks.
+Daily Opening Job (at 12:00 AM):
+This job must programmatically ensure all four shifts ('`', '``', 'RBS1', 'RBS2') are set to an 'OPEN' status for the new day in the database.
+Daily Closing Job (at 11:59 PM):
+This job must find all shifts that are still in an 'OPEN' status and forcibly change their status to 'CLOSED', recording the timestamp.
+
+Phase 2: API Endpoint Development
+
+Create new, secure, and efficient API endpoints to support the frontend.
+POST /api/shifts/close: For clerks. Closes the currently active shift associated with the user's session.
+POST /api/shifts/manual-toggle: For admins. Toggles a shift's status. It should accept a shiftId and the newStatus ('OPEN' or 'CLOSED'). This route must be protected by admin-level authorization.
+GET /api/shifts/status: For admins. Fetches the status of all four shifts for the current date.
+GET /api/reports/time-range: Admin-only. Requires date, startTime, and endTime as query parameters. Returns all bills within that window.
+GET /api/reports/date-range: Admin-only. Requires startDate and endDate as query parameters.
+GET /api/reports/by-shift: Admin-only. Requires date and shiftName as query parameters. Returns all bills for that specific shift.
+GET /api/reports/by-item: Admin-only. Requires startDate and endDate. The JSON response for this must be an array of objects, each structured like this: { "itemName": "string", "totalQuantity": number, "soldInShifts": { "RBS1": number, " ": number, ... } }.
+GET /api/reconciliation/unprinted: Admin-only. Fetches all bills with a "not printed" or "running" status. The response must include the name of the shift in which the bill was created.
+GET /api/dashboard/top-items: Admin-only. Returns the top 5 best-selling items for the current day.
+
+Phase 3: Frontend Implementation
+
+3.1. New "Shift" Tab:
+Create a new primary tab in the main navigation labeled "Shifts", positioned alongside "Billing" and "Food Menu".
+This tab must be visible to both Admin and Clerk roles.
+3.2. Shift Tab - Clerk Mode:
+Display the name of the currently active shift (e.g., "Current Shift: RBS1").
+Provide one button: "Close Shift".
+Clicking this button must trigger a confirmation modal with the text: "Are you sure you want to close this shift? This will log you out."
+If confirmed, the frontend must call the POST /api/shifts/close endpoint and, upon a successful response, log the user out.
+3.3. Shift Tab - Admin Mode:
+Display a table of all four shifts for the current day.
+The table must have three columns: Shift Name, Status (displaying 'OPEN' or 'CLOSED'), and Actions.
+In the Actions column, if a shift is 'OPEN', show a "Close" button. If it's 'CLOSED', show a "Re-open" button. These buttons will call the POST /api/shifts/manual-toggle endpoint.
+3.4. Admin Dashboard & Reports Section:
+Top 5 Items: On the main admin dashboard, add a new component that displays the top 5 best-selling items, fetched from GET /api/dashboard/top-items.
+New Reports:
+Time Report: Add a UI with a date picker and two time inputs.
+Date Report: Add a UI with two date pickers for a range.
+Shift Report: Add a UI with a date picker and a dropdown menu to select one of the four shifts.
+Item Report: Add a UI with two date pickers. The results must be displayed in a table showing the item, total quantity, and a breakdown of sales by shift.
+Reconciliation Tab:
+Modify this existing tab to display a table of all "not printed" bills.
+A new column, "Created in Shift", must be added to this table, displaying the shift name associated with each bill.
+
+Phase 4: Global UI Overhaul (Mandatory)
+
+This is a critical, application-wide visual change.
+Identify CSS Targets: Locate the primary stylesheet(s) (.css files) that define the application's visual theme.
+Invert Textbox Styles: Find all CSS rules for input[type="text"], textarea, and any other text-entry fields.
+Implement New Style:
+Change background-color to white or #FFFFFF.
+Change color (the text color) to black or #000000.
+Ensure there are no remaining elements in the entire application that use a black background with white text for data entry.
+
+Final Deliverable
+
+You are to provide the complete, updated code for every file that was created or modified. You must follow the code structure used the repository.
+You must prepend each code block with its full, unambiguous file path (e.g., backend/routes/reportRoutes.js, frontend/src/components/tabs/ShiftTab.js).
+The final integrated codebase must be fully functional, robust, and ready to run.

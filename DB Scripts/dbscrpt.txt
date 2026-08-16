@@ -1,0 +1,652 @@
+Creation script: 
+-- ========================================================================
+-- RESTAURANT BILLING SYSTEM - FULL DATABASE CREATION SCRIPT
+-- This script builds the entire database from scratch with the latest schema.
+-- WARNING: It will drop all existing restaurant data.
+-- ========================================================================
+
+BEGIN;
+
+-- ========================================================================
+-- 1. DROP ALL EXISTING OBJECTS FOR A CLEAN SLATE (ROBUST ORDER)
+-- ========================================================================
+
+-- Step 1: Drop all views that depend on the tables.
+DROP VIEW IF EXISTS table_status CASCADE;
+DROP VIEW IF EXISTS pending_bills CASCADE;
+DROP VIEW IF EXISTS completed_bills CASCADE;
+
+-- Step 2: Drop all functions that might be used by views or other objects.
+DROP FUNCTION IF EXISTS get_current_session_id(VARCHAR, DATE, VARCHAR) CASCADE;
+DROP FUNCTION IF EXISTS get_current_session_id(VARCHAR, DATE, VARCHAR) CASCADE;
+DROP FUNCTION IF EXISTS move_orders_to_bill_json(INTEGER, VARCHAR, VARCHAR) CASCADE;
+DROP FUNCTION IF EXISTS get_section_by_table(VARCHAR) CASCADE;
+
+-- Step 3: Now that dependent objects are gone, drop all tables.
+DROP TABLE IF EXISTS
+    audit_log,
+    bill_items,
+    orders,
+    bills,
+    bill_sequences,
+    sessions,
+    shifts,
+    items,
+    tables, -- This was formerly 'sections'
+    settings
+CASCADE;
+
+-- ========================================================================
+-- 2. SETUP AND EXTENSIONS
+-- ========================================================================
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ========================================================================
+-- 3. CREATE ALL TABLES WITH THE FINAL SCHEMA
+-- ========================================================================
+
+-- Table for system-wide settings
+CREATE TABLE IF NOT EXISTS settings (
+    id SERIAL PRIMARY KEY,
+    hotel_name VARCHAR(255) DEFAULT 'Restaurant Name',
+    address TEXT,
+    phone VARCHAR(20),
+    gstin VARCHAR(20),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for menu items
+CREATE TABLE IF NOT EXISTS items (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    alpha_code VARCHAR(20) UNIQUE,
+    numeric_code VARCHAR(20) UNIQUE,
+    price_fixed DECIMAL(10,2) DEFAULT 0,
+    price_general DECIMAL(10,2) DEFAULT 0,
+    price_ac DECIMAL(10,2) DEFAULT 0,
+    category VARCHAR(100),
+    is_separate BOOLEAN DEFAULT FALSE, -- New column
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Master table for shift types
+CREATE TABLE IF NOT EXISTS shifts (
+    id SERIAL PRIMARY KEY,
+    shift_name VARCHAR(20) NOT NULL UNIQUE CHECK (
+        shift_name IN ('`', '``', 'RBS1', 'RBS2')
+    ),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for individual shift instances
+CREATE TABLE IF NOT EXISTS sessions (
+    id SERIAL PRIMARY KEY,
+    session_id UUID DEFAULT uuid_generate_v4() UNIQUE,
+    shift_name VARCHAR(20) NOT NULL REFERENCES shifts(shift_name),
+    clerk_initials VARCHAR(10) NOT NULL,
+    session_date DATE NOT NULL,
+    start_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    end_time TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(10) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED')),
+    closed_by VARCHAR(50),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(shift_name, session_date, clerk_initials)
+);
+
+-- Main table for bills
+CREATE TABLE IF NOT EXISTS bills (
+    id SERIAL PRIMARY KEY, -- Simple primary key
+    bill_number INTEGER NOT NULL,
+    bill_date DATE NOT NULL,
+    table_no VARCHAR(20),
+    party_no VARCHAR(20) DEFAULT '1',
+    section VARCHAR(10) DEFAULT 'G',
+    track VARCHAR(20),
+    clerk_initials VARCHAR(10),
+    subtotal DECIMAL(10,2) DEFAULT 0,
+    sgst DECIMAL(10,2) DEFAULT 0,
+    cgst DECIMAL(10,2) DEFAULT 0,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    grand_total DECIMAL(10,2) DEFAULT 0,
+    items_json JSONB, -- New column for items
+    order_id VARCHAR(50), -- New column for reference
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(bill_number, bill_date)
+);
+
+-- Temporary storage for orders before a bill is printed
+CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    track VARCHAR(20) NOT NULL,
+    clerk_initials VARCHAR(10) NOT NULL,
+    table_no VARCHAR(20) NOT NULL,
+    party_no VARCHAR(20) NOT NULL DEFAULT '1',
+    bill_number INTEGER NOT NULL,
+    item_code VARCHAR(20),
+    numeric_item_code VARCHAR(20),
+    item_name VARCHAR(255),
+    quantity INTEGER DEFAULT 1,
+    unit_price DECIMAL(10,2) DEFAULT 0,
+    line_total DECIMAL(10,2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for mapping table numbers to sections
+CREATE TABLE IF NOT EXISTS tables (
+    table_id INTEGER PRIMARY KEY,
+    section_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for logging system events
+CREATE TABLE IF NOT EXISTS audit_log (
+    id SERIAL PRIMARY KEY,
+    event_id UUID DEFAULT uuid_generate_v4(),
+    timestamp_utc TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    performed_by_user_id VARCHAR(50),
+    performed_by_user_name VARCHAR(100),
+    user_role VARCHAR(20),
+    action_type VARCHAR(50),
+    resource_type VARCHAR(50),
+    resource_id VARCHAR(50),
+    session_id UUID REFERENCES sessions(session_id), -- References new sessions table
+    ip_address INET,
+    payload JSONB,
+    correlation_id UUID
+);
+
+-- ========================================================================
+-- 4. CREATE INDEXES FOR PERFORMANCE
+-- ========================================================================
+
+CREATE INDEX IF NOT EXISTS idx_bills_date_number ON bills(bill_date, bill_number);
+CREATE INDEX IF NOT EXISTS idx_bills_items_json ON bills USING GIN (items_json);
+CREATE INDEX IF NOT EXISTS idx_items_codes ON items(alpha_code, numeric_code);
+CREATE INDEX IF NOT EXISTS idx_sessions_shift_date ON sessions(shift_name, session_date);
+CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(session_date);
+CREATE INDEX IF NOT EXISTS idx_orders_table_no ON orders(table_no);
+CREATE INDEX IF NOT EXISTS idx_tables_section_name ON tables(section_name);
+
+
+-- ========================================================================
+-- 5. CREATE HELPER FUNCTIONS AND VIEWS
+-- ========================================================================
+
+-- Function to get section name by table number.
+CREATE OR REPLACE FUNCTION get_section_by_table(p_table_no VARCHAR(20))
+RETURNS VARCHAR AS $$
+DECLARE
+    section_name VARCHAR(100);
+    table_num INTEGER;
+BEGIN
+    BEGIN
+        table_num := p_table_no::INTEGER;
+    EXCEPTION WHEN OTHERS THEN
+        RETURN 'Unknown';
+    END;
+    SELECT t.section_name INTO section_name FROM tables t WHERE t.table_id = table_num;
+    RETURN COALESCE(section_name, 'Unknown');
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to move orders into the `bills.items_json` column.
+CREATE OR REPLACE FUNCTION move_orders_to_bill_json(
+    p_bill_id INTEGER, p_table_no VARCHAR(20), p_party_no VARCHAR(20)
+) RETURNS INTEGER AS $$
+DECLARE
+    moved_count INTEGER := 0;
+    items_array JSONB;
+BEGIN
+    SELECT jsonb_agg(jsonb_build_object('item_name', o.item_name, 'item_code_numeric', o.numeric_item_code, 'item_code_alpha', o.item_code, 'quantity', o.quantity, 'fixed_price', o.unit_price, 'actual_price', o.unit_price, 'line_total', o.line_total))
+    INTO items_array FROM orders o WHERE o.table_no = p_table_no AND o.party_no = p_party_no;
+
+    IF items_array IS NULL OR jsonb_array_length(items_array) = 0 THEN RETURN 0; END IF;
+
+    UPDATE bills SET items_json = items_array WHERE id = p_bill_id;
+
+    WITH deleted AS (DELETE FROM orders WHERE table_no = p_table_no AND party_no = p_party_no RETURNING 1)
+    SELECT count(*) INTO moved_count FROM deleted;
+    RETURN moved_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get the current session ID from the new `sessions` table.
+CREATE OR REPLACE FUNCTION get_current_session_id(
+    p_shift_type VARCHAR DEFAULT NULL, p_target_date DATE DEFAULT NULL, p_clerk_initials VARCHAR DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+    session_uuid UUID;
+    v_shift_type VARCHAR;
+    v_target_date DATE := COALESCE(p_target_date, CURRENT_DATE);
+BEGIN
+    v_shift_type := COALESCE(p_shift_type, CASE
+        WHEN CURRENT_TIME BETWEEN '06:00:00' AND '11:59:59' THEN '`'
+        WHEN CURRENT_TIME BETWEEN '12:00:00' AND '17:59:59' THEN '``'
+        WHEN CURRENT_TIME BETWEEN '18:00:00' AND '21:59:59' THEN 'RBS1'
+        ELSE 'RBS2' END);
+    SELECT s.session_id INTO session_uuid FROM sessions s
+    WHERE s.shift_name = v_shift_type AND s.session_date = v_target_date AND s.status = 'OPEN'
+      AND (p_clerk_initials IS NULL OR s.clerk_initials = p_clerk_initials)
+    ORDER BY s.start_time DESC LIMIT 1;
+    RETURN session_uuid;
+END;
+$$ LANGUAGE plpgsql;
+
+-- View for pending bills (orders not yet printed).
+CREATE OR REPLACE VIEW pending_bills AS
+SELECT DISTINCT o.table_no, o.party_no,
+    get_section_by_table(o.table_no) as section_name,
+    COUNT(o.id) as total_items,
+    SUM(o.line_total) as total_amount,
+    MIN(o.created_at) as order_started_at,
+    MAX(o.updated_at) as last_updated_at
+FROM orders o GROUP BY o.table_no, o.party_no;
+
+-- View to show the current status of each table.
+CREATE OR REPLACE VIEW table_status AS
+SELECT
+    t.table_id,
+    t.section_name,
+    CASE WHEN pb.table_no IS NOT NULL THEN 'OCCUPIED' ELSE 'AVAILABLE' END as status,
+    pb.total_items,
+    pb.total_amount,
+    pb.order_started_at
+FROM tables t
+LEFT JOIN pending_bills pb ON t.table_id::VARCHAR = pb.table_no
+ORDER BY t.table_id;
+
+-- ========================================================================
+-- 6. INSERT INITIAL & SAMPLE DATA
+-- ========================================================================
+
+-- Insert default settings
+INSERT INTO settings (hotel_name, address, phone, gstin)
+SELECT 'Udupi Anand Bhavan', 'Default Address', '123-456-7890', 'GST123456789'
+WHERE NOT EXISTS (SELECT 1 FROM settings);
+
+-- Insert sample menu items
+INSERT INTO items (name, alpha_code, numeric_code, price_fixed, price_general, price_ac, category) VALUES
+('Idli (2 pcs)', 'IDL', '101', 25.00, 30.00, 35.00, 'South Indian'),
+('Dosa Plain', 'DOS', '102', 35.00, 40.00, 45.00, 'South Indian'),
+('Vada (2 pcs)', 'VAD', '103', 30.00, 35.00, 40.00, 'South Indian'),
+('Coffee', 'COF', '201', 15.00, 20.00, 25.00, 'Beverages'),
+('Tea', 'TEA', '202', 12.00, 15.00, 18.00, 'Beverages')
+ON CONFLICT (alpha_code) DO NOTHING;
+
+-- Populate the standard shift names
+INSERT INTO shifts (shift_name) VALUES
+    ('`'), ('``'), ('RBS1'), ('RBS2')
+ON CONFLICT (shift_name) DO NOTHING;
+
+-- Insert table-to-section mappings
+INSERT INTO tables (table_id, section_name) VALUES
+    (1, 'Parcel'),
+    (2, 'General'), (3, 'General'), (4, 'General'), (5, 'General'),
+    (6, 'General'), (7, 'General'), (8, 'General'), (9, 'General'),
+    (10, 'General'), (11, 'General'), (12, 'General'), (13, 'General'), (14, 'General'),
+    (15, 'AC'), (16, 'AC'), (17, 'AC'), (18, 'AC'), (19, 'AC'),
+    (20, 'AC'), (21, 'AC'), (22, 'AC'), (23, 'AC'), (24, 'AC'),
+    (25, 'AC'), (26, 'AC'), (27, 'AC'), (28, 'AC'), (29, 'AC'), (30, 'AC')
+ON CONFLICT (table_id) DO UPDATE SET section_name = EXCLUDED.section_name;
+
+-- Ensures that there is an open session for each shift for the current day.
+DO $$
+BEGIN
+    INSERT INTO sessions (shift_name, clerk_initials, session_date)
+    SELECT '`', 'SYS', CURRENT_DATE WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE shift_name = '`' AND session_date = CURRENT_DATE);
+    INSERT INTO sessions (shift_name, clerk_initials, session_date)
+    SELECT '``', 'SYS', CURRENT_DATE WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE shift_name = '``' AND session_date = CURRENT_DATE);
+    INSERT INTO sessions (shift_name, clerk_initials, session_date)
+    SELECT 'RBS1', 'SYS', CURRENT_DATE WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE shift_name = 'RBS1' AND session_date = CURRENT_DATE);
+    INSERT INTO sessions (shift_name, clerk_initials, session_date)
+    SELECT 'RBS2', 'SYS', CURRENT_DATE WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE shift_name = 'RBS2' AND session_date = CURRENT_DATE);
+END;
+$$;
+
+COMMIT;
+
+-- ========================================================================
+-- VERIFICATION
+-- ========================================================================
+
+SELECT 'Database creation completed successfully!' AS status;
+SELECT 'Shifts table:' AS info, (SELECT string_agg(shift_name, ', ') FROM shifts) AS shifts, COUNT(*) AS count FROM shifts;
+SELECT 'Today''s sessions:' AS info, COUNT(*) AS count FROM sessions WHERE session_date = CURRENT_DATE;
+
+
+
+Update-1:
+
+-- ========================================================================
+-- RESTAURANT BILLING SYSTEM - ADD FOREIGN KEY CONSTRAINTS AND ENHANCEMENTS
+-- This script adds relationships and improves the schema structure
+-- ========================================================================
+
+BEGIN;
+
+-- ========================================================================
+-- STEP 1: ADD MISSING COLUMNS TO ORDERS TABLE
+-- ========================================================================
+
+-- Add bill_date column to orders table to match bills(bill_number, bill_date)
+ALTER TABLE orders 
+ADD COLUMN IF NOT EXISTS bill_date DATE DEFAULT CURRENT_DATE;
+
+-- Update existing records to have today's date (adjust as needed)
+UPDATE orders 
+SET bill_date = CURRENT_DATE 
+WHERE bill_date IS NULL;
+
+-- Make bill_date NOT NULL after updating existing records
+ALTER TABLE orders 
+ALTER COLUMN bill_date SET NOT NULL;
+
+COMMENT ON COLUMN orders.bill_date IS 'Date of the bill, used for foreign key relationship with bills table';
+
+-- ========================================================================
+-- STEP 2: FIX DATA TYPE MISMATCH FOR table_no IN bills TABLE
+-- ========================================================================
+
+-- Convert bills.table_no from VARCHAR to INTEGER to match tables.table_id
+-- First, ensure all table_no values are valid integers or handle exceptions
+
+-- Check for non-numeric values (optional - for safety)
+DO $$
+DECLARE
+    invalid_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO invalid_count
+    FROM bills
+    WHERE table_no !~ '^[0-9]+$' AND table_no IS NOT NULL;
+
+    IF invalid_count > 0 THEN
+        RAISE WARNING 'Found % non-numeric table_no values in bills table. These need to be fixed manually.', invalid_count;
+    END IF;
+END $$;
+
+-- Convert table_no to INTEGER type
+ALTER TABLE bills 
+ALTER COLUMN table_no TYPE INTEGER USING table_no::INTEGER;
+
+COMMENT ON COLUMN bills.table_no IS 'Table number (INTEGER) - references tables.table_id';
+
+-- ========================================================================
+-- STEP 3: ADD FOREIGN KEY CONSTRAINT FROM bills TO tables
+-- ========================================================================
+
+-- Add foreign key constraint from bills.table_no to tables.table_id
+ALTER TABLE bills
+ADD CONSTRAINT fk_bills_tables
+FOREIGN KEY (table_no) REFERENCES tables(table_id)
+ON DELETE SET NULL  -- If table is deleted, set bill's table_no to NULL
+ON UPDATE CASCADE;  -- If table_id changes, update bill's table_no
+
+COMMENT ON CONSTRAINT fk_bills_tables ON bills IS 'Links bills to their respective tables';
+
+-- ========================================================================
+-- STEP 4: ADD FOREIGN KEY CONSTRAINT FROM orders TO bills
+-- ========================================================================
+
+-- First, ensure bill_number and bill_date in orders match existing bills
+-- This is critical for the foreign key to be accepted
+
+-- Option A: Clean up orphaned orders (orders without matching bills)
+DELETE FROM orders o
+WHERE NOT EXISTS (
+    SELECT 1 FROM bills b 
+    WHERE b.bill_number = o.bill_number 
+    AND b.bill_date = o.bill_date
+);
+
+-- Add composite foreign key constraint from orders to bills
+ALTER TABLE orders
+ADD CONSTRAINT fk_orders_bills
+FOREIGN KEY (bill_number, bill_date) 
+REFERENCES bills(bill_number, bill_date)
+ON DELETE CASCADE   -- If bill is deleted, delete associated orders
+ON UPDATE CASCADE;  -- If bill identifiers change, update orders
+
+COMMENT ON CONSTRAINT fk_orders_bills ON orders IS 'Links orders to their bills using bill_number and bill_date';
+
+-- ========================================================================
+-- STEP 5: MODIFY items.category TO STORE JSON WITH QUANTITIES
+-- ========================================================================
+
+-- Rename old category column to category_old for backup
+ALTER TABLE items 
+RENAME COLUMN category TO category_old;
+
+-- Add new category column as JSONB to store category with quantities
+ALTER TABLE items 
+ADD COLUMN category JSONB DEFAULT '[]'::jsonb;
+
+COMMENT ON COLUMN items.category IS 'JSON array storing categories with quantities, e.g., [{"name": "Idli", "qty": 1}, {"name": "Vada", "qty": 1}]';
+
+-- Migrate existing category data to new JSON format
+UPDATE items
+SET category = jsonb_build_array(
+    jsonb_build_object('name', category_old, 'qty', 1)
+)
+WHERE category_old IS NOT NULL AND category_old != '';
+
+-- Example: Update specific items with proper category quantities
+-- You'll need to customize this based on your actual menu items
+
+-- Example for Idli Vada (1 idli + 1 vada)
+UPDATE items
+SET category = '[
+    {"name": "Idli", "qty": 1},
+    {"name": "Vada", "qty": 1}
+]'::jsonb
+WHERE LOWER(name) LIKE '%idli%vada%' AND LOWER(name) NOT LIKE '%plate%';
+
+-- Example for Plate Idli Vada (2 idlis + 1 vada)
+UPDATE items
+SET category = '[
+    {"name": "Idli", "qty": 2},
+    {"name": "Vada", "qty": 1}
+]'::jsonb
+WHERE LOWER(name) LIKE '%plate%idli%vada%';
+
+-- Drop old category column after migration (optional - keep for rollback)
+-- ALTER TABLE items DROP COLUMN category_old;
+
+-- ========================================================================
+-- STEP 6: CREATE FUNCTION TO CALCULATE TOTAL ITEMS SOLD BY CATEGORY
+-- ========================================================================
+
+CREATE OR REPLACE FUNCTION get_category_totals_for_date(p_date DATE)
+RETURNS TABLE(
+    category_name VARCHAR,
+    total_quantity INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        cat->>'name' AS category_name,
+        SUM((item->>'quantity')::INTEGER * (cat->>'qty')::INTEGER)::INTEGER AS total_quantity
+    FROM bills b
+    CROSS JOIN LATERAL jsonb_array_elements(b.items_json) AS item
+    CROSS JOIN LATERAL (
+        SELECT i.category
+        FROM items i
+        WHERE i.alpha_code = item->>'item_code_alpha'
+           OR i.numeric_code = item->>'item_code_numeric'
+        LIMIT 1
+    ) AS item_info
+    CROSS JOIN LATERAL jsonb_array_elements(item_info.category) AS cat
+    WHERE b.bill_date = p_date
+    GROUP BY cat->>'name'
+    ORDER BY total_quantity DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION get_category_totals_for_date IS 'Calculates total quantity sold for each category on a given date';
+
+-- ========================================================================
+-- STEP 7: UPDATE move_orders_to_bill_json FUNCTION TO INCLUDE CATEGORIES
+-- ========================================================================
+
+CREATE OR REPLACE FUNCTION move_orders_to_bill_json(
+    p_bill_id INTEGER, 
+    p_table_no VARCHAR(20), 
+    p_party_no VARCHAR(20)
+) RETURNS INTEGER AS $$
+DECLARE
+    moved_count INTEGER := 0;
+    items_array JSONB;
+BEGIN
+    -- Build items_json with category information included
+    SELECT jsonb_agg(
+        jsonb_build_object(
+            'item_name', o.item_name,
+            'item_code_numeric', o.numeric_item_code,
+            'item_code_alpha', o.item_code,
+            'quantity', o.quantity,
+            'fixed_price', o.unit_price,
+            'actual_price', o.unit_price,
+            'line_total', o.line_total,
+            'categories', COALESCE(i.category, '[]'::jsonb)  -- Include category quantities
+        )
+    )
+    INTO items_array 
+    FROM orders o
+    LEFT JOIN items i ON (i.alpha_code = o.item_code OR i.numeric_code = o.numeric_item_code)
+    WHERE o.table_no = p_table_no::VARCHAR 
+    AND o.party_no = p_party_no;
+
+    IF items_array IS NULL OR jsonb_array_length(items_array) = 0 THEN 
+        RETURN 0; 
+    END IF;
+
+    -- Update bills with the items_json including categories
+    UPDATE bills 
+    SET items_json = items_array 
+    WHERE id = p_bill_id;
+
+    -- Delete orders after moving to bill
+    WITH deleted AS (
+        DELETE FROM orders 
+        WHERE table_no = p_table_no::VARCHAR 
+        AND party_no = p_party_no 
+        RETURNING 1
+    )
+    SELECT count(*) INTO moved_count FROM deleted;
+
+    RETURN moved_count;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION move_orders_to_bill_json IS 'Moves orders to bills.items_json including category quantity information';
+
+-- ========================================================================
+-- STEP 8: CREATE INDEXES FOR NEW FOREIGN KEYS
+-- ========================================================================
+
+CREATE INDEX IF NOT EXISTS idx_orders_bill_number_date 
+ON orders(bill_number, bill_date);
+
+CREATE INDEX IF NOT EXISTS idx_bills_table_no 
+ON bills(table_no);
+
+CREATE INDEX IF NOT EXISTS idx_items_category 
+ON items USING GIN (category);
+
+-- ========================================================================
+-- STEP 9: ADD CHECK CONSTRAINT FOR CATEGORY JSON FORMAT
+-- ========================================================================
+
+-- Ensure category JSON follows the expected structure
+ALTER TABLE items
+ADD CONSTRAINT chk_category_format
+CHECK (
+    category IS NULL OR
+    jsonb_typeof(category) = 'array'
+);
+
+COMMENT ON CONSTRAINT chk_category_format ON items IS 'Ensures category is stored as a JSON array';
+
+COMMIT;
+
+-- ========================================================================
+-- VERIFICATION QUERIES
+-- ========================================================================
+
+SELECT 'Schema updates completed successfully!' AS status;
+
+-- Show all foreign key constraints
+SELECT 
+    tc.table_name, 
+    tc.constraint_name, 
+    tc.constraint_type,
+    kcu.column_name,
+    ccu.table_name AS foreign_table_name,
+    ccu.column_name AS foreign_column_name
+FROM information_schema.table_constraints AS tc
+JOIN information_schema.key_column_usage AS kcu
+    ON tc.constraint_name = kcu.constraint_name
+    AND tc.table_schema = kcu.table_schema
+LEFT JOIN information_schema.constraint_column_usage AS ccu
+    ON ccu.constraint_name = tc.constraint_name
+    AND ccu.table_schema = tc.table_schema
+WHERE tc.constraint_type = 'FOREIGN KEY'
+    AND tc.table_name IN ('orders', 'bills', 'audit_log', 'sessions')
+ORDER BY tc.table_name, tc.constraint_name;
+
+-- Example: Test category totals function
+-- SELECT * FROM get_category_totals_for_date(CURRENT_DATE);
+
+
+
+Update-2:
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS clerk_initials VARCHAR(50);
+UPDATE settings SET clerk_initials = 'CLK' WHERE clerk_initials IS NULL;
+ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_clerk_initials_key;
+ALTER TABLE settings ADD CONSTRAINT settings_clerk_initials_key UNIQUE (clerk_initials);
+
+
+
+Update-3:
+-- ========================================================================
+-- RESTAURANT BILLING SYSTEM - SCHEMA UPDATE (FIXED)
+-- Switch FK from bill_number to composite key (table_no, party_no, created_at, track, clerk_initials)
+-- ========================================================================
+
+BEGIN;
+
+-- 1. Drop existing FK constraint if it exists
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS fk_orders_bills;
+-- Also drop the previous attempt's constraint if it managed to partially apply (unlikely due to error but good practice)
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS fk_orders_bills_composite;
+
+-- 2. Fix Data Type Mismatch: Convert orders.table_no to INTEGER
+-- CHECK FIRST: Make sure all data can be converted.
+-- If this fails, you have non-numeric data in orders.table_no that needs manual cleanup.
+ALTER TABLE orders 
+ALTER COLUMN table_no TYPE INTEGER USING table_no::INTEGER;
+
+-- 3. Add Unique Constraint on bills to support the new FK
+-- ensuring (table_no, party_no, created_at, track, clerk_initials) is unique
+ALTER TABLE bills 
+DROP CONSTRAINT IF EXISTS uq_bills_composite_key; -- Drop if exists from previous run
+
+ALTER TABLE bills 
+ADD CONSTRAINT uq_bills_composite_key 
+UNIQUE (table_no, party_no, created_at, track, clerk_initials);
+
+-- 4. Add the Foreign Key Constraint to orders
+ALTER TABLE orders
+ADD CONSTRAINT fk_orders_bills_composite
+FOREIGN KEY (table_no, party_no, created_at, track, clerk_initials)
+REFERENCES bills (table_no, party_no, created_at, track, clerk_initials)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
+
+-- 5. Verification
+SELECT 'Foreign key updated successfully. orders.table_no converted to INTEGER.' as status;
+
+COMMIT;

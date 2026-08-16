@@ -1,0 +1,122 @@
+# Database Schema
+
+This document outlines the current database schema for the Restaurant Billing Application.
+
+## ER Diagram
+
+```mermaid
+erDiagram
+    orders {
+        integer id PK
+        varchar track
+        varchar clerk_initials
+        varchar table_no
+        varchar party_no
+        integer bill_number
+        varchar item_code
+        varchar numeric_item_code
+        varchar item_name
+        integer quantity
+        numeric unit_price
+        numeric line_total
+        date bill_date
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    items {
+        integer id PK
+        varchar name
+        varchar alpha_code
+        varchar numeric_code
+        numeric price_fixed
+        numeric price_general
+        numeric price_ac
+        jsonb category
+        boolean is_separate
+        timestamp created_at
+    }
+
+    sections {
+        integer table_id PK
+        varchar section_name
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    bills {
+        integer id PK
+        integer bill_number
+        date bill_date
+        integer table_no FK
+        varchar party_no
+        varchar section
+        varchar track
+        varchar clerk_initials
+        numeric subtotal
+        numeric tax_amount
+        numeric grand_total
+        jsonb items_json
+        varchar order_id
+        timestamp created_at
+    }
+
+    shifts {
+        integer id PK
+        varchar shift_name
+        timestamp created_at
+    }
+
+    sessions {
+        integer id PK
+        uuid session_id
+        varchar shift_name FK
+        varchar clerk_initials
+        date session_date
+        timestamp start_time
+        timestamp end_time
+        varchar status
+        varchar closed_by
+        timestamp created_at
+    }
+
+    audit_log {
+        integer id PK
+        uuid event_id
+        uuid shift_session_id FK
+        varchar action_type
+        varchar resource_type
+        jsonb payload
+        timestamp timestamp_utc
+    }
+
+    settings {
+        integer id PK
+        varchar hotel_name
+        varchar address
+        varchar phone
+        varchar gstin
+        varchar clerk_initials
+        timestamp created_at
+    }
+
+    %% Relationships
+    sessions }|--|| shifts : "shift_name"
+    audit_log }|--|| sessions : "shift_session_id"
+```
+
+## Table Descriptions
+
+### Tables
+- **orders**: Individual line items/orders placed for a table.
+- **items**: Menu items with pricing and category.
+- **sections**: Defines table sections (e.g., AC, Garden, General).
+- **bills**: Finalized bills containing aggregated order data.
+- **shifts**: Definitions of available shifts (e.g., Morning, Evening).
+- **sessions**: Instances of opened shifts (daily operations).
+- **audit_log**: Logs of important actions and events.
+- **settings**: Application configuration (hotel info, per-clerk settings).
+
+### Views (or Materialized Views)
+- **pending_bills**: Aggregated view of current running orders.
+- **table_status**: Live status of tables (occupied, amount, items).

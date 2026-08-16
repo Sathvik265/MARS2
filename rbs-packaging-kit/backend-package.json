@@ -1,0 +1,43 @@
+{
+  "name": "restaurant-billing-backend",
+  "version": "2.0.0",
+  "description": "Complete backend for restaurant billing system with PostgreSQL",
+  "main": "src/app.js",
+  "bin": "src/app.js",
+  "pkg": {
+    "targets": [
+      "node22-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "init-db": "psql -U $DB_USER -d $DB_NAME -f database_schema.sql",
+    "build:exe": "pkg . --output dist/rbs-backend.exe",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0",
+    "node-cron": "^4.2.1",
+    "pg": "^8.10.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.21.0",
+    "nodemon": "^3.0.3"
+  },
+  "keywords": [
+    "restaurant",
+    "billing",
+    "pos",
+    "postgresql",
+    "express"
+  ],
+  "author": "Restaurant Billing Team",
+  "license": "MIT"
+}

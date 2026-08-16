@@ -1,0 +1,137 @@
+:root {
+  --card-bg: #1a1a1a;
+  --card-border: #333333;
+  --accent: #5a67f2;
+  --muted: #9ca3af;
+  --success: #20a64a;
+}
+
+.recent-bills-wrapper {
+  padding: 18px 24px;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.recent-bills-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.recent-bills-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #ffffff;
+}
+.search-inline {
+  min-width: 260px;
+}
+.search-input {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  width: 260px;
+}
+
+.cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bill-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  outline: none;
+}
+.bill-card:focus {
+  box-shadow: 0 0 0 3px rgba(90, 103, 242, 0.12);
+}
+.bill-card.expanded {
+  border-color: var(--accent);
+  box-shadow: 0 4px 18px rgba(90, 103, 242, 0.06);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-left {
+  display: flex;
+  flex-direction: column;
+}
+.bill-title {
+  font-weight: 600;
+  font-size: 1rem;
+}
+.bill-time {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.card-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bill-amount {
+  color: var(--success);
+  font-weight: 700;
+}
+.expand-icon {
+  font-size: 0.875rem;
+  color: #e5e5e5;
+}
+
+.card-body {
+  margin-top: 12px;
+  padding: 12px;
+  border-top: 1px dashed #444;
+  background: #262626;
+  border-radius: 8px;
+}
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.items-table th {
+  text-align: left;
+  padding: 10px;
+  background: #333;
+  font-weight: 600;
+  color: #d1d5db;
+}
+.items-table td {
+  padding: 10px;
+  border-bottom: 1px solid #444;
+  color: #ffffff;
+}
+.col-qty,
+.col-price,
+.col-total {
+  text-align: right;
+}
+.total-row td {
+  font-weight: 700;
+  border-top: 2px solid #555;
+  color: #ffffff;
+}
+
+.empty-message {
+  padding: 28px;
+  color: var(--muted);
+}
+
+.recent-error {
+  margin-left: 12px;
+  color: #b33;
+  font-weight: 600;
+}
+
+.focused {
+  box-shadow: 0 0 0 3px rgba(90, 103, 242, 0.08);
+}
