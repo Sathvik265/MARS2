@@ -5,12 +5,13 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  Input,
   Loader2,
   Button,
 } from "../ui/UIComponents";
 
-const API = process.env.REACT_APP_API_URL;
+import { API as HELPER_API } from "../../utils/helpers";
+
+const API = process.env.REACT_APP_API_URL || HELPER_API || "http://127.0.0.1:8000/api";
 
 // ── Item Row ──────────────────────────────────────────────────────────────────
 function ItemRow({ item, onChangeCategory, maxCategory, saving }) {

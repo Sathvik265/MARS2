@@ -31,6 +31,7 @@ Pop-Location
 Write-Host "== 3/5: Building frontend production bundle ==" -ForegroundColor Cyan
 Push-Location "$root\frontend"
 if (-not (Test-Path node_modules)) { npm install }
+if (-not $env:REACT_APP_API_URL) { $env:REACT_APP_API_URL = "http://localhost:8000/api" }
 npm run build
 Pop-Location
 

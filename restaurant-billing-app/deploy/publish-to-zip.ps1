@@ -32,6 +32,7 @@ New-Item -ItemType Directory -Path $toolsDest -Force | Out-Null
 Write-Host "Building frontend..."
 Push-Location $frontendPath
 if (Test-Path 'package-lock.json') { npm ci } else { npm install }
+if (-not $env:REACT_APP_API_URL) { $env:REACT_APP_API_URL = "http://localhost:8000/api" }
 npm run build
 Pop-Location
 

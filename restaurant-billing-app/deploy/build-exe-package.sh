@@ -23,6 +23,7 @@ npx pkg . --targets node22-win-x64 --output dist/rbs-backend.exe
 echo "== 3/5: Building frontend production bundle =="
 cd "$FRONTEND_DIR"
 if [ ! -d "node_modules" ]; then npm install; fi
+export REACT_APP_API_URL="${REACT_APP_API_URL:-http://localhost:8000/api}"
 npm run build
 
 echo "== 4/5: Compiling frontend server to rbs-frontend.exe =="

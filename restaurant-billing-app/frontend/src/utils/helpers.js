@@ -1,7 +1,7 @@
 // Shared utility functions and constants for the Restaurant Billing System
 
-export const BACKEND_URL = "http://127.0.0.1:8000";
-export const API = `${BACKEND_URL}/api`;
+export const API = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api";
+export const BACKEND_URL = API.replace(/\/api\/?$/, "");
 
 // Toast notification system
 export const toast = {
