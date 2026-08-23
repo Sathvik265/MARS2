@@ -94,7 +94,8 @@ app.get("/api/auth/shift-status", async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ detail: "Failed to fetch shift status" });
+    console.error("Shift status error:", error.message || error);
+    res.status(500).json({ detail: "Failed to fetch shift status", error: error.message || String(error) });
   }
 });
 
@@ -701,10 +702,8 @@ app.use("*", (req, res) => {
 app.use((err, req, res, next) => {
   console.error("Global error handler:", err);
   res.status(500).json({
-    detail:
-      process.env.NODE_ENV === "production"
-        ? "Internal server error"
-        : err.message,
+    detail: err.message || "Internal server error",
+    error: err.message || String(err),
     timestamp: new Date().toISOString(),
   });
 });
