@@ -14,45 +14,105 @@ if (!fs.existsSync(buildDir)) {
   process.exit(1);
 }
 
-// Serve static assets under /static explicitly with fallthrough: false
-app.use("/static", express.static(path.join(buildDir, "static"), {
-  fallthrough: false,
-  immutable: true,
-  maxAge: "1y",
-}));
+// MIME types map for static assets
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".map": "application/json; charset=utf-8",
+};
 
-// Catch any subpath static asset requests (e.g. /subpath/static/*)
-app.use("*/static", (req, res, next) => {
-  const relPath = req.url;
-  const targetFile = path.join(buildDir, "static", relPath);
-  if (fs.existsSync(targetFile)) {
-    return res.sendFile(targetFile);
+// Custom static file handler that works 100% reliably inside pkg virtual filesystem
+const serveFile = (filePath, res) => {
+  try {
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeType = MIME_TYPES[ext] || "application/octet-stream";
+      res.setHeader("Content-Type", mimeType);
+
+      if (
+        ext === ".js" ||
+        ext === ".css" ||
+        ext === ".png" ||
+        ext === ".jpg" ||
+        ext === ".woff2"
+      ) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+
+      const stream = fs.createReadStream(filePath);
+      stream.pipe(res);
+      return true;
+    }
+  } catch (err) {
+    console.error("Error reading file:", filePath, err);
   }
-  next();
-});
+  return false;
+};
 
-// Serve root build directory files (favicon, manifest, icons)
-app.use(express.static(buildDir));
-
-// Return 404 for missing static JS/CSS assets rather than falling through to index.html
-app.use((req, res, next) => {
-  if (req.url.match(/\.(js|css|json|png|jpg|jpeg|gif|ico|svg|ttf|woff|woff2)$/)) {
-    return res.status(404).send("Asset not found");
+// Handle all incoming HTTP requests
+app.use((req, res) => {
+  let reqPath = req.path;
+  try {
+    reqPath = decodeURIComponent(req.path);
+  } catch (e) {
+    reqPath = req.path;
   }
-  next();
-});
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(buildDir, "index.html"));
+  // 1. Direct file lookup in build directory (e.g., /static/js/main.js, /favicon.ico)
+  const relativeFilePath = reqPath.startsWith("/") ? reqPath.slice(1) : reqPath;
+  if (relativeFilePath) {
+    const targetFile = path.join(buildDir, relativeFilePath);
+    if (serveFile(targetFile, res)) {
+      return;
+    }
+  }
+
+  // 2. Look for static asset subpaths (e.g., /billing/static/js/main.js -> static/js/main.js)
+  const staticIndex = reqPath.indexOf("/static/");
+  if (staticIndex !== -1) {
+    const cleanStaticPath = reqPath.substring(staticIndex + 1);
+    const staticFile = path.join(buildDir, cleanStaticPath);
+    if (serveFile(staticFile, res)) {
+      return;
+    }
+  }
+
+  // 3. For requests targeting static extensions (.js, .css, etc.) that do not exist: return proper MIME 404
+  const ext = path.extname(reqPath).toLowerCase();
+  if (MIME_TYPES[ext]) {
+    res.setHeader("Content-Type", MIME_TYPES[ext]);
+    return res.status(404).send(`/* File not found: ${reqPath} */`);
+  }
+
+  // 4. Fallback to index.html for all SPA routes (e.g. /, /billing, /reports)
+  const indexHtmlPath = path.join(buildDir, "index.html");
+  if (serveFile(indexHtmlPath, res)) {
+    return;
+  }
+
+  res.status(500).send("index.html not found in build directory");
 });
 
 const server = app.listen(PORT, () => {
-  console.log(`Restaurant Billing frontend running on http://localhost:${PORT}`);
+  console.log(`🚀 Restaurant Billing frontend running on http://localhost:${PORT}`);
 });
 
 server.on("error", (err) => {
   if (err && err.code === "EADDRINUSE") {
-    console.error(`❌ Port ${PORT} is already in use. Stop the process using this port or set a different PORT environment variable.`);
+    console.error(
+      `❌ Port ${PORT} is already in use. Stop the process using this port or set a different PORT environment variable.`
+    );
     process.exit(1);
   } else {
     console.error("Server error:", err);
