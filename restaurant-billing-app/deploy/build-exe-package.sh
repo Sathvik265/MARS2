@@ -17,6 +17,7 @@ if [ ! -f "node_modules/.bin/pkg" ]; then
   npm install --save-dev @yao-pkg/pkg
 fi
 echo "== 2/5: Compiling backend to rbs-backend.exe =="
+rm -rf "$BACKEND_DIR/dist"
 npx pkg . --targets node22-win-x64 --output dist/rbs-backend.exe
 
 echo "== 3/5: Building frontend production bundle =="
@@ -26,6 +27,7 @@ npm run build
 
 echo "== 4/5: Compiling frontend server to rbs-frontend.exe =="
 rm -rf "$FS_DIR/build"
+rm -rf "$FS_DIR/dist"
 cp -R "$FRONTEND_DIR/build" "$FS_DIR/"
 cd "$FS_DIR"
 if [ ! -d "node_modules" ]; then npm install; fi

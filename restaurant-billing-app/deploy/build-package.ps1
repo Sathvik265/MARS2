@@ -29,6 +29,7 @@ if (-not (Test-Path "node_modules\.bin\pkg.cmd")) {
   npm install --save-dev @yao-pkg/pkg
 }
 Write-Host "== 2/5: Compiling backend to rbs-backend.exe ==" -ForegroundColor Cyan
+if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
 npx pkg . --targets node22-win-x64 --output dist\rbs-backend.exe
 Pop-Location
 
@@ -40,6 +41,8 @@ Pop-Location
 
 Write-Host "== 4/5: Compiling frontend server to rbs-frontend.exe ==" -ForegroundColor Cyan
 $fsDir = "$root\deploy\frontend-server"
+if (Test-Path "$fsDir\build") { Remove-Item -Recurse -Force "$fsDir\build" }
+if (Test-Path "$fsDir\dist") { Remove-Item -Recurse -Force "$fsDir\dist" }
 Copy-Item -Recurse -Force "$root\frontend\build" "$fsDir\build"
 Push-Location $fsDir
 if (-not (Test-Path node_modules)) { npm install }
