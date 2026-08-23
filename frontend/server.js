@@ -8,17 +8,21 @@ const PORT = process.env.PORT || 3000;
 const BACKEND_PORT = process.env.BACKEND_PORT || 8000;
 const BACKEND_HOST = process.env.BACKEND_HOST || "127.0.0.1";
 
-// Resolve build directory dynamically so disk updates take priority over embedded pkg snapshots
+// Build directory resolution:
+// 1. If an external 'build' folder exists next to the executable on disk (exeDir/build) with files in it, use it.
+// 2. Otherwise, use embedded pkg snapshot directory (__dirname/build).
 const exeDir = path.dirname(process.execPath);
-const diskBuildCandidates = [
-  path.join(process.cwd(), "build"),
-  path.join(process.cwd(), "frontend", "build"),
-  path.join(exeDir, "build"),
-  path.join(exeDir, "frontend", "build"),
-  path.join(__dirname, "build")
-];
+const diskBuild = path.join(exeDir, "build");
 
-const buildDir = diskBuildCandidates.find(d => fs.existsSync(d)) || path.join(__dirname, "build");
+let buildDir = path.join(__dirname, "build");
+if (fs.existsSync(diskBuild)) {
+  try {
+    if (fs.readdirSync(diskBuild).length > 0) {
+      buildDir = diskBuild;
+    }
+  } catch (e) {}
+}
+
 console.log(`[Frontend Server] Serving static build from: ${buildDir}`);
 
 if (!fs.existsSync(buildDir)) {
@@ -59,9 +63,15 @@ app.use(express.static(buildDir));
 app.get("*", (req, res) => {
   const ext = path.extname(req.path);
   if (ext && ext !== ".html") {
-    return res.status(404).send("File not found");
+    console.warn(`[Frontend Server] Static asset not found (404): ${req.path}`);
+    return res.status(404).send(`Asset not found: ${req.path}`);
   }
-  res.sendFile(path.join(buildDir, "index.html"));
+  const indexPath = path.join(buildDir, "index.html");
+  if (!fs.existsSync(indexPath)) {
+    console.error(`[Frontend Server] index.html missing at ${indexPath}`);
+    return res.status(500).send("index.html missing in build folder");
+  }
+  res.sendFile(indexPath);
 });
 
 const server = app.listen(PORT, () => {

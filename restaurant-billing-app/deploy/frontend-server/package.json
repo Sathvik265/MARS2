@@ -6,7 +6,8 @@
   "bin": "server.js",
   "pkg": {
     "assets": [
-      "build/**/*"
+      "build/**/*",
+      "build/**"
     ],
     "targets": [
       "node22-win-x64"
