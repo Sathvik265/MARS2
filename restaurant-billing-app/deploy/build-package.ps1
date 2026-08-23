@@ -40,13 +40,9 @@ if (-not $env:REACT_APP_API_URL) { $env:REACT_APP_API_URL = "http://localhost:80
 npm run build
 Pop-Location
 
-Write-Host "== 4/5: Compiling frontend server to rbs-frontend.exe ==" -ForegroundColor Cyan
+Write-Host "== 4/5: Compiling frontend server (Express exe only — no build embedding) ==" -ForegroundColor Cyan
 $fsDir = "$root\deploy\frontend-server"
-# Remove the old build folder completely first, then copy the folder itself.
-# IMPORTANT: Do NOT copy into an existing 'build' dir — PowerShell will nest it as build\build.
-if (Test-Path "$fsDir\build") { Remove-Item -Recurse -Force "$fsDir\build" }
 if (Test-Path "$fsDir\dist") { Remove-Item -Recurse -Force "$fsDir\dist" }
-Copy-Item -Recurse -Force "$root\frontend\build" "$fsDir\build"
 Push-Location $fsDir
 if (-not (Test-Path node_modules)) { npm install }
 npx pkg . --targets node22-win-x64 --public --no-bytecode --output dist\rbs-frontend.exe
@@ -66,6 +62,10 @@ if (Test-Path "$root\Final_Dump_Fixed.sql") {
 }
 
 Copy-Item "$fsDir\dist\rbs-frontend.exe" "$OutputDir\frontend\"
+# Copy the React build folder next to the exe so server.js can serve it from disk.
+# The build folder MUST be at dist-package\frontend\build\
+if (Test-Path "$OutputDir\frontend\build") { Remove-Item -Recurse -Force "$OutputDir\frontend\build" }
+Copy-Item -Recurse -Force "$root\frontend\build" "$OutputDir\frontend\build"
 
 Copy-Item "$root\deploy\install-services.ps1" "$OutputDir\"
 Copy-Item "$root\deploy\run-local.ps1" "$OutputDir\"
@@ -81,4 +81,10 @@ Write-Host ""
 Write-Host "Done. Package folder: $OutputDir" -ForegroundColor Green
 Write-Host "Zipped package:       $OutputZip" -ForegroundColor Green
 Write-Host ""
-Write-Host "IMPORTANT: edit dist-package\backend\.env with the real production DB credentials before shipping/copying it, and remove it from anywhere you don't want secrets sitting around." -ForegroundColor Yellow
+Write-Host "Package structure:" -ForegroundColor Yellow
+Write-Host "  frontend\" -ForegroundColor Yellow
+Write-Host "    rbs-frontend.exe  <- Express server exe" -ForegroundColor Yellow
+Write-Host "    build\            <- React build (served from disk)" -ForegroundColor Yellow
+Write-Host "  backend\" -ForegroundColor Yellow
+Write-Host "    rbs-backend.exe   <- API server exe" -ForegroundColor Yellow
+Write-Host "IMPORTANT: edit dist-package\backend\.env with the real production DB credentials before shipping." -ForegroundColor Red

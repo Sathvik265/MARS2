@@ -5,16 +5,29 @@ const fs = require("fs");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Build is embedded inside the executable at __dirname/build via pkg assets.
-// This matches the proven working build from rbs-apps-only.zip.
-const buildDir = path.join(__dirname, "build");
+// Serve the React build from a 'build' folder located next to the running exe.
+// This avoids any pkg VFS / asset-embedding issues entirely.
+// When running as a packaged exe: process.execPath = C:\...\rbs-frontend.exe
+//   → buildDir = C:\...\build\
+// When running directly with node (dev): __dirname\build\
+const exeDir = path.dirname(
+  process.pkg ? process.execPath : path.resolve(__filename)
+);
+const buildDir = path.join(exeDir, "build");
 
 if (!fs.existsSync(buildDir)) {
   console.error(`[RBS Frontend] Build folder not found at: ${buildDir}`);
+  console.error(`[RBS Frontend] Make sure the 'build' folder is in the same directory as rbs-frontend.exe`);
   process.exit(1);
 }
 
-console.log(`[RBS Frontend] Serving build from: ${buildDir}`);
+if (!fs.existsSync(path.join(buildDir, "index.html"))) {
+  console.error(`[RBS Frontend] index.html not found in: ${buildDir}`);
+  console.error(`[RBS Frontend] The build folder appears to be empty or corrupt.`);
+  process.exit(1);
+}
+
+console.log(`[RBS Frontend] Serving React build from: ${buildDir}`);
 
 app.use(express.static(buildDir));
 
@@ -28,7 +41,7 @@ const server = app.listen(PORT, () => {
 
 server.on("error", (err) => {
   if (err && err.code === "EADDRINUSE") {
-    console.error(`Port ${PORT} is already in use.`);
+    console.error(`Port ${PORT} is already in use. Please close the other process or set a different PORT.`);
     process.exit(1);
   } else {
     console.error("Server error:", err);

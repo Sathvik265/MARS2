@@ -25,6 +25,7 @@ if (-not (Test-Path "node_modules\.bin\pkg.cmd")) {
   npm install --save-dev @yao-pkg/pkg
 }
 Write-Host "== 2/5: Compiling backend to rbs-backend.exe ==" -ForegroundColor Cyan
+if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
 npx pkg . --targets node22-win-x64 --output dist\rbs-backend.exe
 Pop-Location
 
@@ -35,13 +36,9 @@ if (-not $env:REACT_APP_API_URL) { $env:REACT_APP_API_URL = "http://localhost:80
 npm run build
 Pop-Location
 
-Write-Host "== 4/5: Compiling frontend server to rbs-frontend.exe ==" -ForegroundColor Cyan
+Write-Host "== 4/5: Compiling frontend server (Express exe only — no build embedding) ==" -ForegroundColor Cyan
 $fsDir = "$root\deploy\frontend-server"
-# Remove the old build folder completely first, then copy the folder itself.
-# IMPORTANT: Do NOT copy into an existing 'build' dir — PowerShell will nest it as build\build.
-if (Test-Path "$fsDir\build") { Remove-Item -Recurse -Force "$fsDir\build" }
 if (Test-Path "$fsDir\dist") { Remove-Item -Recurse -Force "$fsDir\dist" }
-Copy-Item -Recurse -Force "$root\frontend\build" "$fsDir\build"
 Push-Location $fsDir
 if (-not (Test-Path node_modules)) { npm install }
 npx pkg . --targets node22-win-x64 --public --no-bytecode --output dist\rbs-frontend.exe
@@ -53,11 +50,16 @@ New-Item -ItemType Directory -Path "$OutputDir\backend" -Force | Out-Null
 New-Item -ItemType Directory -Path "$OutputDir\frontend" -Force | Out-Null
 
 Copy-Item "$root\backend\dist\rbs-backend.exe" "$OutputDir\backend\"
-Copy-Item "$root\backend\.env" "$OutputDir\backend\.env"
-(Get-Content "$OutputDir\backend\.env") -replace 'DB_USER=.*', 'DB_USER=postgres' | Set-Content "$OutputDir\backend\.env"
+Copy-Item "$root\backend\.env" "$OutputDir\backend\.env" -ErrorAction SilentlyContinue
+if (-not (Test-Path "$OutputDir\backend\.env")) {
+    Copy-Item "$root\backend\.env.example" "$OutputDir\backend\.env" -ErrorAction SilentlyContinue
+}
 
 Copy-Item "$fsDir\dist\rbs-frontend.exe" "$OutputDir\frontend\"
-Copy-Item "$root\frontend\.env.example" "$OutputDir\frontend\.env" -ErrorAction SilentlyContinue
+# Copy the React build folder next to the exe so server.js can serve it from disk.
+# The build folder MUST be at apps-only-package\frontend\build\
+if (Test-Path "$OutputDir\frontend\build") { Remove-Item -Recurse -Force "$OutputDir\frontend\build" }
+Copy-Item -Recurse -Force "$root\frontend\build" "$OutputDir\frontend\build"
 
 Copy-Item "$root\deploy\run-apps-only.ps1" "$OutputDir\"
 Copy-Item "$root\deploy\RunAppsOnly.bat" "$OutputDir\"

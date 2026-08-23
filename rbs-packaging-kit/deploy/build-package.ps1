@@ -40,13 +40,9 @@ if (-not $env:REACT_APP_API_URL) { $env:REACT_APP_API_URL = "http://localhost:80
 npm run build
 Pop-Location
 
-Write-Host "== 4/5: Compiling frontend server to rbs-frontend.exe ==" -ForegroundColor Cyan
+Write-Host "== 4/5: Compiling frontend server (Express exe only — no build embedding) ==" -ForegroundColor Cyan
 $fsDir = "$root\deploy\frontend-server"
-# Remove the old build folder completely first, then copy the folder itself.
-# IMPORTANT: Do NOT copy into an existing 'build' dir — PowerShell will nest it as build\build.
-if (Test-Path "$fsDir\build") { Remove-Item -Recurse -Force "$fsDir\build" }
 if (Test-Path "$fsDir\dist") { Remove-Item -Recurse -Force "$fsDir\dist" }
-Copy-Item -Recurse -Force "$root\frontend\build" "$fsDir\build"
 Push-Location $fsDir
 if (-not (Test-Path node_modules)) { npm install }
 npx pkg . --targets node22-win-x64 --public --no-bytecode --output dist\rbs-frontend.exe
@@ -62,6 +58,9 @@ Copy-Item "$root\backend\.env.example" "$OutputDir\backend\.env"
 Copy-Item "$root\Final_Dump_Fixed.sql" "$OutputDir\backend\" -ErrorAction SilentlyContinue
 
 Copy-Item "$fsDir\dist\rbs-frontend.exe" "$OutputDir\frontend\"
+# Copy the React build folder next to the exe so server.js can serve it from disk.
+if (Test-Path "$OutputDir\frontend\build") { Remove-Item -Recurse -Force "$OutputDir\frontend\build" }
+Copy-Item -Recurse -Force "$root\frontend\build" "$OutputDir\frontend\build"
 
 Copy-Item "$root\deploy\install-services.ps1" "$OutputDir\"
 Copy-Item "$root\deploy\DEPLOY_PACKAGE_README.md" "$OutputDir\README.md"

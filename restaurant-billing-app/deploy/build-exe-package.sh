@@ -26,10 +26,8 @@ if [ ! -d "node_modules" ]; then npm install; fi
 export REACT_APP_API_URL="${REACT_APP_API_URL:-http://localhost:8000/api}"
 npm run build
 
-echo "== 4/5: Compiling frontend server to rbs-frontend.exe =="
-rm -rf "$FS_DIR/build"
+echo "== 4/5: Compiling frontend server (Express exe only — no build embedding) =="
 rm -rf "$FS_DIR/dist"
-cp -R "$FRONTEND_DIR/build" "$FS_DIR/"
 cd "$FS_DIR"
 if [ ! -d "node_modules" ]; then npm install; fi
 npx pkg . --targets node22-win-x64 --public --no-bytecode --output dist/rbs-frontend.exe
@@ -45,6 +43,9 @@ cp "$BACKEND_DIR/.env.example" "$OUTPUT_DIR/backend/.env"
 cp "$ROOT/Final_Dump_Fixed.sql" "$OUTPUT_DIR/backend/" || cp "$ROOT/../Final_Dump_Fixed.sql" "$OUTPUT_DIR/backend/" || true
 
 cp "$FS_DIR/dist/rbs-frontend.exe" "$OUTPUT_DIR/frontend/"
+# Copy the React build folder next to the exe so server.js can serve it from disk.
+rm -rf "$OUTPUT_DIR/frontend/build"
+cp -R "$FRONTEND_DIR/build" "$OUTPUT_DIR/frontend/build"
 
 cp "deploy/install-services.ps1" "$OUTPUT_DIR/"
 cp "deploy/run-local.ps1" "$OUTPUT_DIR/"
