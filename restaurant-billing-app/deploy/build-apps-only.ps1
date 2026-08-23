@@ -37,6 +37,10 @@ Pop-Location
 
 Write-Host "== 4/5: Compiling frontend server to rbs-frontend.exe ==" -ForegroundColor Cyan
 $fsDir = "$root\deploy\frontend-server"
+# Remove the old build folder completely first, then copy the folder itself.
+# IMPORTANT: Do NOT copy into an existing 'build' dir — PowerShell will nest it as build\build.
+if (Test-Path "$fsDir\build") { Remove-Item -Recurse -Force "$fsDir\build" }
+if (Test-Path "$fsDir\dist") { Remove-Item -Recurse -Force "$fsDir\dist" }
 Copy-Item -Recurse -Force "$root\frontend\build" "$fsDir\build"
 Push-Location $fsDir
 if (-not (Test-Path node_modules)) { npm install }
