@@ -54,6 +54,7 @@ Copy-Item "$root\backend\.env" "$OutputDir\backend\.env" -ErrorAction SilentlyCo
 if (-not (Test-Path "$OutputDir\backend\.env")) {
     Copy-Item "$root\backend\.env.example" "$OutputDir\backend\.env" -ErrorAction SilentlyContinue
 }
+(Get-Content "$OutputDir\backend\.env") -replace 'DB_USER=.*', 'DB_USER=postgres' -replace 'ADMIN_FULL_PASSWORD=.*', 'ADMIN_FULL_PASSWORD=vittal' -replace 'ADMIN_LIMITED_PASSWORD=.*', 'ADMIN_LIMITED_PASSWORD=vittal123' | Set-Content "$OutputDir\backend\.env"
 
 Copy-Item "$fsDir\dist\rbs-frontend.exe" "$OutputDir\frontend\"
 # Copy the React build folder next to the exe so server.js can serve it from disk.

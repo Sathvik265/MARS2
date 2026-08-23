@@ -55,6 +55,7 @@ New-Item -ItemType Directory -Path "$OutputDir\frontend" -Force | Out-Null
 
 Copy-Item "$root\backend\dist\rbs-backend.exe" "$OutputDir\backend\"
 Copy-Item "$root\backend\.env.example" "$OutputDir\backend\.env"
+(Get-Content "$OutputDir\backend\.env") -replace 'DB_USER=.*', 'DB_USER=postgres' -replace 'ADMIN_FULL_PASSWORD=.*', 'ADMIN_FULL_PASSWORD=vittal' -replace 'ADMIN_LIMITED_PASSWORD=.*', 'ADMIN_LIMITED_PASSWORD=vittal123' | Set-Content "$OutputDir\backend\.env"
 if (Test-Path "$root\Final_Dump_Fixed.sql") {
     Copy-Item "$root\Final_Dump_Fixed.sql" "$OutputDir\backend\"
 } elseif (Test-Path "$root\backend\Final_Dump_Fixed.sql") {
