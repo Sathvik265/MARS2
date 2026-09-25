@@ -173,8 +173,8 @@ router.patch("/:id/split-category", requireAdminFull, async (req, res) => {
   try {
     const { split_category } = req.body;
     const catVal = parseInt(split_category, 10);
-    if (isNaN(catVal) || catVal < 0) {
-      return res.status(400).json({ error: "Invalid split category" });
+    if (isNaN(catVal) || catVal < 0 || catVal > 5) {
+      return res.status(400).json({ error: "Invalid split category (must be between 0 and 5)" });
     }
     const item = await ItemModel.updateItemSplitCategory(req.params.id, catVal);
     res.json(item);

@@ -33,7 +33,7 @@ if (-not (Test-Path $envPath)) {
     if (Test-Path $exampleEnv) {
         Copy-Item $exampleEnv $envPath
     } else {
-        Set-Content -Path $envPath -Value "DB_USER=postgres`r`nDB_PASSWORD=your_postgres_password`r`nDB_HOST=localhost`r`nDB_PORT=5432`r`nDB_NAME=restaurant_billing_db`r`nPORT=8000`r`nADMIN_FULL_PASSWORD=SHRIDAR123`r`nADMIN_LIMITED_PASSWORD=SHRIDAR"
+        Set-Content -Path $envPath -Value "DB_USER=postgres`r`nDB_PASSWORD=your_postgres_password`r`nDB_HOST=localhost`r`nDB_PORT=5432`r`nDB_NAME=restaurant_billing_db`r`nPORT=8000`r`nADMIN_FULL_PASSWORD=vittal`r`nADMIN_LIMITED_PASSWORD=vittal123"
     }
 }
 

@@ -31,32 +31,59 @@ cd "$FS_DIR"
 if [ ! -d "node_modules" ]; then npm install; fi
 npx pkg . --targets node22-win-x64 --public --no-bytecode --output dist/rbs-frontend.exe
 
-echo "== 5/5: Assembling apps-only package =="
+echo "== 5/5: Assembling deploy package =="
 cd "$ROOT"
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR/backend"
 mkdir -p "$OUTPUT_DIR/frontend"
 
-# Backend
+# Backend — exe + .env + DB dump
 cp "$BACKEND_DIR/dist/rbs-backend.exe" "$OUTPUT_DIR/backend/"
-cp "$BACKEND_DIR/.env" "$OUTPUT_DIR/backend/.env"
+if [ -f "$BACKEND_DIR/.env" ]; then
+  cp "$BACKEND_DIR/.env" "$OUTPUT_DIR/backend/.env"
+else
+  cp "$BACKEND_DIR/.env.example" "$OUTPUT_DIR/backend/.env"
+fi
 sed -i '' 's/DB_USER=.*/DB_USER=postgres/g' "$OUTPUT_DIR/backend/.env"
 
-# Frontend
-cp "$FS_DIR/dist/rbs-frontend.exe" "$OUTPUT_DIR/frontend/"
-if [ -f "$FRONTEND_DIR/.env.example" ]; then
-  cp "$FRONTEND_DIR/.env.example" "$OUTPUT_DIR/frontend/.env"
-elif [ -f "$FRONTEND_DIR/.env" ]; then
-  cp "$FRONTEND_DIR/.env" "$OUTPUT_DIR/frontend/.env"
+# Include the DB dump (Final_Dump_Fixed.sql)
+if [ -f "$ROOT/Final_Dump_Fixed.sql" ]; then
+  cp "$ROOT/Final_Dump_Fixed.sql" "$OUTPUT_DIR/backend/"
+elif [ -f "$BACKEND_DIR/Final_Dump_Fixed.sql" ]; then
+  cp "$BACKEND_DIR/Final_Dump_Fixed.sql" "$OUTPUT_DIR/backend/"
 fi
 
-# Run scripts
-cp "deploy/run-apps-only.ps1" "$OUTPUT_DIR/"
-cp "deploy/RunAppsOnly.bat" "$OUTPUT_DIR/"
+# Frontend — exe + React production build folder
+cp "$FS_DIR/dist/rbs-frontend.exe" "$OUTPUT_DIR/frontend/"
+
+# Copy the React build folder so server.js can serve it from disk
+# This MUST be at dist-package/frontend/build/
+if [ -d "$FRONTEND_DIR/build" ]; then
+  cp -R "$FRONTEND_DIR/build" "$OUTPUT_DIR/frontend/build"
+fi
+
+# Deploy / run scripts (matches rbs-deploy-package.zip structure)
+[ -f "deploy/run-apps-only.ps1" ]        && cp "deploy/run-apps-only.ps1"        "$OUTPUT_DIR/"
+[ -f "deploy/RunAppsOnly.bat" ]          && cp "deploy/RunAppsOnly.bat"          "$OUTPUT_DIR/"
+[ -f "deploy/run-local.ps1" ]            && cp "deploy/run-local.ps1"            "$OUTPUT_DIR/"
+[ -f "deploy/RunApp.bat" ]               && cp "deploy/RunApp.bat"               "$OUTPUT_DIR/"
+[ -f "deploy/RunAppsSetup.bat" ]         && cp "deploy/RunAppsSetup.bat"         "$OUTPUT_DIR/" || \
+  [ -f "$ROOT/RunAppsSetup.bat" ]        && cp "$ROOT/RunAppsSetup.bat"          "$OUTPUT_DIR/"
+[ -f "deploy/install-services.ps1" ]     && cp "deploy/install-services.ps1"     "$OUTPUT_DIR/"
+[ -f "deploy/DEPLOY_PACKAGE_README.md" ] && cp "deploy/DEPLOY_PACKAGE_README.md" "$OUTPUT_DIR/README.md"
 
 rm -f "$OUTPUT_ZIP"
 cd "$OUTPUT_DIR"
 zip -r "../$OUTPUT_ZIP" .
 
-echo "Done. Apps-only package folder: $OUTPUT_DIR"
+echo ""
+echo "Done. Package folder: $OUTPUT_DIR"
 echo "Zipped package: $OUTPUT_ZIP"
+echo ""
+echo "Package structure:"
+echo "  frontend/"
+echo "    rbs-frontend.exe  <- Express server exe"
+echo "    build/            <- React build (served from disk)"
+echo "  backend/"
+echo "    rbs-backend.exe   <- API server exe"
+echo "    .env              <- Configuration"

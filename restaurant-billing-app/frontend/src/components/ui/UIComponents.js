@@ -45,6 +45,64 @@ export const Input = React.forwardRef(({ className = "", ...props }, ref) => (
   />
 ));
 
+export const DDMMYYYYInput = ({ value, onChange, className = "", placeholder = "DD/MM/YYYY", readOnly = false }) => {
+  const dateInputRef = React.useRef(null);
+
+  const formatDateDisplay = (val) => {
+    if (!val) return "";
+    if (typeof val === "string" && val.includes("-")) {
+      const parts = val.split("-");
+      if (parts.length === 3) {
+        return `${parts[2].padStart(2, "0")}/${parts[1].padStart(2, "0")}/${parts[0]}`;
+      }
+    }
+    return val;
+  };
+
+  const displayVal = formatDateDisplay(value);
+
+  return (
+    <div className="relative w-full">
+      <Input
+        type="text"
+        readOnly={readOnly}
+        value={displayVal}
+        placeholder={placeholder}
+        className={`w-full ${className}`}
+        onClick={() => {
+          if (!readOnly && dateInputRef.current) {
+            try {
+              if (dateInputRef.current.showPicker) {
+                dateInputRef.current.showPicker();
+              } else {
+                dateInputRef.current.focus();
+              }
+            } catch (_) {}
+          }
+        }}
+      />
+      {!readOnly && (
+        <input
+          ref={dateInputRef}
+          type="date"
+          value={value || ""}
+          onChange={(e) => onChange && onChange(e.target.value)}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            opacity: 0,
+            pointerEvents: "none",
+            zIndex: -1,
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
 export const Button = React.forwardRef(({
   children,
   onClick,
@@ -70,12 +128,17 @@ export const Button = React.forwardRef(({
     lg: "px-6 py-3 text-lg",
   };
 
+  const computedStyle =
+    variant === "destructive"
+      ? { backgroundColor: "#dc2626", color: "#ffffff", border: "1px solid #b91c1c", fontWeight: "bold", ...propStyle }
+      : propStyle;
+
   return (
     <button
       ref={ref}
       onClick={onClick}
       disabled={disabled}
-      style={propStyle}
+      style={computedStyle}
       className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${
         disabled ? "opacity-40 cursor-not-allowed" : ""
       } ${className}`}
@@ -148,26 +211,39 @@ export const TabsTrigger = ({
   isActive,
   onClick,
   className = "",
-}) => (
-  <button
-    onClick={onClick}
-    style={{
-      padding: "0.4rem 0.9rem",
-      fontSize: "0.875rem",
-      fontWeight: 600,
-      borderRadius: "0.55rem",
-      border: "none",
-      cursor: "pointer",
-      transition: "all 0.18s ease",
-      background: isActive ? "#1d4ed8" : "transparent",
-      color: isActive ? "#ffffff" : "#9ca3af",
-      boxShadow: isActive ? "0 2px 8px rgba(29,78,216,0.4)" : "none",
-    }}
-    className={className}
-  >
-    {children}
-  </button>
-);
+}) => {
+  const isPurge = value === "purge" || className.includes("red");
+  const bg = isActive
+    ? (isPurge ? "#dc2626" : "#1d4ed8")
+    : "transparent";
+  const textColor = isActive
+    ? "#ffffff"
+    : (isPurge ? "#ef4444" : "#9ca3af");
+  const shadow = isActive
+    ? (isPurge ? "0 2px 8px rgba(220,38,38,0.5)" : "0 2px 8px rgba(29,78,216,0.4)")
+    : "none";
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "0.4rem 0.9rem",
+        fontSize: "0.875rem",
+        fontWeight: 600,
+        borderRadius: "0.55rem",
+        border: isPurge ? "1px solid rgba(220,38,38,0.4)" : "none",
+        cursor: "pointer",
+        transition: "all 0.18s ease",
+        background: bg,
+        color: textColor,
+        boxShadow: shadow,
+      }}
+      className={className}
+    >
+      {children}
+    </button>
+  );
+};
 
 export const TabsContent = ({ children, value, activeTab }) =>
   activeTab === value ? <div>{children}</div> : null;

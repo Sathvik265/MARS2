@@ -58,6 +58,10 @@ export function generateAsciiReceipt(data, settings) {
 
   const separator = "-".repeat(LINE_WIDTH);
 
+  // NOTE: Do NOT embed ESC/P2 codes here! The backend printerRoutes.js
+  // prepends the appropriate binary ESC prefix (Draft mode, 12 CPI, etc.)
+  // for Windows. Embedding ESC codes in the text caused ESC E (Emphasized)
+  // to make the printer do 2 passes per character, halving speed.
   let ascii = "";
 
   // Title Suffix support (for split bills)
@@ -69,8 +73,12 @@ export function generateAsciiReceipt(data, settings) {
   const hotelHeading = trackLetter ? `${hotelNameWithSection} ${trackLetter}` : hotelNameWithSection;
   const displayHotelName = titleSuffix ? `${hotelHeading} ${titleSuffix}` : hotelHeading;
 
-  // Header (Hotel Name, Address, Phone, GST)
-  ascii += centerText(`${displayHotelName} (${clerkInitials})`, LINE_WIDTH) + "\r\n";
+  // Suppress SRIHARI from printed receipts — leave it blank (only affects printing, not DB)
+  const printClerkInitials = (clerkInitials && clerkInitials.toUpperCase() === "SRIHARI") ? "" : clerkInitials;
+  const headerHotelTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
+
+  // Header at TOP (Hotel Name, Address, Phone, GST) — matched to commit b5bcf98
+  ascii += centerText(headerHotelTitle, LINE_WIDTH) + "\r\n";
   if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
   if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
   if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
@@ -116,7 +124,6 @@ export function generateAsciiReceipt(data, settings) {
   ascii += separator + "\r\n";
 
   // Totals
-
   const cgstLabel = `CGST (${Number(cgstPercentage || 0).toFixed(1)}%)`;
   const cgstStr = Number(cgst || 0).toFixed(2);
   ascii += padRight(cgstLabel, LINE_WIDTH - cgstStr.length) + cgstStr + "\r\n";
@@ -133,11 +140,6 @@ export function generateAsciiReceipt(data, settings) {
   ascii += separator + "\r\n";
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\r\n";
   ascii += separator + "\r\n";
-
-  // 2-inch gap for mechanical paper feed tear-off (approx 12 lines)
-  /* for (let i = 0; i < 12; i++) {
-     ascii += ".\r\n";
-   }*/
 
   return ascii;
 }
@@ -168,10 +170,15 @@ export function generateAsciiReport(title, columns, data, settings) {
 
   const separator = "-".repeat(LINE_WIDTH);
 
+  // NOTE: Do NOT embed ESC/P2 codes here! The backend handles printer
+  // control codes. Embedding them caused double-pass printing (ESC E).
   let ascii = "";
 
   // Header Title
-  ascii += centerText(`${hotelName} (${clerkInitials})`, LINE_WIDTH) + "\r\n";
+  // Suppress SRIHARI from printed reports — leave it blank (only affects printing, not DB)
+  const printClerkInitials = (clerkInitials && clerkInitials.toUpperCase() === "SRIHARI") ? "" : clerkInitials;
+  const reportHotelTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${hotelName} (${printClerkInitials})` : hotelName;
+  ascii += centerText(reportHotelTitle, LINE_WIDTH) + "\r\n";
 
   // Wrap very long report titles onto two lines perfectly
   const titleLines = [];

@@ -32,7 +32,7 @@ import {
   updateOrder,
   deleteOrder,
 } from "../services/api";
-import { toast, safeGet, safeArray, safeObject, getCustomShortcuts, matchesShortcut } from "../utils/helpers";
+import { toast, safeGet, safeArray, safeObject, getCustomShortcuts, matchesShortcut, formatDateToDDMMYYYY } from "../utils/helpers";
 import { generateAsciiReceipt } from "../utils/receiptGenerator";
 
 export const getSectionForTable = (tableNo) => {
@@ -62,7 +62,8 @@ export default function Billing({
   const [loading, setLoading] = useState(false);
   const [splitBillUpto, setSplitBillUptoState] = useState(() => {
     const saved = localStorage.getItem("rbs_split_bill_upto");
-    return saved !== null ? parseInt(saved, 10) || 0 : 0;
+    const parsed = saved !== null ? parseInt(saved, 10) || 0 : 0;
+    return [0, 4, 5].includes(parsed) ? parsed : 0;
   });
 
   const setSplitBillUpto = useCallback((val) => {
@@ -72,6 +73,14 @@ export default function Billing({
       return nextVal;
     });
   }, []);
+
+  const cachedSettingsRef = useRef({});
+  useEffect(() => {
+    const clerk = userInitials || activeShift?.clerk_initials || "CLK";
+    api.get(`/settings?clerk=${clerk}`)
+      .then((res) => { if (res.data) cachedSettingsRef.current = res.data; })
+      .catch((err) => console.warn("Failed to pre-fetch settings:", err));
+  }, [userInitials, activeShift]);
   const [currentParty, setCurrentParty] = useState("1");
 
   const computeSplitBillTotals = (itemsInSubBill, sgstPct, cgstPct) => {
@@ -133,17 +142,10 @@ export default function Billing({
   const [searchQuery, setSearchQuery] = useState("");
   const [menuItems, setMenuItems] = useState([]);
 
-  const maxSplitCategoryFromMenu = useMemo(() => {
-    return Math.max(3, ...menuItems.map((item) => parseInt(item.split_category, 10) || 0));
-  }, [menuItems]);
-
+  // Exactly 3 split types/modes exist: 0 (Off), 4 (4 Splits -> 5 Bills), 5 (5 Splits -> 6 Bills).
   const dropdownOptions = useMemo(() => {
-    const options = [];
-    for (let i = 0; i <= maxSplitCategoryFromMenu; i++) {
-      options.push(i);
-    }
-    return options;
-  }, [maxSplitCategoryFromMenu]);
+    return [0, 4, 5];
+  }, []);
 
   const [filteredItems, setFilteredItems] = useState([]);
   const [selectedHelpIndex, setSelectedHelpIndex] = useState(0);
@@ -923,7 +925,7 @@ export default function Billing({
                   bills: null,
                   items: catItems,
                   items_json: catItems,
-                  titleSuffix: `(Split ${c})`,
+                  titleSuffix: `(Bill ${c})`,
                   subtotal: totals.subtotal,
                   grand_total: totals.grand_total,
                   sgst: totals.sgst,
@@ -972,18 +974,14 @@ export default function Billing({
           }
 
           try {
-            // Always fetch fresh settings from API to reflect updates instantly
-            const clerk = userInitials || activeShift?.clerk_initials || "CLK";
-            const settingsRes = await api.get(`/settings?clerk=${clerk}`);
-            const settings = settingsRes.data;
-
+            const settings = cachedSettingsRef.current || {};
             if (printPayload.split && printPayload.bills) {
-              // Print each split bill as a separate print request in a loop
-              // This guarantees that the printer's feed lines are run after each bill
-              for (const b of printPayload.bills) {
-                const rawText = generateAsciiReceipt(b, settings);
-                await api.post(`/printer/print`, { text: rawText });
-              }
+              await Promise.all(
+                printPayload.bills.map((b) => {
+                  const rawText = generateAsciiReceipt(b, settings);
+                  return api.post(`/printer/print`, { text: rawText });
+                })
+              );
             } else {
               const rawText = generateAsciiReceipt(printPayload, settings);
               await api.post(`/printer/print`, { text: rawText });
@@ -1072,8 +1070,22 @@ export default function Billing({
       try {
         const activeCode = String(rawCode);
         const cleanCode = activeCode.trim();
-        const res = await api.get(`/menu/lookup/${encodeURIComponent(cleanCode)}`);
-        const item = res.data;
+        const cleanCodeLower = cleanCode.toLowerCase();
+
+        let item = menuItems.find(
+          (i) =>
+            String(safeGet(i, "numeric_code", "")).trim().toLowerCase() === cleanCodeLower ||
+            String(safeGet(i, "alpha_code", "")).trim().toLowerCase() === cleanCodeLower
+        );
+
+        if (!item) {
+          try {
+            const res = await api.get(`/menu/lookup/${encodeURIComponent(cleanCode)}`);
+            item = res.data;
+          } catch (err) {
+            item = null;
+          }
+        }
 
         if (!item) {
           toast.error("Item not found");
@@ -1293,7 +1305,7 @@ export default function Billing({
                 bills: null,
                 items: catItems,
                 items_json: catItems,
-                titleSuffix: `(Split ${c})`,
+                titleSuffix: `(Bill ${c})`,
                 subtotal: totals.subtotal,
                 grand_total: totals.grand_total,
                 sgst: totals.sgst,
@@ -1342,18 +1354,14 @@ export default function Billing({
         }
 
         try {
-          // Always fetch fresh settings from API to reflect updates instantly
-          const clerk = userInitials || activeShift?.clerk_initials || "CLK";
-          const settingsRes = await api.get(`/settings?clerk=${clerk}`);
-          const settings = settingsRes.data;
-
+          const settings = cachedSettingsRef.current || {};
           if (printPayload.split && printPayload.bills) {
-            // Print each split bill as a separate print request in a loop
-            // This guarantees that the printer's feed lines are run after each bill
-            for (const b of printPayload.bills) {
-              const rawText = generateAsciiReceipt(b, settings);
-              await api.post(`/printer/print`, { text: rawText });
-            }
+            await Promise.all(
+              printPayload.bills.map((b) => {
+                const rawText = generateAsciiReceipt(b, settings);
+                return api.post(`/printer/print`, { text: rawText });
+              })
+            );
           } else {
             const rawText = generateAsciiReceipt(printPayload, settings);
             await api.post(`/printer/print`, { text: rawText });
@@ -1657,9 +1665,13 @@ export default function Billing({
       } else if (matchesShortcut(event, shortcuts.toggleSplit)) {
         event.preventDefault();
         setSplitBillUpto((prev) => {
-          const nextIndex = (prev + 1) % (maxSplitCategoryFromMenu + 1);
-          toast.success(`SPLIT BILL CATEGORY SET TO: ${nextIndex === 0 ? "Off" : nextIndex}`);
-          return nextIndex;
+          // Cycle through only the allowed split values: 0, 4, 5
+          const allowedValues = dropdownOptions;
+          const currentIdx = allowedValues.indexOf(prev);
+          const nextIdx = (currentIdx + 1) % allowedValues.length;
+          const nextVal = allowedValues[nextIdx];
+          toast.success(`SPLIT BILL CATEGORY SET TO: ${nextVal === 0 ? "Off" : nextVal}`);
+          return nextVal;
         });
       }
     };
@@ -1668,7 +1680,7 @@ export default function Billing({
     return () => {
       window.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [handlePrintBill, helpTab, showF4Popup, setCurrentTable, setCurrentParty, setSplitBillUpto, maxSplitCategoryFromMenu, tableNoRef, itemCodeRef]);
+  }, [handlePrintBill, helpTab, showF4Popup, setCurrentTable, setCurrentParty, setSplitBillUpto, dropdownOptions, tableNoRef, itemCodeRef]);
 
   const tempBillNumber = useMemo(() => {
     const existingBillNum = safeGet(currentDraft, "header.bill_number");
@@ -1829,7 +1841,7 @@ export default function Billing({
                 </div>
               </div>
               <div className="flex flex-col items-end justify-center gap-1 flex-none bg-zinc-900/40 border border-zinc-800/80 rounded-lg px-3 py-1 mb-0.5">
-                <span className="text-[10px] font-black text-zinc-500 tracking-wider">DATE: {billingDate}</span>
+                <span className="text-[10px] font-black text-zinc-500 tracking-wider">DATE: {formatDateToDDMMYYYY(billingDate) || billingDate}</span>
                 <div className="flex items-center gap-2 select-none">
                   <span className="text-xs font-black text-zinc-300">SPLIT BILL</span>
                   <select
@@ -1856,7 +1868,7 @@ export default function Billing({
                   >
                     {dropdownOptions.map((opt) => (
                       <option key={opt} value={opt} style={{ color: "black" }}>
-                        {opt === 0 ? "Off (0)" : `Upto ${opt}`}
+                        {opt === 0 ? "Off (0)" : opt === 4 ? "Split 4 (5 Bills)" : "Split 5 (6 Bills)"}
                       </option>
                     ))}
                   </select>
@@ -1967,27 +1979,32 @@ export default function Billing({
                         <span className="mr-3 text-lg font-bold text-black tracking-wide">
                           {safeGet(l, "name", "Unknown Item")}
                         </span>
-                        {splitBillUpto > 0 && (
-                          <select
-                            value={l.split_category || 0}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10) || 0;
-                              updateLineSplitCategory(idx, val);
-                            }}
-                            className={`ml-2 px-1.5 py-0.5 text-xs font-bold rounded shadow-sm border transition-all cursor-pointer ${
-                              (l.split_category || 0) > 0
-                                ? "bg-green-100 text-green-700 border-green-500 font-bold"
-                                : "bg-gray-800 text-zinc-400 border-zinc-700 hover:bg-gray-700 font-normal"
-                            }`}
-                            style={{ outline: "none" }}
-                          >
-                            {dropdownOptions.map((opt) => (
-                              <option key={opt} value={opt} style={{ color: "black", background: "white" }}>
-                                {opt === 0 ? "Main" : `Split ${opt}`}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                        {splitBillUpto > 0 && (() => {
+                          const cat = l.split_category || 0;
+                          const isSplitActive = cat > 0 && cat <= splitBillUpto;
+                          const effectiveCat = isSplitActive ? cat : 0;
+                          return (
+                            <select
+                              value={effectiveCat}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10) || 0;
+                                updateLineSplitCategory(idx, val);
+                              }}
+                              className={`ml-2 px-1.5 py-0.5 text-xs font-bold rounded shadow-sm border transition-all cursor-pointer ${
+                                isSplitActive
+                                  ? "bg-green-100 text-green-700 border-green-500 font-bold"
+                                  : "bg-gray-800 text-zinc-400 border-zinc-700 hover:bg-gray-700 font-normal"
+                              }`}
+                              style={{ outline: "none" }}
+                            >
+                              {Array.from({ length: splitBillUpto + 1 }, (_, opt) => (
+                                <option key={opt} value={opt} style={{ color: "black", background: "white" }}>
+                                  {opt === 0 ? "Main" : `Bill ${opt}`}
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        })()}
                         <div className="flex space-x-1.5 ml-4">
                           <Button
                             ref={(el) => (itemMoveRefs.current[idx] = el)}

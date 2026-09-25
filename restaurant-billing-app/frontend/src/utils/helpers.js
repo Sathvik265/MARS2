@@ -37,6 +37,10 @@ export const safeObject = (obj, defaultValue = {}) => {
 // Date formatter helper: DD/MM/YYYY
 export const formatDateToDDMMYYYY = (dateInput) => {
   if (!dateInput) return "";
+  if (typeof dateInput === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateInput.trim())) {
+    const [yyyy, mm, dd] = dateInput.trim().split("-");
+    return `${dd}/${mm}/${yyyy}`;
+  }
   const d = new Date(dateInput);
   if (isNaN(d.getTime())) return "";
   const day = String(d.getDate()).padStart(2, "0");

@@ -6,7 +6,6 @@ import {
   CardTitle,
   CardContent,
   Loader2,
-  Button,
 } from "../ui/UIComponents";
 
 import { API as HELPER_API } from "../../utils/helpers";
@@ -75,7 +74,7 @@ function ItemRow({ item, onChangeCategory, maxCategory, saving }) {
       >
         {Array.from({ length: maxCategory + 1 }, (_, i) => (
           <option key={i} value={i}>
-            {i === 0 ? "None" : `Split ${i}`}
+            {i === 0 ? "Main" : `Bill ${i}`}
           </option>
         ))}
       </select>
@@ -94,7 +93,7 @@ export default function SplitBillSettings() {
   const [toast, setToast] = useState(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const [focusedPill, setFocusedPill] = useState(null);
-  const [maxCategory, setMaxCategory] = useState(3);
+  const maxCategory = 5;
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -109,10 +108,6 @@ export default function SplitBillSettings() {
       const res = await axios.get(`${API}/items`);
       const menu = res.data || [];
       setItems(menu.sort((a, b) => a.name.localeCompare(b.name)));
-      
-      // Determine initial max category from existing items
-      const currentMax = Math.max(3, ...menu.map(i => parseInt(i.split_category, 10) || 0));
-      setMaxCategory(currentMax);
     } catch {
       setError("Failed to load items");
     } finally {
@@ -133,7 +128,7 @@ export default function SplitBillSettings() {
       await axios.patch(`${API}/items/${item.id}/split-category`, { split_category: newCategory });
       setToast({
         type: "success",
-        msg: `${item.name} → ${newCategory > 0 ? `Split ${newCategory} ✓` : "Regular Bill"}`,
+        msg: `${item.name} → ${newCategory > 0 ? `Bill ${newCategory} ✓` : "Main Bill"}`,
       });
     } catch {
       // Revert
@@ -232,12 +227,6 @@ export default function SplitBillSettings() {
           </div>
         ))}
         <div style={{ flex: 1 }} />
-        <Button
-          onClick={() => setMaxCategory(prev => prev + 1)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-lg text-sm shadow-sm transition-all focus:ring-2 focus:ring-indigo-500"
-        >
-          + Add Split Category
-        </Button>
       </div>
 
       {/* ── Two-panel layout ── */}
@@ -344,7 +333,7 @@ export default function SplitBillSettings() {
                   return (
                     <div key={cat}>
                       <h4 style={{ fontSize: "0.85rem", fontWeight: 700, color: "#4f46e5", marginBottom: "0.35rem", borderBottom: "1px solid #e0e7ff", paddingBottom: "0.15rem" }}>
-                        Split Bill {cat} ({catItems.length})
+                        Bill {cat} ({catItems.length})
                       </h4>
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                         {catItems.map(item => (

@@ -7,134 +7,193 @@ const { execFile, exec } = require("child_process");
 const { randomUUID } = require("crypto");
 const os = require("os");
 
-// PRINTER_NAME       — the display name of the printer (for detection/status check)
-// PRINTER_SHARE_NAME — the Windows share name used in copy /b (for printing on Windows)
-//                      If not set, falls back to PRINTER_NAME.
-// PRINTER_FEED_LINES — number of blank lines appended after the receipt for easy tear-off
-//                      Default: 4. Increase for more feed, decrease to reduce paper waste.
-const PRINTER_NAME = process.env.PRINTER_NAME || "Generic  Text Only";
-const PRINTER_SHARE_NAME = process.env.PRINTER_SHARE_NAME || PRINTER_NAME;
+const ENV_PRINTER_NAME = process.env.PRINTER_NAME || "";
 const PRINTER_FEED_LINES = Math.max(0, parseInt(process.env.PRINTER_FEED_LINES || "4", 10));
 
 const MAX_PRINT_SIZE = 10 * 1024 * 1024; // 10MB limit
-const EXEC_TIMEOUT = 25000; // 25 second timeout
+const EXEC_TIMEOUT = 25000; // 25 second timeout for print execution
+const STATUS_TIMEOUT = 15000; // 15 second timeout for status checks
 const TEMP_DIR = os.tmpdir();
 const IS_WINDOWS = process.platform === "win32";
 
-// Set DISABLE_PRINTER_CHECK=true in .env to bypass printer detection during testing
 const DISABLE_PRINTER_CHECK = process.env.DISABLE_PRINTER_CHECK === "true";
 
+// Normalize printer names for whitespace/hyphen/underscore/case-insensitive matching
+function normalizePrinterName(name) {
+  if (!name) return "";
+  return name.toLowerCase().replace(/[\s\-_]+/g, "").trim();
+}
+
+function getEffectivePrinterName() {
+  return process.env.PRINTER_NAME !== undefined ? process.env.PRINTER_NAME : ENV_PRINTER_NAME;
+}
+
+// In-memory print job status tracking
+const printJobMap = new Map();
+
+function updateJobStatus(jobId, status, error = null) {
+  if (!jobId) return;
+  printJobMap.set(jobId, {
+    jobId,
+    status,
+    error,
+    timestamp: Date.now()
+  });
+  if (printJobMap.size > 200) {
+    const oldestKey = printJobMap.keys().next().value;
+    printJobMap.delete(oldestKey);
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Helper: resolve printer status on Windows using Get-Printer → CIM → WMI
+// Helper: resolve printer status on Windows / macOS
 // ---------------------------------------------------------------------------
 async function resolvePrinter() {
+  const configuredName = getEffectivePrinterName();
+  const configuredNorm = normalizePrinterName(configuredName);
+
   if (DISABLE_PRINTER_CHECK) {
-    return { name: PRINTER_NAME, online: true };
+    return { name: configuredName || "Default Printer", online: true, bypassed: true };
   }
+
   return new Promise((resolve, reject) => {
     if (IS_WINDOWS) {
       const psCommand = `
-        $target = '${PRINTER_NAME}';
-        $printers = Get-Printer -ErrorAction SilentlyContinue
+        $targetNorm = '${configuredNorm.replace(/'/g, "''")}';
+        $printers = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, ShareName, PortName, @{Name="WorkOffline"; Expression={$_.PrinterStatus -eq 7 -or $_.WorkOffline}}, Default
         if (-not $printers) {
-            $printers = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, @{Name="WorkOffline"; Expression={$_.PrinterStatus -eq 7 -or $_.WorkOffline}}
-        }
-        if (-not $printers) {
-            $printers = Get-WmiObject Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, @{Name="WorkOffline"; Expression={$_.PrinterStatus -eq 7 -or $_.WorkOffline}}
+            $printers = Get-WmiObject Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, ShareName, PortName, @{Name="WorkOffline"; Expression={$_.PrinterStatus -eq 7 -or $_.WorkOffline}}, Default
         }
         if (-not $printers) {
             Write-Output "NO_PRINTERS_FOUND";
             exit 1;
         }
 
-        $defaultPrinterName = (Get-CimInstance Win32_Printer | Where-Object { $_.Default }).Name
-        if (-not $defaultPrinterName) {
-            $defaultPrinterName = (Get-WmiObject Win32_Printer | Where-Object { $_.Default }).Name
-        }
-        if (-not $defaultPrinterName) {
-            $defaultPrinterName = Get-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows" -Name "Device" -ErrorAction SilentlyContinue | ForEach-Object { $_.Device.Split(',')[0] }
+        $printerList = @()
+        foreach ($p in $printers) {
+            $isOffline = ($p.WorkOffline -eq $true -or $p.WorkOffline -eq 1 -or $p.WorkOffline -eq "True")
+            $pNorm = $p.Name.ToLower() -replace '[\s\-_]+', ''
+            $sNorm = if ($p.ShareName) { $p.ShareName.ToLower() -replace '[\s\-_]+', '' } else { '' }
+            $printerList += [PSCustomObject]@{
+                Name = $p.Name
+                ShareName = if ($p.ShareName) { $p.ShareName } else { '' }
+                NormName = $pNorm
+                NormShare = $sNorm
+                Default = [bool]$p.Default
+                Online = -not $isOffline
+            }
         }
 
-        $p = $printers | Where-Object { $_.Name -like "*$target*" -or $_.Name.Replace(' ', '') -like "*$($target.Replace(' ', ''))*" }
-        if (-not $p -and $defaultPrinterName) {
-            $p = $printers | Where-Object { $_.Name -eq $defaultPrinterName }
+        $installedNames = ($printerList | Select-Object -ExpandProperty Name) -join ", "
+        $matched = $null
+
+        if ($targetNorm -ne "") {
+            $matched = $printerList | Where-Object { $_.NormName.Contains($targetNorm) -or $targetNorm.Contains($_.NormName) -or ($_.NormShare -ne '' -and ($_.NormShare.Contains($targetNorm) -or $targetNorm.Contains($_.NormShare))) } | Select-Object -First 1
         }
-        if (-not $p) {
-            $names = ($printers | Select-Object -ExpandProperty Name) -join ", "
-            Write-Output "NOT_FOUND:Installed printers: [$names]";
-            exit 1;
+
+        if (-not $matched) {
+            $matched = $printerList | Where-Object { $_.Default } | Select-Object -First 1
         }
-        $matched = $p | Select-Object -First 1
-        $name = $matched.Name;
-        $offline = $matched.WorkOffline;
-        if ($offline -eq $true -or $offline -eq 1 -or $offline -eq "True") {
-           Write-Output "OFFLINE:$name";
-           exit 2;
+        if (-not $matched) {
+            $matched = $printerList | Select-Object -First 1
+        }
+
+        if (-not $matched) {
+            Write-Output "NOT_FOUND:Installed printers: [$installedNames]"
+            exit 1
+        }
+
+        if (-not $matched.Online) {
+            Write-Output "OFFLINE:$($matched.Name)|$($matched.ShareName)|Installed printers: [$installedNames]"
+            exit 2
         } else {
-           Write-Output "ONLINE:$name";
-           exit 0;
+            Write-Output "ONLINE:$($matched.Name)|$($matched.ShareName)"
+            exit 0
         }
       `;
-      execFile("powershell.exe", ["-Command", psCommand], { timeout: 5000 }, (error, stdout) => {
-        if (error) {
-          if (error.code === 2 || (stdout && stdout.startsWith("OFFLINE:"))) {
-            const name = stdout ? stdout.replace("OFFLINE:", "").trim() : PRINTER_NAME;
-            reject(new Error(`Printer '${name}' is offline`));
+
+      execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", psCommand], { timeout: STATUS_TIMEOUT }, (error, stdout, stderr) => {
+        const outStr = stdout ? stdout.trim() : "";
+        if (error || !outStr.startsWith("ONLINE:")) {
+          if (outStr.startsWith("OFFLINE:")) {
+            const parts = outStr.replace("OFFLINE:", "").split("|");
+            const offlineName = parts[0].trim();
+            const listStr = parts[2] || "";
+            const err = new Error(`Printer '${offlineName}' is offline. ${listStr}`);
+            err.printer = offlineName;
+            reject(err);
+          } else if (outStr.startsWith("NOT_FOUND:")) {
+            const details = outStr.replace("NOT_FOUND:", "").trim();
+            const err = new Error(`Configured printer '${configuredName || "Default"}' not found. ${details}`);
+            reject(err);
+          } else if (outStr === "NO_PRINTERS_FOUND") {
+            reject(new Error("No printers are installed on this Windows system."));
           } else {
-            reject(new Error(`Printer '${PRINTER_NAME}' not found and no default printer configured`));
+            const detailMsg = outStr || stderr || (error ? error.message : "Printer status check failed");
+            reject(new Error(`Unable to check printer status: ${detailMsg}`));
           }
-        } else if (stdout && stdout.startsWith("ONLINE:")) {
-          const name = stdout.replace("ONLINE:", "").trim();
-          resolve({ name, online: true });
         } else {
-          reject(new Error("Unable to check printer status"));
+          const payload = outStr.replace("ONLINE:", "").trim();
+          const parts = payload.split("|");
+          const resolvedName = parts[0].trim();
+          const resolvedShareName = (parts[1] || "").trim();
+          resolve({ name: resolvedName, shareName: resolvedShareName, online: true });
         }
       });
     } else {
-      // macOS: Use system_profiler to check real hardware status
-      execFile("system_profiler", ["SPPrintersDataType"], { timeout: 5000 }, (error, stdout) => {
-        if (error || !stdout) {
-          reject(new Error("Unable to check printer status"));
-          return;
+      // macOS printer resolution
+      execFile("lpstat", ["-d"], { timeout: STATUS_TIMEOUT }, (lpErr, lpStdout) => {
+        let defaultQueue = null;
+        if (!lpErr && lpStdout) {
+          const m = lpStdout.match(/system default destination:\s*(.+)/i);
+          if (m) defaultQueue = m[1].trim();
         }
 
-        const lines = stdout.split("\n");
-        let currentPrinter = null;
-        let isOffline = false;
-        let printerFound = false;
-        let matchedName = PRINTER_NAME;
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line.endsWith(":")) {
-            currentPrinter = line.slice(0, -1).trim();
+        execFile("system_profiler", ["SPPrintersDataType"], { timeout: STATUS_TIMEOUT }, (error, stdout) => {
+          if (error || !stdout) {
+            reject(new Error("Unable to check printer status on macOS"));
+            return;
           }
 
-          if (currentPrinter) {
-            const matchesTarget = PRINTER_NAME === "Generic  Text Only"
-              ? true
-              : currentPrinter.toLowerCase().replace(/[-_]/g, " ").includes(PRINTER_NAME.toLowerCase().replace(/[-_]/g, " "));
+          const lines = stdout.split("\n");
+          let currentPrinter = null;
+          let isOffline = false;
+          let installedPrinters = [];
+          let matchedName = null;
 
-            if (matchesTarget) {
-              printerFound = true;
-              matchedName = currentPrinter;
-              if (line.startsWith("Status:")) {
-                const statusVal = line.replace("Status:", "").trim().toLowerCase();
-                if (statusVal.includes("offline")) {
-                  isOffline = true;
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line.endsWith(":")) {
+              currentPrinter = line.slice(0, -1).trim();
+              if (currentPrinter && !installedPrinters.includes(currentPrinter)) {
+                installedPrinters.push(currentPrinter);
+              }
+            }
+
+            if (currentPrinter && configuredNorm) {
+              const currentNorm = normalizePrinterName(currentPrinter);
+              if (currentNorm.includes(configuredNorm) || configuredNorm.includes(currentNorm)) {
+                matchedName = currentPrinter;
+                if (line.startsWith("Status:")) {
+                  const statusVal = line.replace("Status:", "").trim().toLowerCase();
+                  if (statusVal.includes("offline")) isOffline = true;
                 }
               }
             }
           }
-        }
 
-        if (isOffline) {
-          reject(new Error(`Printer '${matchedName}' is offline`));
-        } else if (!printerFound && PRINTER_NAME !== "Generic  Text Only") {
-          reject(new Error(`Printer '${PRINTER_NAME}' not found`));
-        } else {
-          resolve({ name: matchedName, online: true });
-        }
+          if (!matchedName) {
+            matchedName = defaultQueue || installedPrinters[0] || configuredName || "Default Printer";
+          }
+
+          if (isOffline) {
+            const err = new Error(`Printer '${matchedName}' is offline. Installed: [${installedPrinters.join(", ")}]`);
+            err.printer = matchedName;
+            reject(err);
+          } else {
+            resolve({ name: matchedName, online: true });
+          }
+        });
       });
     }
   });
@@ -157,13 +216,90 @@ router.get("/status", async (req, res) => {
     const printerInfo = await resolvePrinter();
     return res.json({ connected: true, printer: printerInfo.name });
   } catch (err) {
-    return res.json({ connected: false, reason: err.message, printer: PRINTER_NAME });
+    return res.json({ connected: false, reason: err.message, printer: err.printer || getEffectivePrinterName() || "Default Printer" });
   }
 });
 
 // ---------------------------------------------------------------------------
+// GET /printer/list — Enumerate installed printers for admin configuration
+// ---------------------------------------------------------------------------
+router.get("/list", async (req, res) => {
+  if (!IS_WINDOWS) {
+    return res.json({ printers: [{ name: "System Default Printer", isDefault: true, isOnline: true }] });
+  }
+
+  const psListCommand = `
+    $printers = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, ShareName, Default, PrinterStatus, WorkOffline
+    if (-not $printers) {
+        $printers = Get-WmiObject Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, ShareName, Default, PrinterStatus, WorkOffline
+    }
+    $res = @()
+    foreach ($p in $printers) {
+        $isOffline = ($p.WorkOffline -eq $true -or $p.WorkOffline -eq 1 -or $p.WorkOffline -eq "True" -or $p.PrinterStatus -eq 7)
+        $res += [PSCustomObject]@{
+            name = $p.Name
+            isDefault = [bool]$p.Default
+            isOnline = -not $isOffline
+        }
+    }
+    $res | ConvertTo-Json -Compress
+  `;
+
+  execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", psListCommand], { timeout: STATUS_TIMEOUT }, (error, stdout) => {
+    if (error || !stdout) {
+      return res.json({ printers: [] });
+    }
+    try {
+      const parsed = JSON.parse(stdout.trim());
+      const printersList = Array.isArray(parsed) ? parsed : [parsed];
+      return res.json({ printers: printersList });
+    } catch (_) {
+      return res.json({ printers: [] });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /printer/config — Persist PRINTER_NAME setting to .env
+// ---------------------------------------------------------------------------
+router.post("/config", async (req, res) => {
+  const { printerName } = req.body;
+  const newName = typeof printerName === "string" ? printerName.trim() : "";
+
+  process.env.PRINTER_NAME = newName;
+
+  try {
+    const envFilePath = path.join(__dirname, "..", "..", ".env");
+    if (fsSyncCheck.existsSync(envFilePath)) {
+      let content = await fs.readFile(envFilePath, "utf8");
+      if (/^PRINTER_NAME=/m.test(content)) {
+        content = content.replace(/^PRINTER_NAME=.*/m, `PRINTER_NAME=${newName}`);
+      } else {
+        content += `\r\nPRINTER_NAME=${newName}\r\n`;
+      }
+      await fs.writeFile(envFilePath, content, "utf8");
+    }
+    return res.json({ message: "Printer configuration updated successfully", printerName: newName });
+  } catch (err) {
+    console.error("Failed to save .env printer config:", err);
+    return res.status(500).json({ error: "Failed to persist printer configuration", detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /printer/print/:jobId — Check status of a specific print job
+// ---------------------------------------------------------------------------
+router.get("/print/:jobId", (req, res) => {
+  const { jobId } = req.params;
+  const job = printJobMap.get(jobId);
+  if (!job) {
+    return res.status(404).json({ error: "Print job not found", jobId });
+  }
+  return res.json(job);
+});
+
+// ---------------------------------------------------------------------------
 // Serial Print Queue — prevents buffer corruption from overlapping print jobs
-// and allows instant API response (fire-and-forget)
 // ---------------------------------------------------------------------------
 const printQueue = [];
 let printQueueRunning = false;
@@ -181,14 +317,13 @@ async function processPrintQueue() {
       // Retry once on transient failure
       try {
         console.log(`[PrintQueue] Retrying job ${job.jobId}...`);
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 400));
         await executePrintJob(job.printBuf, job.jobId);
         console.log(`[PrintQueue] Retry succeeded for job ${job.jobId}`);
       } catch (retryErr) {
         console.error(`[PrintQueue] Retry also failed for job ${job.jobId}:`, retryErr.message);
       }
     }
-    // Small inter-job delay to let the printer buffer flush
     if (printQueue.length > 0) {
       await new Promise(r => setTimeout(r, 150));
     }
@@ -197,8 +332,18 @@ async function processPrintQueue() {
   printQueueRunning = false;
 }
 
+// ---------------------------------------------------------------------------
+// executePrintJob — sends raw binary buffer to printer via copy /b (Windows)
+//                   or lp (macOS). This is the PROVEN approach from b5bcf98
+//                   that correctly sends ESC/P2 raw bytes without corruption.
+//
+// IMPORTANT: Do NOT use System.Printing, Out-Printer, or any PowerShell
+// print API here — they add document formatting overhead that dot-matrix
+// printers interpret as garbage characters.
+// ---------------------------------------------------------------------------
 async function executePrintJob(printBuf, jobId) {
   const tempFilePath = path.join(TEMP_DIR, `receipt_${jobId}.txt`);
+  updateJobStatus(jobId, "printing");
 
   const cleanup = async () => {
     try {
@@ -209,23 +354,63 @@ async function executePrintJob(printBuf, jobId) {
   try {
     await fs.writeFile(tempFilePath, printBuf);
 
-    const shareName = PRINTER_SHARE_NAME;
-    const cmdCommand = `copy /b "${tempFilePath}" "\\\\localhost\\${shareName}"`;
+    if (IS_WINDOWS) {
+      // Resolve the actual printer to get its share name
+      let shareName = "";
+      try {
+        const resolved = await resolvePrinter();
+        // Use share name if available, otherwise fall back to printer name
+        shareName = resolved.shareName || resolved.name;
+      } catch (resolveErr) {
+        // Fall back to configured name
+        shareName = getEffectivePrinterName() || "Generic  Text Only";
+        console.warn(`[PrintQueue] Printer resolution failed, falling back to '${shareName}': ${resolveErr.message}`);
+      }
 
-    await new Promise((resolve, reject) => {
-      exec(cmdCommand, { timeout: EXEC_TIMEOUT }, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`[PrintQueue] Windows copy /b failed for job ${jobId}:`, error.message, stderr);
-          reject(error);
-        } else {
-          resolve();
-        }
+      // copy /b sends the raw binary buffer to the printer without any
+      // encoding or document-format transformation — exactly what ESC/P2
+      // dot-matrix printers need.
+      const cmdCommand = `copy /b "${tempFilePath}" "\\\\localhost\\${shareName}"`;
+      console.log(`[PrintQueue] Sending job ${jobId} to \\\\localhost\\${shareName} via copy /b`);
+
+      await new Promise((resolve, reject) => {
+        exec(cmdCommand, { timeout: EXEC_TIMEOUT }, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`[PrintQueue] Windows copy /b failed for job ${jobId}:`, error.message, stderr);
+            reject(error);
+          } else {
+            console.log(`[PrintQueue] Job ${jobId} sent successfully to ${shareName}`);
+            resolve();
+          }
+        });
       });
-    });
+    } else {
+      // macOS — use lp command
+      let resolvedPrinterName = "";
+      try {
+        const resolved = await resolvePrinter();
+        resolvedPrinterName = resolved.name;
+      } catch (_) {
+        resolvedPrinterName = getEffectivePrinterName() || "";
+      }
+
+      const PRINTER_MEDIA_SIZE = process.env.PRINTER_MEDIA_SIZE || "Custom.8.5x4in";
+      const args = (!resolvedPrinterName || resolvedPrinterName === "Generic  Text Only")
+        ? ["-o", `media=${PRINTER_MEDIA_SIZE}`, tempFilePath]
+        : ["-d", resolvedPrinterName, "-o", `media=${PRINTER_MEDIA_SIZE}`, tempFilePath];
+
+      await new Promise((resolve, reject) => {
+        execFile("lp", args, { timeout: EXEC_TIMEOUT }, (error) => {
+          if (error) reject(error); else resolve();
+        });
+      });
+    }
 
     await cleanup();
+    updateJobStatus(jobId, "success");
   } catch (err) {
     await cleanup();
+    updateJobStatus(jobId, "failed", err.message);
     throw err;
   }
 }
@@ -243,50 +428,18 @@ router.post("/print", async (req, res) => {
     return res.status(413).json({ error: "Print content exceeds maximum size limit" });
   }
 
-  if (DISABLE_PRINTER_CHECK) {
-    console.log("[Printer] Bypass physical printing (DISABLE_PRINTER_CHECK=true)");
-    return res.json({ message: "Print job bypassed successfully (DISABLE_PRINTER_CHECK=true)" });
-  }
-
   try {
-    // ── macOS / Linux ───────────────────────────────────────────────────────
-    if (!IS_WINDOWS) {
-      const tempFilePath = path.join(TEMP_DIR, `receipt_${randomUUID()}.txt`);
-      const cleanup = async () => {
-        try {
-          if (fsSyncCheck.existsSync(tempFilePath)) await fs.unlink(tempFilePath);
-        } catch (_) { /* ignore */ }
-      };
-
-      await fs.writeFile(tempFilePath, text, "utf8");
-      const PRINTER_MEDIA_SIZE = process.env.PRINTER_MEDIA_SIZE || "Custom.8.5x4in";
-      const args = PRINTER_NAME === "Generic  Text Only"
-        ? ["-o", `media=${PRINTER_MEDIA_SIZE}`, tempFilePath]
-        : ["-d", PRINTER_NAME, "-o", `media=${PRINTER_MEDIA_SIZE}`, tempFilePath];
-
-      await new Promise((resolve, reject) => {
-        execFile("lp", args, { timeout: EXEC_TIMEOUT }, (error) => {
-          if (error) reject(error); else resolve();
-        });
-      });
-      await cleanup();
-      return res.json({ message: "Print job sent successfully on macOS" });
-    }
-
-    // ── Windows ─────────────────────────────────────────────────────────────
-    //
-    // ESC/P2 initialization — matched to old system for speed and consistency:
+    // ESC/P2 initialization — EXACT MATCH to commit b5bcf98:
     //
     //   CR         (0D)         — Flush any partial line from previous job
     //   ESC x 0    (1B 78 00)   — Select DRAFT quality (~300 CPS, fast mode)
-    //   ESC M      (1B 4D)      — Select 12 CPI (Elite pitch — matches old system)
+    //   ESC M      (1B 4D)      — Select 12 CPI (Elite pitch)
     //   ESC 2      (1B 32)      — Set 1/6-inch line spacing (standard)
     //   ESC l 0    (1B 6C 00)   — Left margin = 0 columns
     //
     // NOTE: We do NOT send ESC @ (reset) at the start! ESC @ resets the
     // printer to its DIP-switch defaults, which may be NLQ mode (~60 CPS)
-    // making printing ~5x slower. Instead we explicitly set every mode we
-    // need. ESC @ is sent only at the END as cleanup for the next job.
+    // making printing ~5x slower. ESC @ is sent only at the END as cleanup.
     //
     const ESC = 0x1B;
     const escPrefix = Buffer.from([
@@ -301,17 +454,17 @@ router.post("/print", async (req, res) => {
 
     // Append feed lines for tear-off, then ESC @ to reset printer state
     // for the next job (prevents state drift / congestion on rapid prints)
-    const feedBuf = Buffer.from("\r\n".repeat(PRINTER_FEED_LINES), "utf8");
+    const feedLines = Math.max(0, parseInt(process.env.PRINTER_FEED_LINES || "4", 10));
+    const feedBuf = Buffer.from("\r\n".repeat(feedLines), "utf8");
     const escCleanup = Buffer.from([ESC, 0x40]); // ESC @ — Reset at END only
 
     const printBuf = Buffer.concat([escPrefix, textBuf, feedBuf, escCleanup]);
 
-    // Queue the job and return immediately (fire-and-forget)
     const jobId = randomUUID();
+    updateJobStatus(jobId, "queued");
     printQueue.push({ printBuf, jobId });
     console.log(`[PrintQueue] Job ${jobId} queued (queue depth: ${printQueue.length})`);
 
-    // Kick off queue processing (non-blocking)
     processPrintQueue().catch(err => {
       console.error("[PrintQueue] Queue processing error:", err.message);
     });

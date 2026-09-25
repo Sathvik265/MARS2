@@ -8,6 +8,7 @@ import {
   Input,
   Button,
   Label,
+  DDMMYYYYInput,
 } from "./ui/UIComponents";
 import { API, toast, safeGet, safeArray } from "../utils/helpers";
 
@@ -72,12 +73,13 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
       return;
     }
 
-    // Check by shift_name only — session_date in DB is the original creation
-    // date, not today's date, so date comparison would always fail.
-    const matchingSessions = sessions.filter((s) => s.shift_name === track);
+    // Filter sessions matching shift_name AND today's date (session_date)
+    const matchingSessions = sessions.filter(
+      (s) => s.shift_name === track && (s.session_date === date || (s.session_date && String(s.session_date).startsWith(date)))
+    );
 
     if (matchingSessions.length === 0) {
-      // No session exists for this shift yet — allow login (backend will create one)
+      // No session exists for this shift today — allow login (backend will create one)
       setIsShiftClosed(false);
       return;
     }
@@ -89,7 +91,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
       (s) => s.status && s.status.toUpperCase() === "CLOSED",
     );
 
-    // Block login only if all sessions for this shift are CLOSED (none OPEN)
+    // Block login only if today's session for this shift is CLOSED (none OPEN)
     setIsShiftClosed(hasClosed && !hasOpen);
   }, [track, date, sessions]);
 
@@ -227,15 +229,13 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
                 </div>
                 <div className="grid grid-cols-3 gap-4 items-center">
                   <Label>Date</Label>
-                  <Input
-                    type="date"
-                    className="col-span-2"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    readOnly
-                    tabIndex={-1}
-                  />
+                  <div className="col-span-2">
+                    <DDMMYYYYInput
+                      value={date}
+                      onChange={(val) => setDate(val)}
+                      readOnly={true}
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4 items-center">
                   <Label>Shift Name</Label>

@@ -1,137 +1,254 @@
-:root {
-  --card-bg: #1a1a1a;
-  --card-border: #333333;
-  --accent: #5a67f2;
-  --muted: #9ca3af;
-  --success: #20a64a;
+/* RecentBills.css — Complete Styling for Recent Bills Screen */
+
+.recent-bills-wrapper,
+.recent-bills-container {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  color: #ffffff;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-.recent-bills-wrapper {
-  padding: 18px 24px;
-  font-family: "Segoe UI", Roboto, Arial, sans-serif;
-}
-
+/* Header & Search Bar */
 .recent-bills-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #262626;
 }
 
 .recent-bills-header h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #f3f4f6;
   margin: 0;
-  font-size: 1.25rem;
-  color: #ffffff;
-}
-.search-inline {
-  min-width: 260px;
-}
-.search-input {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--card-border);
-  width: 260px;
+  letter-spacing: -0.02em;
 }
 
+.search-inline {
+  flex: 1;
+  max-width: 380px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 1rem !important;
+  font-size: 0.95rem;
+  background-color: #171717 !important;
+  color: #ffffff !important;
+  border: 1px solid #333333 !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+  outline: none !important;
+}
+
+.recent-error {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: rgba(220, 38, 38, 0.15);
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  color: #fca5a5;
+  font-size: 0.9rem;
+}
+
+/* Cards Container */
 .cards-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 1rem;
 }
 
-.bill-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
+.empty-message {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background: #121212;
+  border: 1px dashed #333333;
   border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  color: #9ca3af;
+  font-size: 1rem;
+}
+
+/* Bill Card */
+.bill-card {
+  background-color: #171717;
+  border: 1px solid #262626;
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
   outline: none;
 }
-.bill-card:focus {
-  box-shadow: 0 0 0 3px rgba(90, 103, 242, 0.12);
-}
-.bill-card.expanded {
-  border-color: var(--accent);
-  box-shadow: 0 4px 18px rgba(90, 103, 242, 0.06);
+
+.bill-card:hover {
+  background-color: #1f1f1f;
+  border-color: #404040;
 }
 
+.bill-card.focused {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  background-color: #1c2433;
+}
+
+.bill-card.expanded {
+  border-color: #3b82f6;
+  background-color: #181c24;
+}
+
+/* Card Header Content */
 .card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .card-left {
   display: flex;
   flex-direction: column;
+  gap: 0.3rem;
 }
+
 .bill-title {
+  font-size: 1.05rem;
   font-weight: 600;
-  font-size: 1rem;
+  color: #ffffff;
+  letter-spacing: -0.01em;
 }
+
 .bill-time {
-  color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: 0.82rem;
+  color: #9ca3af;
 }
+
 .card-right {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-.bill-amount {
-  color: var(--success);
-  font-weight: 700;
-}
-.expand-icon {
-  font-size: 0.875rem;
-  color: #e5e5e5;
+  gap: 1.25rem;
 }
 
-.card-body {
-  margin-top: 12px;
-  padding: 12px;
-  border-top: 1px dashed #444;
-  background: #262626;
-  border-radius: 8px;
+.bill-amount {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #10b981;
 }
+
+.expand-icon {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #262626;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.bill-card.expanded .expand-icon {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+/* Expanded Card Body & Table */
+.card-body {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #262626;
+  overflow-x: auto;
+}
+
 .items-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 0.9rem;
 }
+
 .items-table th {
-  text-align: left;
-  padding: 10px;
-  background: #333;
+  padding: 0.6rem 0.8rem;
+  background-color: #111827;
+  color: #9ca3af;
   font-weight: 600;
-  color: #d1d5db;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #374151;
 }
+
 .items-table td {
-  padding: 10px;
-  border-bottom: 1px solid #444;
-  color: #ffffff;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid #1f2937;
+  color: #e5e7eb;
 }
-.col-qty,
-.col-price,
-.col-total {
+
+.items-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.col-qty, .col-price, .col-total {
   text-align: right;
 }
+
 .total-row td {
   font-weight: 700;
-  border-top: 2px solid #555;
+  font-size: 1rem;
+  color: #ffffff;
+  border-top: 2px solid #374151;
+  border-bottom: none;
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.total-label {
+  text-align: right;
+  color: #9ca3af !important;
+}
+
+/* Loading state */
+.loading-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 250px;
+  font-size: 1.1rem;
+  color: #9ca3af;
+}
+
+.system-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
   color: #ffffff;
 }
 
-.empty-message {
-  padding: 28px;
-  color: var(--muted);
+.nav-section {
+  margin-bottom: 1.5rem;
 }
 
-.recent-error {
-  margin-left: 12px;
-  color: #b33;
-  font-weight: 600;
+.nav-tabs {
+  display: flex;
+  gap: 0.5rem;
 }
 
-.focused {
-  box-shadow: 0 0 0 3px rgba(90, 103, 242, 0.08);
+.nav-tab {
+  padding: 0.5rem 1rem;
+  background: #171717;
+  border: 1px solid #262626;
+  border-radius: 6px;
+  color: #9ca3af;
+}
+
+.nav-tab.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
 }

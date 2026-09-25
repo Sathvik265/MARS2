@@ -10,6 +10,7 @@ import {
   Button,
   Label,
   Loader2,
+  DDMMYYYYInput,
 } from "./ui/UIComponents";
 import {
   Table,
@@ -123,11 +124,10 @@ export function TimeRangeReport({ sessionId }) {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <Label>Date</Label>
-              <Input
-                type="date"
+              <DDMMYYYYInput
                 value={filters.date}
-                onChange={(e) =>
-                  setFilters({ ...filters, date: e.target.value })
+                onChange={(val) =>
+                  setFilters({ ...filters, date: val })
                 }
               />
             </div>
@@ -281,21 +281,19 @@ export function DateRangeReport({ sessionId }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Start Date</Label>
-              <Input
-                type="date"
+              <DDMMYYYYInput
                 value={filters.startDate}
-                onChange={(e) =>
-                  setFilters({ ...filters, startDate: e.target.value })
+                onChange={(val) =>
+                  setFilters({ ...filters, startDate: val })
                 }
               />
             </div>
             <div>
               <Label>End Date</Label>
-              <Input
-                type="date"
+              <DDMMYYYYInput
                 value={filters.endDate}
-                onChange={(e) =>
-                  setFilters({ ...filters, endDate: e.target.value })
+                onChange={(val) =>
+                  setFilters({ ...filters, endDate: val })
                 }
               />
             </div>
@@ -384,7 +382,7 @@ export function ShiftReport({ sessionId }) {
       setActiveReportType("list");
 
       const rawText = generateAsciiReport(
-        `Shift Bills (${filters.date.slice(5)} - ${filters.shiftName})`,
+        `Shift Bills (${formatDateToDDMMYYYY(filters.date)} - ${filters.shiftName})`,
         [
           { header: "Bill", accessor: (r) => r.bill_number, width: 6 },
           { header: "Tbl", accessor: (r) => r.table_no, width: 4 },
@@ -543,7 +541,7 @@ export function ShiftReport({ sessionId }) {
       setActiveReportType("summary");
 
       const rawText = generateAsciiReport(
-        `Shift Summary (${filters.date})`,
+        `Shift Summary (${formatDateToDDMMYYYY(filters.date)})`,
         [
           { header: "Shift Name", accessor: (r) => r.shift_name, width: 14 },
           {
@@ -661,7 +659,7 @@ export function ShiftReport({ sessionId }) {
       ];
 
       const rawText = generateAsciiReport(
-        `Shift Only (${filters.shiftName} - ${filters.date})`,
+        `Shift Only (${filters.shiftName} - ${formatDateToDDMMYYYY(filters.date)})`,
         [
           { header: "Field", accessor: (r) => r.label, width: 15 },
           {
@@ -709,11 +707,10 @@ export function ShiftReport({ sessionId }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Date</Label>
-              <Input
-                type="date"
+              <DDMMYYYYInput
                 value={filters.date}
-                onChange={(e) =>
-                  setFilters({ ...filters, date: e.target.value })
+                onChange={(val) =>
+                  setFilters({ ...filters, date: val })
                 }
               />
             </div>
@@ -1036,21 +1033,19 @@ export function ItemReport({ sessionId }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Start Date</Label>
-              <Input
-                type="date"
+              <DDMMYYYYInput
                 value={filters.startDate}
-                onChange={(e) =>
-                  setFilters({ ...filters, startDate: e.target.value })
+                onChange={(val) =>
+                  setFilters({ ...filters, startDate: val })
                 }
               />
             </div>
             <div>
               <Label>End Date</Label>
-              <Input
-                type="date"
+              <DDMMYYYYInput
                 value={filters.endDate}
-                onChange={(e) =>
-                  setFilters({ ...filters, endDate: e.target.value })
+                onChange={(val) =>
+                  setFilters({ ...filters, endDate: val })
                 }
               />
             </div>
@@ -1262,7 +1257,8 @@ export function CategoryReport({ sessionId }) {
     return () => window.removeEventListener("keydown", handleCtrlP);
   }, [report]);
 
-  const totalCategorySum = report.reduce((sum, item) => sum + parseInt(item.totalQuantity || 0), 0);
+  const totalCategorySum = report.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
+  const totalCategorySumDisplay = Number.isInteger(totalCategorySum) ? totalCategorySum : parseFloat(totalCategorySum.toFixed(2));
   const totalAmountSum = report.reduce((sum, item) => sum + parseFloat(item.totalAmount || 0), 0);
 
   return (
@@ -1275,21 +1271,19 @@ export function CategoryReport({ sessionId }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Start Date</Label>
-              <Input
-                type="date"
+              <DDMMYYYYInput
                 value={filters.startDate}
-                onChange={(e) =>
-                  setFilters({ ...filters, startDate: e.target.value })
+                onChange={(val) =>
+                  setFilters({ ...filters, startDate: val })
                 }
               />
             </div>
             <div>
               <Label>End Date</Label>
-              <Input
-                type="date"
+              <DDMMYYYYInput
                 value={filters.endDate}
-                onChange={(e) =>
-                  setFilters({ ...filters, endDate: e.target.value })
+                onChange={(val) =>
+                  setFilters({ ...filters, endDate: val })
                 }
               />
             </div>
@@ -1404,14 +1398,14 @@ export function CategoryReport({ sessionId }) {
                     {!filters.category ? (
                       <>
                         <TableCell>Total</TableCell>
-                        <TableCell className="text-right">{totalCategorySum}</TableCell>
+                        <TableCell className="text-right">{totalCategorySumDisplay}</TableCell>
                         <TableCell className="text-right">₹{totalAmountSum.toFixed(2)}</TableCell>
                       </>
                     ) : (
                       <>
                         <TableCell>Total</TableCell>
                         <TableCell>—</TableCell>
-                        <TableCell className="text-right">{totalCategorySum}</TableCell>
+                        <TableCell className="text-right">{totalCategorySumDisplay}</TableCell>
                         <TableCell className="text-right">₹{totalAmountSum.toFixed(2)}</TableCell>
                       </>
                     )}
@@ -1421,7 +1415,7 @@ export function CategoryReport({ sessionId }) {
 
               <div className="p-4 bg-zinc-900 border rounded-lg flex justify-between items-center text-lg font-bold">
                 <span>Total Category Quantity Sum:</span>
-                <span className="text-emerald-400">{totalCategorySum}</span>
+                <span className="text-emerald-400">{totalCategorySumDisplay}</span>
               </div>
             </div>
           )}

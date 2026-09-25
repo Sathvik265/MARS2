@@ -464,7 +464,7 @@ export default function FoodMenu({ mode }) {
         price_general: parseFloat(newItem.price_general) || 0,
         price_ac: parseFloat(newItem.price_ac) || 0,
         category: {
-          qty: parseInt(newItem.quantity) || 1, // Use user input or default to 1
+          qty: parseFloat(newItem.quantity) || 1, // Use user input or default to 1
           name: newItem.category?.trim() || "",
         },
         is_separate: newItem.is_separate || false,

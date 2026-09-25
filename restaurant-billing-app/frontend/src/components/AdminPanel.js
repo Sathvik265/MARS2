@@ -14,6 +14,7 @@ import {
   TabsContent,
   Textarea,
   Label,
+  DDMMYYYYInput,
 } from "./ui/UIComponents";
 import {
   Table,
@@ -31,7 +32,7 @@ import {
   ItemReport,
   CategoryReport,
 } from "./Reports";
-import { toast, safeGet, safeArray, safeObject, getFriendlyShiftName, getCustomShortcuts, saveCustomShortcuts, validateShortcut, getShortcutActionLabel } from "../utils/helpers";
+import { toast, safeGet, safeArray, safeObject, getFriendlyShiftName, getCustomShortcuts, saveCustomShortcuts, validateShortcut, getShortcutActionLabel, formatDateToDDMMYYYY } from "../utils/helpers";
 import SplitBillSettings from "./Admin/SplitBillSettings";
 
 // ================== RECONCILIATION ==================
@@ -275,7 +276,7 @@ function HourlySalesDashboard({ billingDate }) {
         <CardTitle className="text-lg font-bold text-zinc-100 flex items-center gap-2">
           <span>📊 Sales Trend (Hourly)</span>
         </CardTitle>
-        <span className="text-xs text-zinc-400">Date: {billingDate}</span>
+        <span className="text-xs text-zinc-400">Date: {formatDateToDDMMYYYY(billingDate) || billingDate}</span>
       </CardHeader>
       <CardContent className="p-6 space-y-6">
         {/* Metric Cards Row */}
@@ -559,6 +560,107 @@ function SettingsEditor({ settings, onChange, clerk, isValidClerk }) {
   );
 }
 
+// ================== POS PRINTER CONFIGURATION CARD ==================
+
+function PrinterConfigCard() {
+  const [printers, setPrinters] = useState([]);
+  const [selectedPrinter, setSelectedPrinter] = useState("");
+  const [currentStatus, setCurrentStatus] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const fetchPrinters = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [listRes, statusRes] = await Promise.all([
+        api.get("/printer/list"),
+        api.get("/printer/status")
+      ]);
+      const list = safeArray(listRes.data?.printers);
+      setPrinters(list);
+      setCurrentStatus(statusRes.data);
+      if (statusRes.data?.printer) {
+        setSelectedPrinter(statusRes.data.printer);
+      }
+    } catch (err) {
+      console.error("Failed to fetch printer list:", err);
+      toast.error("Failed to fetch installed printers");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPrinters();
+  }, [fetchPrinters]);
+
+  const savePrinterConfig = async () => {
+    setSaving(true);
+    try {
+      await api.post("/printer/config", { printerName: selectedPrinter });
+      toast.success("Printer setting saved successfully!");
+      fetchPrinters();
+    } catch (err) {
+      console.error("Failed to save printer config:", err);
+      toast.error("Failed to update printer setting");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="border border-zinc-800 bg-zinc-950 text-white rounded-xl shadow-lg mt-6">
+      <CardHeader className="border-b border-zinc-900 pb-4 flex flex-row items-center justify-between">
+        <CardTitle className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+          <span>🖨️ POS Hardware Printer Setup</span>
+        </CardTitle>
+        <Button size="sm" variant="outline" onClick={fetchPrinters} disabled={loading}>
+          {loading ? <Loader2 size={14} className="animate-spin" /> : "Refresh Printers"}
+        </Button>
+      </CardHeader>
+      <CardContent className="p-6 space-y-4">
+        <div className="flex flex-col gap-2">
+          <Label className="text-sm font-semibold text-zinc-300">Select POS Receipt Printer</Label>
+          <select
+            className="w-full p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            value={selectedPrinter}
+            onChange={(e) => setSelectedPrinter(e.target.value)}
+          >
+            <option value="">-- Use OS Default Printer (Auto-Detect) --</option>
+            {printers.map((p, idx) => (
+              <option key={idx} value={p.name}>
+                {p.name} {p.isDefault ? "(OS Default)" : ""} {!p.isOnline ? "[OFFLINE]" : "[ONLINE]"}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-zinc-400">
+            Selecting "Use OS Default Printer" will automatically send receipts to whichever printer is set as active default in Windows.
+          </p>
+        </div>
+
+        {currentStatus && (
+          <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-lg text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Connected Printer:</span>
+              <span className="font-bold text-emerald-400">{currentStatus.printer || "None"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Status:</span>
+              <span className={`font-bold ${currentStatus.connected ? "text-emerald-400" : "text-rose-400"}`}>
+                {currentStatus.connected ? "✓ Connected & Ready" : `✗ Offline: ${currentStatus.reason || ""}`}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <Button onClick={savePrinterConfig} disabled={saving} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
+          {saving ? <Loader2 size={16} className="animate-spin mr-2" /> : "Save Selected Printer"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ================== ENHANCED ADMIN PANEL ==================
 
 export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billingDate }) {
@@ -741,6 +843,9 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
             
             {/* Customizable Keyboard Shortcuts Section */}
             <KeyboardShortcutsSettings />
+
+            {/* POS Printer Setup Section */}
+            <PrinterConfigCard />
           </div>
         </TabsContent>
 
@@ -944,19 +1049,17 @@ function PurgeBillsSection() {
             <div className="flex gap-4 items-end flex-wrap">
               <div className="flex flex-col gap-1">
                 <Label className="text-red-800">Start Date</Label>
-                <Input
-                  type="date"
+                <DDMMYYYYInput
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(val) => setStartDate(val)}
                   className="bg-white"
                 />
               </div>
               <div className="flex flex-col gap-1">
                 <Label className="text-red-800">End Date</Label>
-                <Input
-                  type="date"
+                <DDMMYYYYInput
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(val) => setEndDate(val)}
                   className="bg-white"
                 />
               </div>
@@ -977,6 +1080,7 @@ function PurgeBillsSection() {
                 variant="destructive"
                 onClick={handlePurge}
                 disabled={loading}
+                style={{ backgroundColor: "#dc2626", color: "#ffffff", border: "1px solid #b91c1c" }}
               >
                 {loading ? (
                   <Loader2 className="animate-spin mr-2" size={16} />
@@ -1002,19 +1106,17 @@ function PurgeBillsSection() {
             <div className="flex gap-4 items-end flex-wrap">
               <div className="flex flex-col gap-1">
                 <Label className="text-orange-800">Start Date</Label>
-                <Input
-                  type="date"
+                <DDMMYYYYInput
                   value={shiftStartDate}
-                  onChange={(e) => setShiftStartDate(e.target.value)}
+                  onChange={(val) => setShiftStartDate(val)}
                   className="bg-white"
                 />
               </div>
               <div className="flex flex-col gap-1">
                 <Label className="text-orange-800">End Date</Label>
-                <Input
-                  type="date"
+                <DDMMYYYYInput
                   value={shiftEndDate}
-                  onChange={(e) => setShiftEndDate(e.target.value)}
+                  onChange={(val) => setShiftEndDate(val)}
                   className="bg-white"
                 />
               </div>
@@ -1045,6 +1147,7 @@ function PurgeBillsSection() {
                 variant="destructive"
                 onClick={handleShiftPurge}
                 disabled={shiftPurgeLoading || !shiftName.trim()}
+                style={{ backgroundColor: "#dc2626", color: "#ffffff", border: "1px solid #b91c1c" }}
               >
                 {shiftPurgeLoading ? (
                   <Loader2 className="animate-spin mr-2" size={16} />

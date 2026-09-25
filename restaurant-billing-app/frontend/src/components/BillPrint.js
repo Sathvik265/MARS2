@@ -95,12 +95,15 @@ const BillContent = ({ data, settings, isLast = true }) => {
 
   let ascii = "";
 
-  // Header
-  ascii += centerText(`${displayHotelName} (${clerkInitials})`, LINE_WIDTH) + "\n";
+  // Suppress SRIHARI from printed bills — leave it blank (only affects printing, not DB)
+  const printClerkInitials = (clerkInitials && clerkInitials.toUpperCase() === "SRIHARI") ? "" : clerkInitials;
+  const headerTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
+
+  // Header at TOP — matched to commit b5bcf98
+  ascii += centerText(headerTitle, LINE_WIDTH) + "\n";
   if (address) ascii += centerText(address, LINE_WIDTH) + "\n";
   if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\n";
   if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\n";
-
   ascii += separator + "\n";
 
   // Meta Info
@@ -145,7 +148,6 @@ const BillContent = ({ data, settings, isLast = true }) => {
   ascii += separator + "\n";
 
   // Totals
-
   const cgstLabel = `CGST (${Number(cgstPercentage || 0).toFixed(1)}%)`;
   const cgstStr = Number(cgst || 0).toFixed(2);
   ascii += padRight(cgstLabel, LINE_WIDTH - cgstStr.length) + cgstStr + "\n";
@@ -161,22 +163,17 @@ const BillContent = ({ data, settings, isLast = true }) => {
 
   ascii += separator + "\n";
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\n";
-
-  // Feed lines at bottom
-  // if (isLast) {
-  //   for (let i = 0; i < 20; i++) {
-  //     ascii += ".\n";
-  //   }
-  // }
+  ascii += separator + "\n";
 
   return (
     <pre style={{
       fontFamily: "'Courier New', Courier, monospace",
       fontSize: "13px",
+      fontWeight: "bold",
       margin: 0,
       padding: "0px 5px",
       whiteSpace: "pre",
-      color: "black",
+      color: "#000000",
       background: "white",
       lineHeight: "1.2"
     }}>

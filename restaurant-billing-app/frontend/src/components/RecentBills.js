@@ -255,7 +255,7 @@ function RecentBills({ billingDate }) {
           <div className="empty-message">
             {searchTerm
               ? `No bills found matching "${searchTerm}"`
-              : `No bills found for ${billingDate}`}
+              : `No bills found for ${formatDateToDDMMYYYY(billingDate) || billingDate}`}
           </div>
         )}
 

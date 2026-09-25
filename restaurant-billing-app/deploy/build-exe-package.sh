@@ -39,7 +39,11 @@ mkdir -p "$OUTPUT_DIR/backend"
 mkdir -p "$OUTPUT_DIR/frontend"
 
 cp "$BACKEND_DIR/dist/rbs-backend.exe" "$OUTPUT_DIR/backend/"
-cp "$BACKEND_DIR/.env.example" "$OUTPUT_DIR/backend/.env"
+if [ -f "$BACKEND_DIR/.env" ]; then
+  cp "$BACKEND_DIR/.env" "$OUTPUT_DIR/backend/.env"
+else
+  cp "$BACKEND_DIR/.env.example" "$OUTPUT_DIR/backend/.env"
+fi
 cp "$ROOT/Final_Dump_Fixed.sql" "$OUTPUT_DIR/backend/" || cp "$ROOT/../Final_Dump_Fixed.sql" "$OUTPUT_DIR/backend/" || true
 
 cp "$FS_DIR/dist/rbs-frontend.exe" "$OUTPUT_DIR/frontend/"
@@ -50,13 +54,16 @@ cp -R "$FRONTEND_DIR/build" "$OUTPUT_DIR/frontend/build"
 cp "deploy/install-services.ps1" "$OUTPUT_DIR/"
 cp "deploy/run-local.ps1" "$OUTPUT_DIR/"
 cp "deploy/RunApp.bat" "$OUTPUT_DIR/"
+cp "deploy/RunAppsSetup.bat" "$OUTPUT_DIR/"
 cp "deploy/run-apps-only.ps1" "$OUTPUT_DIR/"
 cp "deploy/RunAppsOnly.bat" "$OUTPUT_DIR/"
 cp "deploy/DEPLOY_PACKAGE_README.md" "$OUTPUT_DIR/README.md"
 
 rm -f "$OUTPUT_ZIP"
+rm -f "rbs-apps-only.zip"
 cd "$OUTPUT_DIR"
 zip -r "../$OUTPUT_ZIP" .
+zip -r "../rbs-apps-only.zip" .
 
 echo "Done. Package folder: $OUTPUT_DIR"
-echo "Zipped package: $OUTPUT_ZIP"
+echo "Zipped package: $OUTPUT_ZIP and rbs-apps-only.zip"

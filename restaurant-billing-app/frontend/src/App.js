@@ -93,9 +93,9 @@ function App() {
 
   useEffect(() => {
     if (mode === "none") return;
-    // Initial check + poll every 5 seconds for faster offline detection
+    // Initial check + poll every 20 seconds for status check
     checkPrinter();
-    printerCheckRef.current = setInterval(checkPrinter, 5000);
+    printerCheckRef.current = setInterval(checkPrinter, 20000);
     return () => clearInterval(printerCheckRef.current);
   }, [mode, checkPrinter]);
 
