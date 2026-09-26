@@ -35,7 +35,7 @@ if (-not (Test-Path $csc)) { $csc = Join-Path $env:SystemRoot "Microsoft.NET\Fra
 if (-not (Test-Path $csc)) { $csc = "csc.exe" }
 Write-Host "Compiling RawPrint.cs with $csc..." -ForegroundColor Gray
 & $csc /nologo /target:exe /out:rawprint.exe RawPrint.cs
-npx pkg . --targets node22-win-x64 --output dist\rbs-backend.exe
+npx pkg . --targets node22-win-x64 --public --no-bytecode --output dist\rbs-backend.exe
 Pop-Location
 
 Write-Host "== 3/5: Building frontend production bundle ==" -ForegroundColor Cyan

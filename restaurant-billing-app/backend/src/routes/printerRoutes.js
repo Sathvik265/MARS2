@@ -33,11 +33,9 @@ const RAWPRINT_EXE_BASE64 = `TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQAAAAAAAAAAAAAAAAAA
 
 function getRawPrintExePath() {
   const candidates = [
-    path.join(__dirname, "..", "..", "rawprint.exe"),
-    path.join(process.cwd(), "rawprint.exe"),
     path.join(path.dirname(process.execPath), "rawprint.exe"),
+    path.join(process.cwd(), "rawprint.exe"),
     path.join(process.cwd(), "backend", "rawprint.exe"),
-    path.join(__dirname, "rawprint.exe"),
     path.join(TEMP_DIR, "rawprint.exe"),
   ];
   for (const p of candidates) {
@@ -97,9 +95,9 @@ async function resolvePrinter() {
     if (IS_WINDOWS) {
       const psCommand = `
         $targetNorm = '${configuredNorm.replace(/'/g, "''")}';
-        $printers = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, ShareName, DriverName, PortName, WorkOffline, PrinterStatus, Default
+        $printers = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, ShareName, DriverName, PortName, WorkOffline, PrinterStatus, Default, Shared
         if (-not $printers) {
-            $printers = Get-WmiObject Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, ShareName, DriverName, PortName, WorkOffline, PrinterStatus, Default
+            $printers = Get-WmiObject Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, ShareName, DriverName, PortName, WorkOffline, PrinterStatus, Default, Shared
         }
         if (-not $printers) {
             Write-Output "NO_PRINTERS_FOUND";
