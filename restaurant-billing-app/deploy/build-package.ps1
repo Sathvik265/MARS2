@@ -28,8 +28,13 @@ npm install --omit=dev
 if (-not (Test-Path "node_modules\.bin\pkg.cmd")) {
   npm install --save-dev @yao-pkg/pkg
 }
-Write-Host "== 2/5: Compiling backend to rbs-backend.exe ==" -ForegroundColor Cyan
+Write-Host "== 2/5: Compiling backend to rbs-backend.exe & rawprint.exe ==" -ForegroundColor Cyan
 if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
+$csc = Join-Path $env:SystemRoot "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+if (-not (Test-Path $csc)) { $csc = Join-Path $env:SystemRoot "Microsoft.NET\Framework\v4.0.30319\csc.exe" }
+if (-not (Test-Path $csc)) { $csc = "csc.exe" }
+Write-Host "Compiling RawPrint.cs with $csc..." -ForegroundColor Gray
+& $csc /nologo /target:exe /out:rawprint.exe RawPrint.cs
 npx pkg . --targets node22-win-x64 --output dist\rbs-backend.exe
 Pop-Location
 
@@ -40,7 +45,7 @@ if (-not $env:REACT_APP_API_URL) { $env:REACT_APP_API_URL = "http://localhost:80
 npm run build
 Pop-Location
 
-Write-Host "== 4/5: Compiling frontend server (Express exe only — no build embedding) ==" -ForegroundColor Cyan
+Write-Host "== 4/5: Compiling frontend server (Express exe only - no build embedding) ==" -ForegroundColor Cyan
 $fsDir = "$root\deploy\frontend-server"
 if (Test-Path "$fsDir\dist") { Remove-Item -Recurse -Force "$fsDir\dist" }
 Push-Location $fsDir
@@ -54,6 +59,9 @@ New-Item -ItemType Directory -Path "$OutputDir\backend" -Force | Out-Null
 New-Item -ItemType Directory -Path "$OutputDir\frontend" -Force | Out-Null
 
 Copy-Item "$root\backend\dist\rbs-backend.exe" "$OutputDir\backend\"
+if (Test-Path "$root\backend\rawprint.exe") {
+    Copy-Item "$root\backend\rawprint.exe" "$OutputDir\backend\"
+}
 if (Test-Path "$root\backend\.env") {
     Copy-Item "$root\backend\.env" "$OutputDir\backend\.env"
 } else {
@@ -88,8 +96,8 @@ Write-Host "Zipped package:       $OutputZip" -ForegroundColor Green
 Write-Host ""
 Write-Host "Package structure:" -ForegroundColor Yellow
 Write-Host "  frontend\" -ForegroundColor Yellow
-Write-Host "    rbs-frontend.exe  <- Express server exe" -ForegroundColor Yellow
-Write-Host "    build\            <- React build (served from disk)" -ForegroundColor Yellow
+Write-Host "    rbs-frontend.exe  -> Express server exe" -ForegroundColor Yellow
+Write-Host "    build\            -> React build (served from disk)" -ForegroundColor Yellow
 Write-Host "  backend\" -ForegroundColor Yellow
-Write-Host "    rbs-backend.exe   <- API server exe" -ForegroundColor Yellow
+Write-Host "    rbs-backend.exe   -> API server exe" -ForegroundColor Yellow
 Write-Host "IMPORTANT: edit dist-package\backend\.env with the real production DB credentials before shipping." -ForegroundColor Red

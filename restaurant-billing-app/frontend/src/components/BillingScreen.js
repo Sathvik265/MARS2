@@ -69,8 +69,9 @@ export default function Billing({
   const setSplitBillUpto = useCallback((val) => {
     setSplitBillUptoState((prev) => {
       const nextVal = typeof val === "function" ? val(prev) : val;
-      localStorage.setItem("rbs_split_bill_upto", nextVal);
-      return nextVal;
+      const validVal = [0, 4, 5].includes(nextVal) ? nextVal : 0;
+      localStorage.setItem("rbs_split_bill_upto", validVal);
+      return validVal;
     });
   }, []);
 
@@ -903,7 +904,20 @@ export default function Billing({
         if (billId) {
           const fullBillData = createdBill;
 
-          // --- SPLIT BILL PRINTING LOGIC ---
+          // --- SPLIT BILL GROUPING & PRINTING LOGIC ---
+          // 1. Category Sub-bills (Splits 1 through splitBillUpto):
+          //    The application loops through active split categories (c = 1 up to splitBillUpto).
+          //    All items matching item.split_category === c are gathered into a dedicated sub-bill.
+          //    The sub-bill title gets tagged with (Bill c). Subtotal, SGST, CGST, and Grand Total
+          //    are scaled and re-calculated specifically for those items.
+          // 2. Main / Remaining Items Bill:
+          //    Items with split_category === 0 (or split_category > splitBillUpto) remain together.
+          //    If any split sub-bills were generated, this remaining bill is tagged with (Main);
+          //    if no items were split off, it prints as the single standard bill.
+          //    Totals for remaining items are calculated independently.
+          // 3. Print Payload Bundling:
+          //    When splitBillUpto > 0 and splits exist, all generated sub-bills and main bill
+          //    are bundled into a single print array (printPayload.bills), triggering sequential printing.
           let printPayload = fullBillData;
 
           if (splitBillUpto > 0) {
@@ -976,22 +990,30 @@ export default function Billing({
           try {
             const settings = cachedSettingsRef.current || {};
             if (printPayload.split && printPayload.bills) {
-              await Promise.all(
+              const responses = await Promise.all(
                 printPayload.bills.map((b) => {
                   const rawText = generateAsciiReceipt(b, settings);
                   return api.post(`/printer/print`, { text: rawText });
                 })
               );
+              const failed = responses.find((r) => r.data && r.data.success === false);
+              if (failed) {
+                toast.error(safeGet(failed, "data.error", "Print failed"));
+              } else {
+                toast.success("Bill sent directly to POS printer!");
+              }
             } else {
-              const rawText = generateAsciiReceipt(printPayload, settings);
-              await api.post(`/printer/print`, { text: rawText });
+              const res = await api.post(`/printer/print`, { text: generateAsciiReceipt(printPayload, settings) });
+              if (res.data && res.data.success === false) {
+                toast.error(safeGet(res, "data.error", "Print failed"));
+              } else {
+                toast.success("Bill sent directly to POS printer!");
+              }
             }
-            toast.success("Bill sent directly to POS printer!");
           } catch (err) {
             console.error("Direct print failed:", err);
-            toast.error(
-              "Printer error. Check if backend printer route is running.",
-            );
+            const errMsg = safeGet(err, "response.data.error") || safeGet(err, "response.data.detail") || err.message || "Printer error. Check if backend printer route is running.";
+            toast.error(errMsg);
           }
 
           if (tableNoRef.current) {
@@ -1283,7 +1305,20 @@ export default function Billing({
         setLoading(true);
         const fullBillData = await getBillById(billIdToPrint);
 
-        // --- SPLIT BILL PRINTING LOGIC ---
+        // --- SPLIT BILL GROUPING & PRINTING LOGIC ---
+        // 1. Category Sub-bills (Splits 1 through splitBillUpto):
+        //    The application loops through active split categories (c = 1 up to splitBillUpto).
+        //    All items matching item.split_category === c are gathered into a dedicated sub-bill.
+        //    The sub-bill title gets tagged with (Bill c). Subtotal, SGST, CGST, and Grand Total
+        //    are scaled and re-calculated specifically for those items.
+        // 2. Main / Remaining Items Bill:
+        //    Items with split_category === 0 (or split_category > splitBillUpto) remain together.
+        //    If any split sub-bills were generated, this remaining bill is tagged with (Main);
+        //    if no items were split off, it prints as the single standard bill.
+        //    Totals for remaining items are calculated independently.
+        // 3. Print Payload Bundling:
+        //    When splitBillUpto > 0 and splits exist, all generated sub-bills and main bill
+        //    are bundled into a single print array (printPayload.bills), triggering sequential printing.
         let printPayload = fullBillData;
 
         if (splitBillUpto > 0) {
@@ -1356,22 +1391,30 @@ export default function Billing({
         try {
           const settings = cachedSettingsRef.current || {};
           if (printPayload.split && printPayload.bills) {
-            await Promise.all(
+            const responses = await Promise.all(
               printPayload.bills.map((b) => {
                 const rawText = generateAsciiReceipt(b, settings);
                 return api.post(`/printer/print`, { text: rawText });
               })
             );
+            const failed = responses.find((r) => r.data && r.data.success === false);
+            if (failed) {
+              toast.error(safeGet(failed, "data.error", "Print failed"));
+            } else {
+              toast.success("Bill sent directly to POS printer!");
+            }
           } else {
-            const rawText = generateAsciiReceipt(printPayload, settings);
-            await api.post(`/printer/print`, { text: rawText });
+            const res = await api.post(`/printer/print`, { text: generateAsciiReceipt(printPayload, settings) });
+            if (res.data && res.data.success === false) {
+              toast.error(safeGet(res, "data.error", "Print failed"));
+            } else {
+              toast.success("Bill sent directly to POS printer!");
+            }
           }
-          toast.success("Bill sent directly to POS printer!");
         } catch (err) {
           console.error("Direct print failed:", err);
-          toast.error(
-            "Printer error. Check if backend printer route is running.",
-          );
+          const errMsg = safeGet(err, "response.data.error") || safeGet(err, "response.data.detail") || err.message || "Printer error. Check if backend printer route is running.";
+          toast.error(errMsg);
         }
 
         if (tableNoRef.current) {
@@ -1665,10 +1708,10 @@ export default function Billing({
       } else if (matchesShortcut(event, shortcuts.toggleSplit)) {
         event.preventDefault();
         setSplitBillUpto((prev) => {
-          // Cycle through only the allowed split values: 0, 4, 5
+          // Cycle through allowed split values in exact sequence: 0 -> 4 -> 5 -> 0
           const allowedValues = dropdownOptions;
           const currentIdx = allowedValues.indexOf(prev);
-          const nextIdx = (currentIdx + 1) % allowedValues.length;
+          const nextIdx = currentIdx >= 0 ? (currentIdx + 1) % allowedValues.length : 0;
           const nextVal = allowedValues[nextIdx];
           toast.success(`SPLIT BILL CATEGORY SET TO: ${nextVal === 0 ? "Off" : nextVal}`);
           return nextVal;

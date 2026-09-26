@@ -37,11 +37,16 @@ const sendToPosPrinter = async (title, columns, data) => {
   try {
     const settings = await fetchSettings();
     const rawText = generateAsciiReport(title, columns, data, settings);
-    await api.post("/printer/print", { text: rawText });
-    toast.success("Report sent to POS printer!");
+    const res = await api.post("/printer/print", { text: rawText });
+    if (res.data && res.data.success === false) {
+      toast.error(safeGet(res, "data.error", "Print failed"));
+    } else {
+      toast.success("Report sent to POS printer!");
+    }
   } catch (err) {
     console.error("Direct print failed:", err);
-    toast.error("Printer error. Check if backend printer route is running.");
+    const errMsg = safeGet(err, "response.data.error") || safeGet(err, "response.data.detail") || err.message || "Printer error. Check if backend printer route is running.";
+    toast.error(errMsg);
   }
 };
 

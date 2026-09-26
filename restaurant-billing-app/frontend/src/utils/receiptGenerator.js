@@ -74,7 +74,8 @@ export function generateAsciiReceipt(data, settings) {
   const displayHotelName = titleSuffix ? `${hotelHeading} ${titleSuffix}` : hotelHeading;
 
   // Suppress SRIHARI from printed receipts — leave it blank (only affects printing, not DB)
-  const printClerkInitials = (clerkInitials && clerkInitials.toUpperCase() === "SRIHARI") ? "" : clerkInitials;
+  const isSrihari = clerkInitials && String(clerkInitials).trim().toUpperCase() === "SRIHARI";
+  const printClerkInitials = isSrihari ? "" : clerkInitials;
   const headerHotelTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
 
   // Header at TOP (Hotel Name, Address, Phone, GST) — matched to commit b5bcf98
@@ -176,7 +177,8 @@ export function generateAsciiReport(title, columns, data, settings) {
 
   // Header Title
   // Suppress SRIHARI from printed reports — leave it blank (only affects printing, not DB)
-  const printClerkInitials = (clerkInitials && clerkInitials.toUpperCase() === "SRIHARI") ? "" : clerkInitials;
+  const isSrihari = clerkInitials && String(clerkInitials).trim().toUpperCase() === "SRIHARI";
+  const printClerkInitials = isSrihari ? "" : clerkInitials;
   const reportHotelTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${hotelName} (${printClerkInitials})` : hotelName;
   ascii += centerText(reportHotelTitle, LINE_WIDTH) + "\r\n";
 

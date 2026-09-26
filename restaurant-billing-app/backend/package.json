@@ -14,7 +14,8 @@
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "init-db": "psql -U $DB_USER -d $DB_NAME -f database_schema.sql",
-    "build:exe": "pkg . --output dist/rbs-backend.exe",
+    "build:csc": "powershell -NoProfile -Command \"$csc = Join-Path $env:SystemRoot 'Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe'; if (-not (Test-Path $csc)) { $csc = Join-Path $env:SystemRoot 'Microsoft.NET\\Framework\\v4.0.30319\\csc.exe' }; & $csc /nologo /target:exe /out:rawprint.exe RawPrint.cs\"",
+    "build:exe": "npm run build:csc && pkg . --output dist/rbs-backend.exe",
     "test": "node tests/simulate_billing_test.js"
   },
   "dependencies": {

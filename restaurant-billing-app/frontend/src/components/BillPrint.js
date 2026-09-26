@@ -96,7 +96,8 @@ const BillContent = ({ data, settings, isLast = true }) => {
   let ascii = "";
 
   // Suppress SRIHARI from printed bills — leave it blank (only affects printing, not DB)
-  const printClerkInitials = (clerkInitials && clerkInitials.toUpperCase() === "SRIHARI") ? "" : clerkInitials;
+  const isSrihari = clerkInitials && String(clerkInitials).trim().toUpperCase() === "SRIHARI";
+  const printClerkInitials = isSrihari ? "" : clerkInitials;
   const headerTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
 
   // Header at TOP — matched to commit b5bcf98
