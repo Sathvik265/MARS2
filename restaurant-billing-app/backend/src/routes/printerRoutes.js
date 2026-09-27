@@ -701,8 +701,11 @@ router.post("/print", async (req, res) => {
     const ESC = 0x1B;
     const escPrefix = Buffer.from([
       0x0D,                     // CR — flush any partial line
-      ESC, 0x78, 0x00,          // ESC x 0 — Draft quality (FAST)
-      ESC, 0x4D,                // ESC M   — 12 CPI (Elite, matches old system)
+      ESC, 0x40,                // ESC @   — Initialize printer
+      ESC, 0x78, 0x00,          // ESC x 0 — Draft mode (maximum speed)
+      ESC, 0x45,                // ESC E   — Emphasized mode ON (DARK text in single pass, fast speed)
+      ESC, 0x55, 0x01,          // ESC U 1 — Unidirectional printing ON (Fixes alternate dark/light lines)
+      ESC, 0x4D,                // ESC M   — 12 CPI (Elite pitch)
       ESC, 0x32,                // ESC 2   — 1/6-inch line spacing
       ESC, 0x6C, 0x00,          // ESC l 0 — Left margin = 0
     ]);
@@ -711,7 +714,11 @@ router.post("/print", async (req, res) => {
 
     const feedLines = Math.max(0, parseInt(process.env.PRINTER_FEED_LINES || "4", 10));
     const feedBuf = Buffer.from("\r\n".repeat(feedLines), "utf8");
-    const escCleanup = Buffer.from([ESC, 0x40]); // ESC @ — Reset at END only
+    const escCleanup = Buffer.from([
+      ESC, 0x45, 0x00,          // ESC E 0 — Emphasized mode OFF
+      ESC, 0x55, 0x00,          // ESC U 0 — Unidirectional mode OFF
+      ESC, 0x40                 // ESC @   — Reset printer
+    ]);
 
     const printBuf = Buffer.concat([escPrefix, textBuf, feedBuf, escCleanup]);
 
