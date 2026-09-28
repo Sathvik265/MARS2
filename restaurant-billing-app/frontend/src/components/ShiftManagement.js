@@ -83,7 +83,7 @@ export default function ShiftTab({ mode, sessionId, currentShift, currentDate, o
           <div className="space-y-4">
             <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
               <span className="text-sm font-medium text-zinc-400">Clerk</span>
-              <span className="text-lg font-bold text-white">{userInitials || "—"}</span>
+              <span className="text-lg font-bold text-white">{String(userInitials || "").trim().toUpperCase() === "SRIHARI" ? "" : (userInitials || "—")}</span>
             </div>
             <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
               <span className="text-sm font-medium text-zinc-400">Business Date</span>

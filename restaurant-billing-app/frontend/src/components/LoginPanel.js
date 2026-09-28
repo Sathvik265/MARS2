@@ -73,25 +73,24 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
       return;
     }
 
-    // Filter sessions matching shift_name AND today's date (session_date)
+    // Filter sessions matching shift_name
     const matchingSessions = sessions.filter(
-      (s) => s.shift_name === track && (s.session_date === date || (s.session_date && String(s.session_date).startsWith(date)))
+      (s) => s.shift_name === track
     );
 
     if (matchingSessions.length === 0) {
-      // No session exists for this shift today — allow login (backend will create one)
       setIsShiftClosed(false);
       return;
     }
 
     const hasOpen = matchingSessions.some(
-      (s) => s.status && s.status.toUpperCase() === "OPEN",
+      (s) => s.status && s.status.toUpperCase() === "OPEN" && !s.is_locked,
     );
     const hasClosed = matchingSessions.some(
-      (s) => s.status && s.status.toUpperCase() === "CLOSED",
+      (s) => (s.status && s.status.toUpperCase() === "CLOSED") || s.is_locked,
     );
 
-    // Block login only if today's session for this shift is CLOSED (none OPEN)
+    // Block login if the session is CLOSED or locked without an open session
     setIsShiftClosed(hasClosed && !hasOpen);
   }, [track, date, sessions]);
 
@@ -276,9 +275,7 @@ export function LoginPanel({ onLogin, onStartAdminVerification }) {
                   fontSize: "0.875rem",
                 }}
               >
-                <strong>⚠ This shift is closed</strong> and cannot be accessed.
-                <br />
-                An admin must log in with this shift and the full admin password to automatically open it.
+                <strong>⚠ This shift is closed.</strong>
               </div>
             )}
 

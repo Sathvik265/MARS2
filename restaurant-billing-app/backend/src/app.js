@@ -88,7 +88,7 @@ app.put("/api/settings/section", requireAuth, reportController.updateSection);
 app.get("/api/auth/shift-status", async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT session_id, shift_name, status, is_locked, last_bill_number, start_time, end_time
+      `SELECT session_id, shift_name, status, is_locked, session_date, last_bill_number, start_time, end_time
        FROM sessions
        ORDER BY shift_name, start_time DESC`,
     );
@@ -158,7 +158,7 @@ app.post("/api/auth/login", async (req, res) => {
       } else {
         return res
           .status(403)
-          .json({ detail: "Shift is closed for this track/date" });
+          .json({ detail: "This shift is closed." });
       }
     }
 
@@ -180,8 +180,7 @@ app.post("/api/auth/login", async (req, res) => {
       );
       if (lockCheck.rows.length > 0) {
         return res.status(423).json({
-          detail:
-            "This track is logged out. Please contact an admin to unlock it.",
+          detail: "This shift is closed.",
           locked: true,
         });
       }
@@ -729,6 +728,15 @@ const server = app.listen(PORT, () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`📊 API Base URL: http://127.0.0.1:${PORT}/api`);
   console.log(`📋 Schema: Updated with merged shift_sessions table`);
+
+  // Run initial printer resolution & header check print asynchronously on app startup
+  if (typeof printerRoutes.runStartupCheckAndPrint === "function") {
+    setImmediate(() => {
+      printerRoutes.runStartupCheckAndPrint().catch((err) => {
+        console.warn("Startup printer check failed:", err.message);
+      });
+    });
+  }
 });
 
 server.on("error", (err) => {

@@ -188,31 +188,42 @@ export const matchesShortcut = (e, shortcutString) => {
 // Extract category name from DB record format
 export const getCategoryName = (raw) => {
   if (!raw) return "";
-  let display = String(raw);
+  let display = "";
   if (typeof raw === "object") {
-    if (Array.isArray(raw) && raw.length > 0) {
-      display = raw[0].name || raw[0].item_name || display;
-    } else if (!Array.isArray(raw)) {
-      display = raw.name || raw.item_name || display;
+    if (Array.isArray(raw)) {
+      if (raw.length > 0) {
+        const item = raw[0];
+        display = (typeof item === "object" && item !== null) ? (item.name || item.item_name || "") : String(item || "");
+      }
+    } else {
+      display = raw.name || raw.item_name || "";
     }
   } else if (typeof raw === "string") {
-    try {
-      if (raw.trim().startsWith("[") || raw.trim().startsWith("{")) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          display = parsed[0].name || parsed[0].item_name || display;
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 0) {
+            const item = parsed[0];
+            display = (typeof item === "object" && item !== null) ? (item.name || item.item_name || "") : String(item || "");
+          }
         } else if (parsed && typeof parsed === "object") {
-          display = parsed.name || parsed.item_name || display;
+          display = parsed.name || parsed.item_name || "";
         }
+      } catch (e) {
+        display = raw;
       }
-    } catch (e) {
-      // Fallback
+    } else {
+      display = raw;
     }
+  } else {
+    display = String(raw);
   }
-  if (display.startsWith("[") && display.includes("name")) {
-    const match = display.match(/["']name["']\s*:\s*["']([^"']+)["']/i);
-    if (match && match[1]) display = match[1];
+
+  if (display === "[object Object]" || display === "-" || display === "N/A" || display === "undefined" || display === "null") {
+    return "";
   }
-  return display === "-" || display === "N/A" ? "" : display;
+  return display;
 };
 

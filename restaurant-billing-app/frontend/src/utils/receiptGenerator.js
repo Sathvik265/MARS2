@@ -78,13 +78,6 @@ export function generateAsciiReceipt(data, settings) {
   const printClerkInitials = isSrihari ? "" : clerkInitials;
   const headerHotelTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
 
-  // Header at TOP (Hotel Name, Address, Phone, GST) — matched to commit b5bcf98
-  ascii += centerText(headerHotelTitle, LINE_WIDTH) + "\r\n";
-  if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
-  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
-  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
-  ascii += separator + "\r\n";
-
   // Meta Info
   const timeAndBill = `${printTime} #${billNumber}`;
   const dateStr = printDate;
@@ -140,6 +133,14 @@ export function generateAsciiReceipt(data, settings) {
 
   ascii += separator + "\r\n";
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\r\n";
+  ascii += separator + "\r\n";
+
+  // Hotel Header at BOTTOM (Hotel Name, Address, Phone, GST) — saves paper & simplifies tearoff
+  ascii += "---BOTTOM_HEADER---\r\n";
+  ascii += centerText(headerHotelTitle, LINE_WIDTH) + "\r\n";
+  if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
+  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
+  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
   ascii += separator + "\r\n";
 
   return ascii;

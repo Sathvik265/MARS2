@@ -5,6 +5,7 @@ import {
   logout as logoutApi,
   closeShiftAndLogout as closeShiftAndLogoutApi,
   getPrinterStatus,
+  recheckPrinter,
   setAuthToken,
 } from "./services/api";
 import RecentBills from "./components/RecentBills";
@@ -68,34 +69,66 @@ function App() {
   // ── Printer detection gate ──────────────────────────────────────────────
   const [printerConnected, setPrinterConnected] = useState(true); // optimistic start
   const [printerError, setPrinterError] = useState("");
+  const [isCheckingPrinter, setIsCheckingPrinter] = useState(false);
   const printerCheckRef = useRef(null);
   const isCheckingRef = useRef(false);
+  const failedCountRef = useRef(0);
 
   const checkPrinter = useCallback(async () => {
     if (isCheckingRef.current) return;
     isCheckingRef.current = true;
+    setIsCheckingPrinter(true);
     try {
       const status = await getPrinterStatus();
       console.log(`[Printer Status Monitor] API returned status:`, status);
-      setPrinterConnected(!!status.connected);
-      if (!status.connected) {
-        setPrinterError(status.reason || "Printer offline or not found");
-      } else {
+      if (status.connected) {
+        setPrinterConnected(true);
         setPrinterError("");
+        failedCountRef.current = 0;
+      } else {
+        failedCountRef.current += 1;
+        setPrinterConnected(false);
+        setPrinterError(status.reason || "Printer offline or not found");
+
+        // If 5 consecutive checks fail, run deep re-check with test header print
+        if (failedCountRef.current >= 5) {
+          console.log(`[Printer Status Monitor] ${failedCountRef.current} consecutive failures. Triggering deep printer recheck & test print...`);
+          try {
+            const recheckStatus = await recheckPrinter();
+            if (recheckStatus.connected) {
+              setPrinterConnected(true);
+              setPrinterError("");
+              failedCountRef.current = 0;
+            }
+          } catch (recheckErr) {
+            console.warn(`[Printer Status Monitor] Deep recheck also failed:`, recheckErr);
+          }
+        }
       }
     } catch (err) {
       console.warn(`[Printer Status Monitor] API status check failed:`, err);
-      // Keep previous printerConnected state on transient network failures rather than forcing 'true'
+      failedCountRef.current += 1;
+      if (failedCountRef.current >= 5) {
+        try {
+          const recheckStatus = await recheckPrinter();
+          if (recheckStatus.connected) {
+            setPrinterConnected(true);
+            setPrinterError("");
+            failedCountRef.current = 0;
+          }
+        } catch (_) {}
+      }
     } finally {
       isCheckingRef.current = false;
+      setIsCheckingPrinter(false);
     }
   }, []);
 
   useEffect(() => {
     if (mode === "none") return;
-    // Initial check + poll every 20 seconds for status check
+    // Initial check + poll every 5 seconds for status check
     checkPrinter();
-    printerCheckRef.current = setInterval(checkPrinter, 20000);
+    printerCheckRef.current = setInterval(checkPrinter, 5000);
     return () => clearInterval(printerCheckRef.current);
   }, [mode, checkPrinter]);
 
@@ -434,7 +467,7 @@ function App() {
           )}
           {mode !== "none" && billingDate && (
             <div className={`${activeTab === "billing" ? "mt-1" : "mt-2"} text-sm text-gray-300`}>
-              Date: {formatDateToDDMMYYYY(billingDate) || billingDate} | {track} | {userInitials}
+              Date: {formatDateToDDMMYYYY(billingDate) || billingDate} | {track} | {String(userInitials || "").trim().toUpperCase() === "SRIHARI" ? "" : userInitials}
               <span className="ml-4 inline-flex gap-2">
                 <Button
                   variant="outline"
@@ -487,7 +520,7 @@ function App() {
               Printer Not Detected
             </div>
             <div style={{ color: "#9ca3af", maxWidth: 400, textAlign: "center" }}>
-              The billing system requires a connected printer. Please connect your printer and wait — the system will check again automatically every 15 seconds.
+              The billing system requires a connected printer. Please connect your printer and wait — the system will check again automatically every 5 seconds.
             </div>
             {printerError && (
               <div style={{
@@ -500,10 +533,26 @@ function App() {
               </div>
             )}
             <Button
-              onClick={checkPrinter}
-              style={{ background: "#2563eb", color: "#fff", marginTop: "0.5rem" }}
+              onClick={() => {
+                if (failedCountRef.current >= 4) {
+                  // If already failed 4+ times, trigger deep recheck test print immediately on click
+                  recheckPrinter().then(res => {
+                    if (res?.connected) {
+                      setPrinterConnected(true);
+                      setPrinterError("");
+                      failedCountRef.current = 0;
+                    } else {
+                      checkPrinter();
+                    }
+                  }).catch(() => checkPrinter());
+                } else {
+                  checkPrinter();
+                }
+              }}
+              disabled={isCheckingPrinter}
+              style={{ background: "#2563eb", color: "#fff", marginTop: "0.5rem", opacity: isCheckingPrinter ? 0.7 : 1 }}
             >
-              Check Now
+              {isCheckingPrinter ? "Checking Printer..." : "Check Now"}
             </Button>
           </div>
         )}

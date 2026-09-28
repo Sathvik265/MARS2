@@ -16,7 +16,7 @@ function getSectionForTable(tableNo) {
     return "P";
   }
 
-  if (table >= 15 && table <= 30) {
+  if (table >= 15) {
     return "AC";
   }
 

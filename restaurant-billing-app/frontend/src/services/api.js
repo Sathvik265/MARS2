@@ -12,7 +12,7 @@ if (!process.env.REACT_APP_API_URL) {
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 25000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -106,6 +106,11 @@ export const closeShiftAndLogout = async () => {
 
 export const getPrinterStatus = async () => {
   const response = await api.get(`/printer/status?_=${Date.now()}`);
+  return response.data;
+};
+
+export const recheckPrinter = async () => {
+  const response = await api.post("/printer/recheck");
   return response.data;
 };
 

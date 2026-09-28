@@ -42,6 +42,7 @@ function EnhancedReconciliation({ sessionId, mode }) {
   const [loading, setLoading] = useState(false);
   const [expandedKey, setExpandedKey] = useState(null);
   const [detailsCache, setDetailsCache] = useState({});
+  const [clearingKey, setClearingKey] = useState(null);
 
   const loadRunningBills = useCallback(async () => {
     setLoading(true);
@@ -56,6 +57,34 @@ function EnhancedReconciliation({ sessionId, mode }) {
       setLoading(false);
     }
   }, []);
+
+  const handleClearBill = async (tableNo, partyNo) => {
+    const confirmClear = window.confirm(
+      `Are you sure you want to clear/delete the unreconciled bill for Table ${tableNo} (Party ${partyNo})?\n\nThis will remove all pending orders for this table and party.`
+    );
+    if (!confirmClear) return;
+
+    const key = `${tableNo}-${partyNo}`;
+    setClearingKey(key);
+    try {
+      await api.delete(`/reconciliation/running/table/${tableNo}/party/${partyNo}`);
+      toast.success(`Bill for Table ${tableNo} (Party ${partyNo}) cleared successfully`);
+      if (expandedKey === key) {
+        setExpandedKey(null);
+      }
+      setDetailsCache((prev) => {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      });
+      await loadRunningBills();
+    } catch (err) {
+      console.error("Failed to clear bill:", err);
+      toast.error("Failed to clear bill");
+    } finally {
+      setClearingKey(null);
+    }
+  };
 
   useEffect(() => {
     if (mode && mode.includes("admin")) {
@@ -118,41 +147,55 @@ function EnhancedReconciliation({ sessionId, mode }) {
                             ₹{Number(row.total_amount || 0).toFixed(2)}
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            if (isExpanded) {
-                              setExpandedKey(null);
-                              return;
-                            }
-                            setExpandedKey(key);
-                            if (!details) {
-                              try {
-                                const res = await api.get(
-                                  `/billing/orders/table/${row.table_no}/party/${row.party_no}`,
-                                );
-                                setDetailsCache((prev) => ({
-                                  ...prev,
-                                  [key]: safeArray(res.data),
-                                }));
-                              } catch (err) {
-                                console.error(
-                                  "Failed to load orders for",
-                                  key,
-                                  err,
-                                );
-                                toast.error("Failed to load bill details");
-                                setDetailsCache((prev) => ({
-                                  ...prev,
-                                  [key]: [],
-                                }));
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              if (isExpanded) {
+                                setExpandedKey(null);
+                                return;
                               }
-                            }
-                          }}
-                        >
-                          {isExpanded ? "Hide" : "Details"}
-                        </Button>
+                              setExpandedKey(key);
+                              if (!details) {
+                                try {
+                                  const res = await api.get(
+                                    `/billing/orders/table/${row.table_no}/party/${row.party_no}`,
+                                  );
+                                  setDetailsCache((prev) => ({
+                                    ...prev,
+                                    [key]: safeArray(res.data),
+                                  }));
+                                } catch (err) {
+                                  console.error(
+                                    "Failed to load orders for",
+                                    key,
+                                    err,
+                                  );
+                                  toast.error("Failed to load bill details");
+                                  setDetailsCache((prev) => ({
+                                    ...prev,
+                                    [key]: [],
+                                  }));
+                                }
+                              }
+                            }}
+                          >
+                            {isExpanded ? "Hide" : "Details"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm"
+                            onClick={() => handleClearBill(row.table_no, row.party_no)}
+                            disabled={clearingKey === key}
+                          >
+                            {clearingKey === key ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              "Clear Bill"
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
 

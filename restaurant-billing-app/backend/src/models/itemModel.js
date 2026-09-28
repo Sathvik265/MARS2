@@ -1,5 +1,36 @@
 const pool = require("../db");
 
+function formatCategoryField(category) {
+  if (!category) return { qty: 1, name: "" };
+  if (typeof category === "string") {
+    const trimmed = category.trim();
+    if (trimmed === "" || trimmed === "[object Object]" || trimmed === "null" || trimmed === "undefined") {
+      return { qty: 1, name: "" };
+    }
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return formatCategoryField(parsed);
+      } catch (e) {
+        return { qty: 1, name: trimmed };
+      }
+    }
+    return { qty: 1, name: trimmed };
+  }
+  if (typeof category === "object") {
+    if (Array.isArray(category)) {
+      if (category.length > 0) return formatCategoryField(category[0]);
+      return { qty: 1, name: "" };
+    }
+    const catName = category.name || category.item_name || "";
+    if (catName === "[object Object]" || catName === "null" || catName === "undefined") {
+      return { qty: 1, name: "" };
+    }
+    return { qty: category.qty || category.quantity || 1, name: String(catName).trim() };
+  }
+  return { qty: 1, name: "" };
+}
+
 const ItemModel = {
   // Get all items
   async getAllItems() {
@@ -36,9 +67,7 @@ const ItemModel = {
       split_category = 0,
     } = itemData;
 
-    // Ensure category is a valid JSON array or object string if passed as string
-    // If it's already an object/array, pg will handle it for JSONB
-
+    const finalCategory = formatCategoryField(category);
     const finalIsSeparate = split_category > 0 || is_separate;
 
     const result = await pool.query(
@@ -55,7 +84,7 @@ const ItemModel = {
         price_fixed,
         price_general,
         price_ac,
-        category,
+        finalCategory,
         finalIsSeparate,
         split_category,
       ],
@@ -77,6 +106,7 @@ const ItemModel = {
       split_category = 0,
     } = itemData;
 
+    const finalCategory = formatCategoryField(category);
     const finalIsSeparate = split_category > 0 || is_separate;
 
     const result = await pool.query(
@@ -93,7 +123,7 @@ const ItemModel = {
         price_fixed,
         price_general,
         price_ac,
-        category,
+        finalCategory,
         finalIsSeparate,
         split_category,
         id,

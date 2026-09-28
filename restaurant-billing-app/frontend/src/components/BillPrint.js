@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../services/api";
-import { API, safeGet, safeArray, safeObject, formatDateToDDMMYYYY } from "../utils/helpers";
+import { safeGet, safeArray, safeObject, formatDateToDDMMYYYY } from "../utils/helpers";
 import { useUser } from "../context/UserContext";
 
 // Inline CSS to handle the continuous roll logic
@@ -100,13 +100,6 @@ const BillContent = ({ data, settings, isLast = true }) => {
   const printClerkInitials = isSrihari ? "" : clerkInitials;
   const headerTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
 
-  // Header at TOP — matched to commit b5bcf98
-  ascii += centerText(headerTitle, LINE_WIDTH) + "\n";
-  if (address) ascii += centerText(address, LINE_WIDTH) + "\n";
-  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\n";
-  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\n";
-  ascii += separator + "\n";
-
   // Meta Info
   const timeAndBill = `${printTime} #${billNumber}`;
   // remaining spaces for date
@@ -166,6 +159,16 @@ const BillContent = ({ data, settings, isLast = true }) => {
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\n";
   ascii += separator + "\n";
 
+  // Hotel Header at BOTTOM — saves paper & simplifies tearoff
+  ascii += "---BOTTOM_HEADER---\n";
+  ascii += centerText(headerTitle, LINE_WIDTH) + "\n";
+  if (address) ascii += centerText(address, LINE_WIDTH) + "\n";
+  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\n";
+  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\n";
+  ascii += separator + "\n";
+
+  const displayAscii = ascii.replace(/---BOTTOM_HEADER---\r?\n?/g, "");
+
   return (
     <pre style={{
       fontFamily: "'Courier New', Courier, monospace",
@@ -178,7 +181,7 @@ const BillContent = ({ data, settings, isLast = true }) => {
       background: "white",
       lineHeight: "1.2"
     }}>
-      {ascii}
+      {displayAscii}
     </pre>
   );
 };

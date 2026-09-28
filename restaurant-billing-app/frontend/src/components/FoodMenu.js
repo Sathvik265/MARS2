@@ -168,6 +168,10 @@ export default function FoodMenu({ mode }) {
   const saveEditedItem = async () => {
     if (!editingItem) return;
     try {
+      const cleanCatName = typeof editingItem.category === "string"
+        ? (editingItem.category === "[object Object]" ? "" : editingItem.category.trim())
+        : getCategoryName(editingItem.category);
+
       const payload = {
         name: editingItem.name,
         alpha_code: editingItem.alpha_code,
@@ -175,7 +179,7 @@ export default function FoodMenu({ mode }) {
         price_fixed: editingItem.price_fixed,
         price_general: editingItem.price_general,
         price_ac: editingItem.price_ac,
-        category: editingItem.category,
+        category: { qty: 1, name: cleanCatName || "" },
         is_separate: editingItem.is_separate || false,
       };
       await updateMenuItem(editingItem.id, payload);
@@ -323,9 +327,9 @@ export default function FoodMenu({ mode }) {
               <div>
                 <Label>Category</Label>
                 <CategorySelector
-                  value={editingItem.category}
+                  value={getCategoryName(editingItem.category)}
                   onChange={(val) =>
-                    setEditingItem({ ...editingItem, category: val })
+                    setEditingItem({ ...editingItem, category: val || "" })
                   }
                   existingCategories={existingCategories}
                 />

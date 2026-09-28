@@ -92,17 +92,25 @@ exports.getShiftSummaryReport = async (req, res) => {
       WITH GstRate AS (
           SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 as rate
           FROM settings LIMIT 1
+      ),
+      ShiftBaseTotals AS (
+          SELECT 
+              b.bill_date as date,
+              b.track as shift_name,
+              SUM((item->>'line_total')::decimal) as base_item_sum
+          FROM bills b,
+          jsonb_array_elements(b.items_json) as item
+          WHERE b.bill_date = $1 AND b.bill_number > 0
+          GROUP BY b.bill_date, b.track
       )
       SELECT 
-          b.bill_date as date,
-          b.track as shift_name,
-          SUM(b.grand_total) as amount,
-          SUM(b.grand_total) * (SELECT rate FROM GstRate) as gst_amount,
-          SUM(b.grand_total) as total_amount
-      FROM bills b
-      WHERE b.bill_date = $1 AND b.bill_number > 0
-      GROUP BY b.bill_date, b.track
-      ORDER BY b.track
+          s.date,
+          s.shift_name,
+          ROUND(s.base_item_sum, 2) as amount,
+          ROUND(s.base_item_sum * (SELECT rate FROM GstRate), 2) as gst_amount,
+          ROUND(s.base_item_sum * (1 + (SELECT rate FROM GstRate)), 2) as total_amount
+      FROM ShiftBaseTotals s
+      ORDER BY s.shift_name
       `,
       [date],
     );
@@ -163,9 +171,9 @@ exports.getShiftDetailedReport = async (req, res) => {
         p.item_name,
         p.category_name as category,
         SUM(p.qty) as total_quantity,
-        SUM(p.amount) as total_amount,
-        SUM(p.amount) * (SELECT rate FROM GstRate) as gst_amount,
-        SUM(p.amount) as final_total
+        ROUND(SUM(p.amount), 2) as base_amount,
+        ROUND(SUM(p.amount) * (SELECT rate FROM GstRate), 2) as gst_amount,
+        ROUND(SUM(p.amount) * (1 + (SELECT rate FROM GstRate)), 2) as final_total
       FROM ProcessedItems p
       GROUP BY p.item_code, p.item_name, p.category_name
       ORDER BY p.category_name, p.item_name
@@ -248,10 +256,14 @@ exports.getItemWiseReport = async (req, res) => {
 
     const result = await pool.query(
       `
+      WITH GstRate AS (
+          SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 + 1.0 as multiplier
+          FROM settings LIMIT 1
+      )
       SELECT   
         item->>'item_name' as item_name,   
         SUM((item->>'quantity')::numeric) as total_quantity,
-        SUM((item->>'line_total')::decimal) as total_amount
+        ROUND(SUM((item->>'line_total')::decimal) * (SELECT multiplier FROM GstRate), 2) as total_amount
       FROM bills b,
       jsonb_array_elements(b.items_json) as item
       WHERE b.bill_date = $1 AND b.bill_number > 0
@@ -312,10 +324,14 @@ exports.getItemReport = async (req, res) => {
     const whereClause = whereConditions.join(" AND ");
 
     const result = await pool.query(
-      `SELECT   
+      `WITH GstRate AS (
+          SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 + 1.0 as multiplier
+          FROM settings LIMIT 1
+      )
+      SELECT   
         item->>'item_name' as item_name,
         SUM((item->>'quantity')::decimal) as total_quantity,
-        SUM((item->>'line_total')::decimal) as total_amount
+        ROUND(SUM((item->>'line_total')::decimal) * (SELECT multiplier FROM GstRate), 2) as total_amount
       FROM bills b,
       jsonb_array_elements(b.items_json) as item
       WHERE ${whereClause}
@@ -340,15 +356,13 @@ exports.getItemReport = async (req, res) => {
 // GET /api/reconciliation/unprinted
 exports.getUnprintedBills = async (req, res) => {
   try {
-    // Get bills from the last 24 hours that haven't been modified
+    // Get bills from the last 24 hours
     const result = await pool.query(`
-      SELECT   
-        b.*,   
-        s.shift_name   
+      SELECT 
+        b.*, 
+        b.track as shift_name 
       FROM bills b
-      JOIN shifts s ON b.shift_id = s.shift_id
       WHERE b.created_at > NOW() - INTERVAL '24 hours' 
-        AND b.modified_from_bill_id IS NULL
       ORDER BY b.created_at DESC`);
 
     res.json(result.rows);
@@ -380,6 +394,19 @@ exports.getRunningBills = async (req, res) => {
   } catch (error) {
     console.error("Running bills error:", error);
     res.status(500).json({ detail: "Failed to fetch running bills" });
+  }
+};
+
+// DELETE /api/reconciliation/running/table/:tableNo/party/:partyNo
+exports.clearRunningBill = async (req, res) => {
+  try {
+    const { tableNo, partyNo } = req.params;
+    const OrderModel = require("../models/orderModel");
+    await OrderModel.clearOrders(tableNo, partyNo);
+    res.json({ message: "Running bill cleared successfully" });
+  } catch (error) {
+    console.error("Clear running bill error:", error);
+    res.status(500).json({ detail: "Failed to clear running bill" });
   }
 };
 
@@ -577,15 +604,28 @@ exports.getShiftOnlyReport = async (req, res) => {
       WITH GstRate AS (
           SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 as rate
           FROM settings LIMIT 1
+      ),
+      ShiftBills AS (
+          SELECT b.id, b.track, b.items_json
+          FROM bills b
+          WHERE b.bill_date = $1 AND b.track = $2 AND b.bill_number > 0
+      ),
+      ShiftBase AS (
+          SELECT 
+              sb.track as shift_name,
+              COUNT(DISTINCT sb.id) as bill_count,
+              COALESCE(SUM((item->>'line_total')::decimal), 0.00) as base_item_sum
+          FROM ShiftBills sb
+          LEFT JOIN LATERAL jsonb_array_elements(sb.items_json) as item ON TRUE
+          GROUP BY sb.track
       )
       SELECT 
-          b.track as shift_name,
-          COUNT(b.id) as bill_count,
-          SUM(b.grand_total) as total_amount,
-          SUM(b.grand_total) * (SELECT rate FROM GstRate) as gst_amount
-      FROM bills b
-      WHERE b.bill_date = $1 AND b.track = $2 AND b.bill_number > 0
-      GROUP BY b.track
+          s.shift_name,
+          s.bill_count,
+          ROUND(s.base_item_sum, 2) as base_amount,
+          ROUND(s.base_item_sum * (SELECT rate FROM GstRate), 2) as gst_amount,
+          ROUND(s.base_item_sum * (1 + (SELECT rate FROM GstRate)), 2) as total_amount
+      FROM ShiftBase s
       `,
       [date, shift_name],
     );
@@ -594,6 +634,7 @@ exports.getShiftOnlyReport = async (req, res) => {
       result.rows[0] || {
         shift_name,
         bill_count: 0,
+        base_amount: 0,
         total_amount: 0,
         gst_amount: 0,
       },
@@ -612,12 +653,62 @@ exports.getCategoryTotals = async (req, res) => {
       return res.status(400).json({ detail: "date is required" });
     }
 
-    const result = await pool.query(
-      "SELECT * FROM get_category_totals_for_date($1)",
-      [date],
-    );
+    const [result, gstRes] = await Promise.all([
+      pool.query(
+        `SELECT items_json FROM bills WHERE bill_date = $1 AND bill_number > 0`,
+        [date]
+      ),
+      pool.query(
+        `SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 + 1.0 as multiplier FROM settings LIMIT 1`
+      )
+    ]);
 
-    res.json(result.rows);
+    const gstMultiplier = parseFloat(gstRes.rows[0]?.multiplier) || 1.05;
+    const catMap = {};
+
+    result.rows.forEach(row => {
+      const items = row.items_json || [];
+      if (Array.isArray(items)) {
+        items.forEach(item => {
+          let cats = [];
+          if (item.categories) {
+            cats = Array.isArray(item.categories) ? item.categories : [item.categories];
+          } else if (item.category) {
+            try {
+              const parsed = typeof item.category === 'string' ? JSON.parse(item.category) : item.category;
+              cats = Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+              cats = [];
+            }
+          }
+          if (cats.length > 0 && Array.isArray(cats[0])) cats = cats[0];
+
+          cats.forEach(cat => {
+            if (cat && cat.name) {
+              const catName = String(cat.name).trim();
+              const catQtyMultiplier = parseFloat(cat.qty || cat.quantity) || 1;
+              const itemQty = parseFloat(item.quantity || item.qty) || 0;
+              const itemBaseAmount = parseFloat(item.line_total || item.amount) || 0;
+              const itemAmountWithGst = itemBaseAmount * gstMultiplier;
+              const resolvedQty = itemQty * catQtyMultiplier;
+
+              if (!catMap[catName]) {
+                catMap[catName] = { category_name: catName, total_quantity: 0, total_amount: 0 };
+              }
+              catMap[catName].total_quantity += resolvedQty;
+              catMap[catName].total_amount += itemAmountWithGst;
+            }
+          });
+        });
+      }
+    });
+
+    const rows = Object.values(catMap).map(c => ({
+      ...c,
+      total_amount: Math.round(c.total_amount * 100) / 100
+    }));
+
+    res.json(rows);
   } catch (error) {
     console.error("Category totals error:", error);
     res.status(500).json({ detail: "Failed to fetch category totals" });
@@ -641,7 +732,15 @@ exports.getCategoryReport = async (req, res) => {
       queryParams.push(shiftFilter.trim());
     }
 
-    const result = await pool.query(queryText, queryParams);
+    const [result, gstRes] = await Promise.all([
+      pool.query(queryText, queryParams),
+      pool.query(`
+        SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 + 1.0 as multiplier
+        FROM settings LIMIT 1
+      `)
+    ]);
+
+    const gstMultiplier = parseFloat(gstRes.rows[0]?.multiplier) || 1.05;
 
     const itemAggregation = {}; // key: item_name::category_name
 
@@ -669,7 +768,8 @@ exports.getCategoryReport = async (req, res) => {
               const catName = String(cat.name).trim();
               const catQtyMultiplier = parseFloat(cat.qty || cat.quantity) || 1;
               const itemQty = parseFloat(item.quantity || item.qty) || 0;
-              const itemAmount = parseFloat(item.line_total || item.amount) || 0;
+              const itemBaseAmount = parseFloat(item.line_total || item.amount) || 0;
+              const itemAmountWithGst = itemBaseAmount * gstMultiplier;
 
               if (!category) {
                 // All categories selected: group and aggregate by category name only
@@ -684,7 +784,7 @@ exports.getCategoryReport = async (req, res) => {
                   };
                 }
                 itemAggregation[key].totalQuantity += resolvedQty;
-                itemAggregation[key].totalAmount += itemAmount;
+                itemAggregation[key].totalAmount += itemAmountWithGst;
               } else {
                 // Specific category selected: group and aggregate by item name + category
                 if (catName.toLowerCase().includes(category.toLowerCase())) {
@@ -700,7 +800,7 @@ exports.getCategoryReport = async (req, res) => {
                     };
                   }
                   itemAggregation[key].totalQuantity += resolvedQty;
-                  itemAggregation[key].totalAmount += itemAmount;
+                  itemAggregation[key].totalAmount += itemAmountWithGst;
                 }
               }
             }
@@ -709,7 +809,11 @@ exports.getCategoryReport = async (req, res) => {
       }
     });
 
-    const reportData = Object.values(itemAggregation).sort((a, b) => b.totalQuantity - a.totalQuantity);
+    const reportData = Object.values(itemAggregation).map(item => ({
+      ...item,
+      totalAmount: Math.round(item.totalAmount * 100) / 100
+    })).sort((a, b) => b.totalQuantity - a.totalQuantity);
+
     res.json(reportData);
   } catch (error) {
     console.error("Category report error:", error);

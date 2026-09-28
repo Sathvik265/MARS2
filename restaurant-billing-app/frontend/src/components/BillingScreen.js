@@ -35,11 +35,14 @@ import {
 import { toast, safeGet, safeArray, safeObject, getCustomShortcuts, matchesShortcut, formatDateToDDMMYYYY } from "../utils/helpers";
 import { generateAsciiReceipt } from "../utils/receiptGenerator";
 
-export const getSectionForTable = (tableNo) => {
+export const getSectionForTable = (tableNo, systemSection = "") => {
   const table = parseInt(tableNo, 10);
-  if (isNaN(table)) return "G";
+  if (isNaN(table)) {
+    return systemSection?.toUpperCase() === "P" ? "P" : "G";
+  }
   if (table === 1) return "P";
-  if (table >= 15 && table <= 30) return "AC";
+  if (table >= 15) return "AC";
+  if (systemSection?.toUpperCase() === "P") return "P";
   return "G";
 };
 
@@ -175,10 +178,7 @@ export default function Billing({
   }, [userInitials, activeShift]);
 
   const currentDraft = useMemo(() => {
-    let sectionDefault = getSectionForTable(currentTable || "");
-    if (settingsCache?.section?.toUpperCase() === "P") {
-      sectionDefault = "P";
-    }
+    let sectionDefault = getSectionForTable(currentTable || "", settingsCache?.section);
     const defaultDraft = {
       header: {
         table_no: currentTable || "",
@@ -268,10 +268,7 @@ export default function Billing({
   };
 
   const setSectionByTable = (tableNo) => {
-    let section = getSectionForTable(tableNo);
-    if (settingsCache?.section?.toUpperCase() === "P") {
-      section = "P";
-    }
+    let section = getSectionForTable(tableNo, settingsCache?.section);
     // Ensure we trigger the update on the CURRENT draft if it exists
     if (onHeaderChange) {
       onHeaderChange({ section });
@@ -292,10 +289,7 @@ export default function Billing({
     let modifiedFromBillId = null;
 
     // Calculate section for new draft
-    let initialSection = getSectionForTable(tableNo);
-    if (settingsCache?.section?.toUpperCase() === "P") {
-      initialSection = "P";
-    }
+    let initialSection = getSectionForTable(tableNo, settingsCache?.section);
 
     try {
       const pendingOrders = await getPendingOrdersByTableAndParty(tableNo, String(partyNo));

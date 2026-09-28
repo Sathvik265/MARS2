@@ -65,6 +65,7 @@ function getRawPrintExePath() {
 
 // In-memory print job status tracking
 const printJobMap = new Map();
+let cachedPrinterInfo = null;
 
 function updateJobStatus(jobId, status, error = null) {
   if (!jobId) return;
@@ -88,12 +89,15 @@ async function resolvePrinter() {
   const configuredNorm = normalizePrinterName(configuredName);
 
   if (DISABLE_PRINTER_CHECK) {
-    return { name: configuredName || "Default Printer", shareName: "", driverName: "Generic / Text Only", shared: false, online: true, bypassed: true };
+    const info = { name: configuredName || "Default Printer", shareName: "", driverName: "Generic / Text Only", shared: false, online: true, bypassed: true };
+    cachedPrinterInfo = info;
+    return info;
   }
 
-  return new Promise((resolve, reject) => {
-    if (IS_WINDOWS) {
-      const psCommand = `
+  try {
+    const info = await new Promise((resolve, reject) => {
+      if (IS_WINDOWS) {
+        const psCommand = `
         $targetNorm = '${configuredNorm.replace(/'/g, "''")}';
         $printers = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue | Select-Object Name, ShareName, DriverName, PortName, WorkOffline, PrinterStatus, Default, Shared
         if (-not $printers) {
@@ -156,99 +160,105 @@ async function resolvePrinter() {
         }
       `;
 
-      execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", psCommand], { timeout: STATUS_TIMEOUT }, (error, stdout, stderr) => {
-        const outStr = stdout ? stdout.trim() : "";
-        if (error || !outStr.startsWith("ONLINE:")) {
-          if (outStr.startsWith("OFFLINE:")) {
-            const parts = outStr.replace("OFFLINE:", "").split("|");
-            const offlineName = parts[0].trim();
-            const listStr = parts[4] || parts[2] || "";
-            const err = new Error(`Printer '${offlineName}' is OFFLINE or DISCONNECTED. Please ensure the printer is turned ON and the USB cable is firmly plugged in. Installed: ${listStr}`);
-            err.printer = offlineName;
-            reject(err);
-          } else if (outStr.startsWith("NOT_FOUND:")) {
-            const details = outStr.replace("NOT_FOUND:", "").trim();
-            const err = new Error(`Configured printer '${configuredName || "Default"}' not found. ${details}`);
-            reject(err);
-          } else if (outStr === "NO_PRINTERS_FOUND") {
-            reject(new Error("No printers are installed on this Windows system."));
+        execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", psCommand], { timeout: STATUS_TIMEOUT }, (error, stdout, stderr) => {
+          const outStr = stdout ? stdout.trim() : "";
+          if (error || !outStr.startsWith("ONLINE:")) {
+            if (outStr.startsWith("OFFLINE:")) {
+              const parts = outStr.replace("OFFLINE:", "").split("|");
+              const offlineName = parts[0].trim();
+              const listStr = parts[4] || parts[2] || "";
+              const err = new Error(`Printer '${offlineName}' is OFFLINE or DISCONNECTED. Please ensure the printer is turned ON and the USB cable is firmly plugged in. Installed: ${listStr}`);
+              err.printer = offlineName;
+              reject(err);
+            } else if (outStr.startsWith("NOT_FOUND:")) {
+              const details = outStr.replace("NOT_FOUND:", "").trim();
+              const err = new Error(`Configured printer '${configuredName || "Default"}' not found. ${details}`);
+              reject(err);
+            } else if (outStr === "NO_PRINTERS_FOUND") {
+              reject(new Error("No printers are installed on this Windows system."));
+            } else {
+              const detailMsg = outStr || stderr || (error ? error.message : "Printer status check failed");
+              reject(new Error(`Unable to check printer status: ${detailMsg}`));
+            }
           } else {
-            const detailMsg = outStr || stderr || (error ? error.message : "Printer status check failed");
-            reject(new Error(`Unable to check printer status: ${detailMsg}`));
+            const payload = outStr.replace("ONLINE:", "").trim();
+            const parts = payload.split("|");
+            const resolvedName = parts[0].trim();
+            const resolvedShareName = (parts[1] || "").trim();
+            const resolvedDriverName = (parts[2] || "").trim();
+            const resolvedShared = (parts[3] || "").trim().toLowerCase() === "true";
+            resolve({
+              name: resolvedName,
+              shareName: resolvedShareName,
+              driverName: resolvedDriverName,
+              shared: resolvedShared,
+              online: true
+            });
           }
-        } else {
-          const payload = outStr.replace("ONLINE:", "").trim();
-          const parts = payload.split("|");
-          const resolvedName = parts[0].trim();
-          const resolvedShareName = (parts[1] || "").trim();
-          const resolvedDriverName = (parts[2] || "").trim();
-          const resolvedShared = (parts[3] || "").trim().toLowerCase() === "true";
-          resolve({
-            name: resolvedName,
-            shareName: resolvedShareName,
-            driverName: resolvedDriverName,
-            shared: resolvedShared,
-            online: true
-          });
-        }
-      });
-    } else {
-      // macOS printer resolution
-      execFile("lpstat", ["-d"], { timeout: STATUS_TIMEOUT }, (lpErr, lpStdout) => {
-        let defaultQueue = null;
-        if (!lpErr && lpStdout) {
-          const m = lpStdout.match(/system default destination:\s*(.+)/i);
-          if (m) defaultQueue = m[1].trim();
-        }
-
-        execFile("system_profiler", ["SPPrintersDataType"], { timeout: STATUS_TIMEOUT }, (error, stdout) => {
-          if (error || !stdout) {
-            reject(new Error("Unable to check printer status on macOS"));
-            return;
+        });
+      } else {
+        // macOS printer resolution
+        execFile("lpstat", ["-d"], { timeout: STATUS_TIMEOUT }, (lpErr, lpStdout) => {
+          let defaultQueue = null;
+          if (!lpErr && lpStdout) {
+            const m = lpStdout.match(/system default destination:\s*(.+)/i);
+            if (m) defaultQueue = m[1].trim();
           }
 
-          const lines = stdout.split("\n");
-          let currentPrinter = null;
-          let isOffline = false;
-          let installedPrinters = [];
-          let matchedName = null;
-
-          for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line.endsWith(":")) {
-              currentPrinter = line.slice(0, -1).trim();
-              if (currentPrinter && !installedPrinters.includes(currentPrinter)) {
-                installedPrinters.push(currentPrinter);
-              }
+          execFile("system_profiler", ["SPPrintersDataType"], { timeout: STATUS_TIMEOUT }, (error, stdout) => {
+            if (error || !stdout) {
+              reject(new Error("Unable to check printer status on macOS"));
+              return;
             }
 
-            if (currentPrinter && configuredNorm) {
-              const currentNorm = normalizePrinterName(currentPrinter);
-              if (currentNorm.includes(configuredNorm) || configuredNorm.includes(currentNorm)) {
-                matchedName = currentPrinter;
-                if (line.startsWith("Status:")) {
-                  const statusVal = line.replace("Status:", "").trim().toLowerCase();
-                  if (statusVal.includes("offline")) isOffline = true;
+            const lines = stdout.split("\n");
+            let currentPrinter = null;
+            let isOffline = false;
+            let installedPrinters = [];
+            let matchedName = null;
+
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i].trim();
+              if (line.endsWith(":")) {
+                currentPrinter = line.slice(0, -1).trim();
+                if (currentPrinter && !installedPrinters.includes(currentPrinter)) {
+                  installedPrinters.push(currentPrinter);
+                }
+              }
+
+              if (currentPrinter && configuredNorm) {
+                const currentNorm = normalizePrinterName(currentPrinter);
+                if (currentNorm.includes(configuredNorm) || configuredNorm.includes(currentNorm)) {
+                  matchedName = currentPrinter;
+                  if (line.startsWith("Status:")) {
+                    const statusVal = line.replace("Status:", "").trim().toLowerCase();
+                    if (statusVal.includes("offline")) isOffline = true;
+                  }
                 }
               }
             }
-          }
 
-          if (!matchedName) {
-            matchedName = defaultQueue || installedPrinters[0] || configuredName || "Default Printer";
-          }
+            if (!matchedName) {
+              matchedName = defaultQueue || installedPrinters[0] || configuredName || "Default Printer";
+            }
 
-          if (isOffline) {
-            const err = new Error(`Printer '${matchedName}' is offline. Installed: [${installedPrinters.join(", ")}]`);
-            err.printer = matchedName;
-            reject(err);
-          } else {
-            resolve({ name: matchedName, shareName: "", driverName: "macOS CUPS", shared: false, online: true });
-          }
+            if (isOffline) {
+              const err = new Error(`Printer '${matchedName}' is offline. Installed: [${installedPrinters.join(", ")}]`);
+              err.printer = matchedName;
+              reject(err);
+            } else {
+              resolve({ name: matchedName, shareName: "", driverName: "macOS CUPS", shared: false, online: true });
+            }
+          });
         });
-      });
-    }
-  });
+      }
+    });
+    cachedPrinterInfo = { ...info, timestamp: Date.now() };
+    return info;
+  } catch (err) {
+    cachedPrinterInfo = null;
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +272,12 @@ router.get("/status", async (req, res) => {
 
   if (DISABLE_PRINTER_CHECK) {
     return res.json({ connected: true, bypassed: true, message: "Printer check disabled (DISABLE_PRINTER_CHECK=true)" });
+  }
+
+  // Fast-path: Return cached printer status if fresh (TTL = 15 seconds) to avoid spawning PowerShell on every poll
+  const CACHE_TTL = 15000;
+  if (cachedPrinterInfo && cachedPrinterInfo.timestamp && (Date.now() - cachedPrinterInfo.timestamp < CACHE_TTL)) {
+    return res.json({ connected: true, printer: cachedPrinterInfo.name, driverName: cachedPrinterInfo.driverName, shared: cachedPrinterInfo.shared, cached: true });
   }
 
   try {
@@ -526,17 +542,24 @@ async function executePrintJob(printBuf, jobId) {
       let driverName = "";
       let shared = false;
 
-      try {
-        const resolved = await resolvePrinter();
-        printerName = resolved.name;
-        shareName = resolved.shareName;
-        driverName = resolved.driverName;
-        shared = resolved.shared;
-      } catch (resolveErr) {
-        printerName = getEffectivePrinterName() || "Generic  Text Only";
-        console.warn(`[PrintQueue] Printer resolution failed for job ${jobId}, falling back to '${printerName}': ${resolveErr.message}`);
-        if (resolveErr.message && (resolveErr.message.includes("offline") || resolveErr.message.includes("OFFLINE") || resolveErr.message.includes("disconnected"))) {
-          throw resolveErr;
+      if (cachedPrinterInfo && cachedPrinterInfo.name) {
+        printerName = cachedPrinterInfo.name;
+        shareName = cachedPrinterInfo.shareName || "";
+        driverName = cachedPrinterInfo.driverName || "";
+        shared = cachedPrinterInfo.shared || false;
+      } else {
+        try {
+          const resolved = await resolvePrinter();
+          printerName = resolved.name;
+          shareName = resolved.shareName;
+          driverName = resolved.driverName;
+          shared = resolved.shared;
+        } catch (resolveErr) {
+          printerName = getEffectivePrinterName() || "Generic / Text Only";
+          console.warn(`[PrintQueue] Printer resolution failed for job ${jobId}, falling back to '${printerName}': ${resolveErr.message}`);
+          if (resolveErr.message && (resolveErr.message.includes("offline") || resolveErr.message.includes("OFFLINE") || resolveErr.message.includes("disconnected"))) {
+            throw resolveErr;
+          }
         }
       }
 
@@ -699,28 +722,71 @@ router.post("/print", async (req, res) => {
 
   try {
     const ESC = 0x1B;
-    const escPrefix = Buffer.from([
+    const isDarkMode = (process.env.PRINTER_DARK_MODE || "false").toLowerCase() === "true" || process.env.PRINTER_DARK_MODE === "1";
+
+    const escPrefixBytes = [
       0x0D,                     // CR — flush any partial line
-      ESC, 0x40,                // ESC @   — Initialize printer
+      // ESC, 0x40,                // ESC @   — Initialize printer
       ESC, 0x78, 0x00,          // ESC x 0 — Draft mode (maximum speed)
-      ESC, 0x45,                // ESC E   — Emphasized mode ON (DARK text in single pass, fast speed)
-      ESC, 0x55, 0x01,          // ESC U 1 — Unidirectional printing ON (Fixes alternate dark/light lines)
+    ];
+
+    if (isDarkMode) {
+      escPrefixBytes.push(ESC, 0x45, 0x01); // ESC E 1 — Emphasized mode ON (DARK text in single pass, fast speed)
+    }
+
+    escPrefixBytes.push(
+      // ESC, 0x55, 0x00,          // ESC U 1 — Unidirectional printing ON (Fixes alternate dark/light lines)
       ESC, 0x4D,                // ESC M   — 12 CPI (Elite pitch)
       ESC, 0x32,                // ESC 2   — 1/6-inch line spacing
       ESC, 0x6C, 0x00,          // ESC l 0 — Left margin = 0
-    ]);
+    );
 
-    const textBuf = Buffer.from(text, "utf8");
+    const escPrefix = Buffer.from(escPrefixBytes);
 
     const feedLines = Math.max(0, parseInt(process.env.PRINTER_FEED_LINES || "4", 10));
-    const feedBuf = Buffer.from("\r\n".repeat(feedLines), "utf8");
+    let feedBuf = Buffer.alloc(0);
+    if (feedLines > 0) {
+      const escD = Buffer.from([ESC, 0x64, Math.min(feedLines, 255)]); // ESC d <n> — ESC/P hardware line feed
+      const crlfFeed = Buffer.from("\r\n".repeat(feedLines), "utf8");
+      feedBuf = Buffer.concat([crlfFeed, escD]);
+    }
+
+    // Insert PRINTER_FEED_LINES gap between bill contents and bottom header
+    let mainBody = text;
+    let bottomHeader = "";
+
+    const marker = "---BOTTOM_HEADER---\r\n";
+    const markerAlt = "---BOTTOM_HEADER---\n";
+
+    let markerIdx = text.indexOf(marker);
+    let markerLen = marker.length;
+    if (markerIdx === -1) {
+      markerIdx = text.indexOf(markerAlt);
+      markerLen = markerAlt.length;
+    }
+
+    if (markerIdx !== -1) {
+      mainBody = text.substring(0, markerIdx);
+      bottomHeader = text.substring(markerIdx + markerLen);
+    } else {
+      // Fallback: search for Table/Party separator line right before bottom header
+      const match = text.match(/(Table:\s*\d+[\s\S]*?----------------------------------------\r?\n)/);
+      if (match) {
+        const splitPos = match.index + match[0].length;
+        mainBody = text.substring(0, splitPos);
+        bottomHeader = text.substring(splitPos);
+      }
+    }
+
     const escCleanup = Buffer.from([
       ESC, 0x45, 0x00,          // ESC E 0 — Emphasized mode OFF
       ESC, 0x55, 0x00,          // ESC U 0 — Unidirectional mode OFF
-      ESC, 0x40                 // ESC @   — Reset printer
     ]);
 
-    const printBuf = Buffer.concat([escPrefix, textBuf, feedBuf, escCleanup]);
+    const mainBodyBuf = Buffer.from(mainBody, "utf8");
+    const bottomHeaderBuf = Buffer.from(bottomHeader, "utf8");
+
+    const printBuf = Buffer.concat([escPrefix, mainBodyBuf, feedBuf, bottomHeaderBuf, escCleanup]);
 
     const jobId = randomUUID();
     updateJobStatus(jobId, "queued");
@@ -768,7 +834,88 @@ router.post("/print", async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /printer/recheck — Deep re-detection & check print test
+// ---------------------------------------------------------------------------
+router.post("/recheck", async (req, res) => {
+  try {
+    cachedPrinterInfo = null;
+    const printerInfo = await resolvePrinter();
+    runStartupCheckAndPrint().catch(err => console.warn("Recheck check print warning:", err.message));
+    return res.json({
+      success: true,
+      connected: true,
+      printer: printerInfo.name,
+      driverName: printerInfo.driverName
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      connected: false,
+      error: err.message
+    });
+  }
+});
+
+async function runStartupCheckAndPrint() {
+  console.log("🖨️ [Startup Printer Check] Resolving printer and sending initial header check print...");
+  try {
+    const printerInfo = await resolvePrinter();
+    console.log(`✅ [Startup Printer Check] Printer resolved: '${printerInfo.name}' (${printerInfo.driverName})`);
+
+    const ESC = 0x1B;
+    const isDarkMode = (process.env.PRINTER_DARK_MODE || "false").toLowerCase() === "true" || process.env.PRINTER_DARK_MODE === "1";
+
+    const escPrefixBytes = [
+      0x0D,                     // CR — flush partial line
+      // ESC, 0x40,                // ESC @   — Initialize printer
+      ESC, 0x78, 0x00,          // ESC x 0 — Draft mode
+    ];
+
+    if (isDarkMode) {
+      escPrefixBytes.push(ESC, 0x45, 0x01); // ESC E 1 — Emphasized mode ON
+    }
+
+    escPrefixBytes.push(
+      // ESC, 0x55, 0x00,          // ESC U 0 — Unidirectional printing OFF
+      ESC, 0x4D,                // ESC M   — 12 CPI
+      ESC, 0x32,                // ESC 2   — 1/6-inch line spacing
+      ESC, 0x6C, 0x00,          // ESC l 0 — Left margin = 0
+    );
+
+    const escPrefix = Buffer.from(escPrefixBytes);
+
+    const testHeader =
+      "========================================\r\n" +
+      "       NEW UDIPI ANAND BHAVAN           \r\n" +
+      "      --- PRINTER CHECK OK ---          \r\n" +
+      "========================================\r\n";
+
+    const textBuf = Buffer.from(testHeader, "utf8");
+    const feedLines = Math.max(0, parseInt(process.env.PRINTER_FEED_LINES || "4", 10));
+    let feedBuf = Buffer.alloc(0);
+    if (feedLines > 0) {
+      const escD = Buffer.from([ESC, 0x64, Math.min(feedLines, 255)]); // ESC d <n>
+      const crlfFeed = Buffer.from("\r\n".repeat(feedLines), "utf8");
+      feedBuf = Buffer.concat([crlfFeed, escD]);
+    }
+
+    const escCleanup = Buffer.from([
+      ESC, 0x45, 0x00,
+      ESC, 0x55, 0x00,
+    ]);
+    const printBuf = Buffer.concat([escPrefix, textBuf, feedBuf, escCleanup]);
+
+    const jobId = "startup_check_" + Date.now();
+    await executePrintJob(printBuf, jobId);
+    console.log("🚀 [Startup Printer Check] Initial header check printed successfully.");
+  } catch (err) {
+    console.warn(`⚠️ [Startup Printer Check] Initial printer check warning: ${err.message}`);
+  }
+}
+
 router.executePrintJob = executePrintJob;
 router.resolvePrinter = resolvePrinter;
+router.runStartupCheckAndPrint = runStartupCheckAndPrint;
 
 module.exports = router;
