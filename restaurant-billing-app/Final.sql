@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS orders (
     item_code VARCHAR(20),
     numeric_item_code VARCHAR(20),
     item_name VARCHAR(255),
-    quantity INTEGER DEFAULT 1,
+    quantity NUMERIC(10,2) DEFAULT 1.00,
     unit_price DECIMAL(10,2) DEFAULT 0,
     line_total DECIMAL(10,2) DEFAULT 0,
     is_separate BOOLEAN DEFAULT FALSE,

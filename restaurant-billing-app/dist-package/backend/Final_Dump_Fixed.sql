@@ -252,7 +252,7 @@ CREATE TABLE public.bill_items (
     bill_item_id integer NOT NULL,
     bill_id integer NOT NULL,
     item_name character varying(255) NOT NULL,
-    quantity integer NOT NULL,
+    quantity numeric(10,2) NOT NULL,
     price_per_item numeric(10,2) NOT NULL,
     line_total numeric(10,2),
     created_at timestamp with time zone DEFAULT now()
@@ -427,7 +427,7 @@ CREATE TABLE public.orders (
     item_code character varying(20),
     numeric_item_code character varying(20),
     item_name character varying(255),
-    quantity integer DEFAULT 1,
+    quantity numeric(10,2) DEFAULT 1.00,
     unit_price numeric(10,2) DEFAULT 0.00,
     line_total numeric(10,2) DEFAULT 0.00,
     is_separate boolean DEFAULT false,

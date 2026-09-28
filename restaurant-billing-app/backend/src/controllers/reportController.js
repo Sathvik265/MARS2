@@ -106,9 +106,9 @@ exports.getShiftSummaryReport = async (req, res) => {
       SELECT 
           s.date,
           s.shift_name,
-          ROUND(s.base_item_sum, 2) as amount,
-          ROUND(s.base_item_sum * (SELECT rate FROM GstRate), 2) as gst_amount,
-          ROUND(s.base_item_sum * (1 + (SELECT rate FROM GstRate)), 2) as total_amount
+          CEIL(s.base_item_sum) as amount,
+          CEIL(s.base_item_sum * (SELECT rate FROM GstRate)) as gst_amount,
+          CEIL(s.base_item_sum * (1 + (SELECT rate FROM GstRate))) as total_amount
       FROM ShiftBaseTotals s
       ORDER BY s.shift_name
       `,
@@ -170,10 +170,10 @@ exports.getShiftDetailedReport = async (req, res) => {
         COALESCE(p.item_code, '') as item_code,
         p.item_name,
         p.category_name as category,
-        SUM(p.qty) as total_quantity,
-        ROUND(SUM(p.amount), 2) as base_amount,
-        ROUND(SUM(p.amount) * (SELECT rate FROM GstRate), 2) as gst_amount,
-        ROUND(SUM(p.amount) * (1 + (SELECT rate FROM GstRate)), 2) as final_total
+        CEIL(SUM(p.qty)) as total_quantity,
+        CEIL(SUM(p.amount)) as base_amount,
+        CEIL(SUM(p.amount) * (SELECT rate FROM GstRate)) as gst_amount,
+        CEIL(SUM(p.amount) * (1 + (SELECT rate FROM GstRate))) as final_total
       FROM ProcessedItems p
       GROUP BY p.item_code, p.item_name, p.category_name
       ORDER BY p.category_name, p.item_name
@@ -203,7 +203,7 @@ exports.getShiftWiseReport = async (req, res) => {
       SELECT   
         track as shift_name,   
         COUNT(id) as bill_count,
-        SUM(grand_total) as total_amount
+        CEIL(SUM(grand_total)) as total_amount
       FROM bills
       WHERE bill_date = $1 AND bill_number > 0
       GROUP BY track
@@ -231,7 +231,7 @@ exports.getTimeWiseReport = async (req, res) => {
       SELECT   
         TO_CHAR(created_at, 'HH24:00') as time_slot,
         COUNT(id) as bill_count,
-        SUM(grand_total) as total_amount
+        CEIL(SUM(grand_total)) as total_amount
       FROM bills
       WHERE bill_date = $1 AND bill_number > 0
       GROUP BY time_slot
@@ -262,8 +262,8 @@ exports.getItemWiseReport = async (req, res) => {
       )
       SELECT   
         item->>'item_name' as item_name,   
-        SUM((item->>'quantity')::numeric) as total_quantity,
-        ROUND(SUM((item->>'line_total')::decimal) * (SELECT multiplier FROM GstRate), 2) as total_amount
+        CEIL(SUM((item->>'quantity')::numeric)) as total_quantity,
+        CEIL(SUM((item->>'line_total')::decimal) * (SELECT multiplier FROM GstRate)) as total_amount
       FROM bills b,
       jsonb_array_elements(b.items_json) as item
       WHERE b.bill_date = $1 AND b.bill_number > 0
@@ -330,8 +330,8 @@ exports.getItemReport = async (req, res) => {
       )
       SELECT   
         item->>'item_name' as item_name,
-        SUM((item->>'quantity')::decimal) as total_quantity,
-        ROUND(SUM((item->>'line_total')::decimal) * (SELECT multiplier FROM GstRate), 2) as total_amount
+        CEIL(SUM((item->>'quantity')::decimal)) as total_quantity,
+        CEIL(SUM((item->>'line_total')::decimal) * (SELECT multiplier FROM GstRate)) as total_amount
       FROM bills b,
       jsonb_array_elements(b.items_json) as item
       WHERE ${whereClause}
@@ -342,8 +342,8 @@ exports.getItemReport = async (req, res) => {
 
     const formattedResult = result.rows.map((row) => ({
       itemName: row.item_name,
-      totalQuantity: parseFloat(row.total_quantity || 0),
-      totalAmount: parseFloat(row.total_amount || 0),
+      totalQuantity: Math.ceil(parseFloat(row.total_quantity || 0)),
+      totalAmount: Math.ceil(parseFloat(row.total_amount || 0)),
     }));
 
     res.json(formattedResult);
@@ -705,7 +705,8 @@ exports.getCategoryTotals = async (req, res) => {
 
     const rows = Object.values(catMap).map(c => ({
       ...c,
-      total_amount: Math.round(c.total_amount * 100) / 100
+      total_quantity: Math.ceil(c.total_quantity),
+      total_amount: Math.ceil(c.total_amount)
     }));
 
     res.json(rows);
@@ -811,7 +812,8 @@ exports.getCategoryReport = async (req, res) => {
 
     const reportData = Object.values(itemAggregation).map(item => ({
       ...item,
-      totalAmount: Math.round(item.totalAmount * 100) / 100
+      totalQuantity: Math.ceil(item.totalQuantity),
+      totalAmount: Math.ceil(item.totalAmount)
     })).sort((a, b) => b.totalQuantity - a.totalQuantity);
 
     res.json(reportData);

@@ -100,6 +100,13 @@ const BillContent = ({ data, settings, isLast = true }) => {
   const printClerkInitials = isSrihari ? "" : clerkInitials;
   const headerTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
 
+  // Hotel Header at TOP
+  ascii += centerText(headerTitle, LINE_WIDTH) + "\n";
+  if (address) ascii += centerText(address, LINE_WIDTH) + "\n";
+  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\n";
+  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\n";
+  ascii += separator + "\n";
+
   // Meta Info
   const timeAndBill = `${printTime} #${billNumber}`;
   // remaining spaces for date
@@ -126,7 +133,8 @@ const BillContent = ({ data, settings, isLast = true }) => {
         temp = temp.substring(19);
       }
 
-      const qty = String(item.quantity || item.qty);
+      const rawQty = parseFloat(item.quantity || item.qty || 0);
+      const qty = Number.isInteger(rawQty) ? String(rawQty) : String(rawQty);
       const total = Number(item.line_total || item.amount).toFixed(2);
 
       nameLines.forEach((line, i) => {
@@ -159,15 +167,7 @@ const BillContent = ({ data, settings, isLast = true }) => {
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\n";
   ascii += separator + "\n";
 
-  // Hotel Header at BOTTOM — saves paper & simplifies tearoff
-  ascii += "---BOTTOM_HEADER---\n";
-  ascii += centerText(headerTitle, LINE_WIDTH) + "\n";
-  if (address) ascii += centerText(address, LINE_WIDTH) + "\n";
-  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\n";
-  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\n";
-  ascii += separator + "\n";
-
-  const displayAscii = ascii.replace(/---BOTTOM_HEADER---\r?\n?/g, "");
+  const displayAscii = ascii;
 
   return (
     <pre style={{

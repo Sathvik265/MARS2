@@ -58,7 +58,10 @@ if (Test-Path $OutputDir) { Remove-Item -Recurse -Force $OutputDir }
 New-Item -ItemType Directory -Path "$OutputDir\backend" -Force | Out-Null
 New-Item -ItemType Directory -Path "$OutputDir\frontend" -Force | Out-Null
 
-Copy-Item "$root\backend\dist\rbs-backend.exe" "$OutputDir\backend\"
+Copy-Item "$root\backend\dist\rbs-backend.exe" "$OutputDir\backend\rbs-backend.exe"
+Copy-Item "$root\backend\dist\rbs-backend.exe" "$OutputDir\backend\backend.exe" -ErrorAction SilentlyContinue
+Copy-Item "$root\backend\dist\rbs-backend.exe" "$root\backend.exe" -ErrorAction SilentlyContinue
+
 if (Test-Path "$root\backend\rawprint.exe") {
     Copy-Item "$root\backend\rawprint.exe" "$OutputDir\backend\"
 }
@@ -74,21 +77,45 @@ if (Test-Path "$root\Final_Dump_Fixed.sql") {
     Copy-Item "$root\backend\Final_Dump_Fixed.sql" "$OutputDir\backend\"
 }
 
-Copy-Item "$fsDir\dist\rbs-frontend.exe" "$OutputDir\frontend\"
+Copy-Item "$fsDir\dist\rbs-frontend.exe" "$OutputDir\frontend\rbs-frontend.exe"
+Copy-Item "$fsDir\dist\rbs-frontend.exe" "$OutputDir\frontend\frontend.exe" -ErrorAction SilentlyContinue
+Copy-Item "$fsDir\dist\rbs-frontend.exe" "$root\frontend.exe" -ErrorAction SilentlyContinue
+
 # Copy the React build folder next to the exe so server.js can serve it from disk.
 # The build folder MUST be at dist-package\frontend\build\
 if (Test-Path "$OutputDir\frontend\build") { Remove-Item -Recurse -Force "$OutputDir\frontend\build" }
 Copy-Item -Recurse -Force "$root\frontend\build" "$OutputDir\frontend\build"
 
-Copy-Item "$root\deploy\install-services.ps1" "$OutputDir\"
-Copy-Item "$root\deploy\run-local.ps1" "$OutputDir\"
-Copy-Item "$root\deploy\RunApp.bat" "$OutputDir\"
-Copy-Item "$root\deploy\run-apps-only.ps1" "$OutputDir\"
-Copy-Item "$root\deploy\RunAppsOnly.bat" "$OutputDir\"
-Copy-Item "$root\deploy\DEPLOY_PACKAGE_README.md" "$OutputDir\README.md"
+Copy-Item "$root\deploy\install-services.ps1" "$OutputDir\" -ErrorAction SilentlyContinue
+Copy-Item "$root\deploy\run-local.ps1" "$OutputDir\" -ErrorAction SilentlyContinue
+Copy-Item "$root\deploy\RunApp.bat" "$OutputDir\" -ErrorAction SilentlyContinue
+Copy-Item "$root\deploy\run-apps-only.ps1" "$OutputDir\" -ErrorAction SilentlyContinue
+Copy-Item "$root\deploy\RunAppsOnly.bat" "$OutputDir\" -ErrorAction SilentlyContinue
+Copy-Item "$root\update_db.bat" "$OutputDir\" -ErrorAction SilentlyContinue
+Copy-Item "$root\update_db.sql" "$OutputDir\" -ErrorAction SilentlyContinue
+Copy-Item "$root\Final.sql" "$OutputDir\" -ErrorAction SilentlyContinue
+Copy-Item "$root\Final_Dump_Fixed.sql" "$OutputDir\" -ErrorAction SilentlyContinue
+
+# Generate shortcut
+$ws = New-Object -ComObject WScript.Shell
+$lnk = $ws.CreateShortcut("$OutputDir\RunAppsOnly.lnk")
+$lnk.TargetPath = "$OutputDir\RunAppsOnly.bat"
+$lnk.WorkingDirectory = "$OutputDir"
+$lnk.Save()
+
+Copy-Item "$root\deploy\DEPLOY_PACKAGE_README.md" "$OutputDir\README.md" -ErrorAction SilentlyContinue
 
 if (Test-Path $OutputZip) { Remove-Item $OutputZip }
 Compress-Archive -Path "$OutputDir\*" -DestinationPath $OutputZip
+
+if (Test-Path "D:\") {
+    Write-Host "Copying package and extract script to D:\..." -ForegroundColor Cyan
+    Copy-Item -Force $OutputZip "D:\rbs-deploy-package.zip"
+    if (Test-Path "$root\extract_package_from_usb.bat") {
+        Copy-Item -Force "$root\extract_package_from_usb.bat" "D:\extract_package_from_usb.bat"
+    }
+    Write-Host "[SUCCESS] Package and USB extraction batch file copied to D:\" -ForegroundColor Green
+}
 
 Write-Host ""
 Write-Host "Done. Package folder: $OutputDir" -ForegroundColor Green

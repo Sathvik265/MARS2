@@ -25,11 +25,17 @@ function Test-PortInUse {
     return $false
 }
 
-# 1. Check and parse backend env file
-$envPath = Join-Path $PSScriptRoot "backend\.env"
+# 1. Resolve base working directory
+$baseDir = $PSScriptRoot
+if (Test-Path (Join-Path $PSScriptRoot "..\backend")) {
+    $baseDir = (Get-Item (Join-Path $PSScriptRoot "..")).FullName
+}
+
+# Check and parse backend env file
+$envPath = Join-Path $baseDir "backend\.env"
 if (-not (Test-Path $envPath)) {
     Write-Host "   - backend\.env not found. Copying from example template..." -ForegroundColor Yellow
-    $exampleEnv = Join-Path $PSScriptRoot "backend\.env.example"
+    $exampleEnv = Join-Path $baseDir "backend\.env.example"
     if (Test-Path $exampleEnv) {
         Copy-Item $exampleEnv $envPath
     } else {
@@ -89,8 +95,15 @@ if (-not $dbPassword -or $dbPassword -eq "your_postgres_password") {
 }
 
 # 3. Start Backend and Frontend processes
-$backendExe = Join-Path $PSScriptRoot "backend\rbs-backend.exe"
-$frontendExe = Join-Path $PSScriptRoot "frontend\rbs-frontend.exe"
+$backendExe = Join-Path $baseDir "backend\rbs-backend.exe"
+if (-not (Test-Path $backendExe)) {
+    $backendExe = Join-Path $baseDir "backend\backend.exe"
+}
+
+$frontendExe = Join-Path $baseDir "frontend\rbs-frontend.exe"
+if (-not (Test-Path $frontendExe)) {
+    $frontendExe = Join-Path $baseDir "frontend\frontend.exe"
+}
 
 if (-not (Test-Path $backendExe)) {
     Write-Error "Backend executable not found at: $backendExe"
@@ -117,18 +130,21 @@ try {
         Exit 1
     }
     
-    $backendLog = Join-Path $PSScriptRoot "backend\local-stderr.log"
-    $frontendLog = Join-Path $PSScriptRoot "frontend\local-stderr.log"
+    $backendLog = Join-Path $baseDir "backend\local-stderr.log"
+    $frontendLog = Join-Path $baseDir "frontend\local-stderr.log"
 
     # Remove stale logs
     Remove-Item $backendLog -ErrorAction SilentlyContinue
     Remove-Item $frontendLog -ErrorAction SilentlyContinue
     
+    $backendWorkDir = Join-Path $baseDir "backend"
+    $frontendWorkDir = Join-Path $baseDir "frontend"
+
     Write-Host "   - Spawning Backend ($backendExe)..." -ForegroundColor Cyan
-    $backendProc = Start-Process -FilePath $backendExe -WorkingDirectory (Join-Path $PSScriptRoot "backend") -WindowStyle Normal -RedirectStandardError $backendLog -PassThru
+    $backendProc = Start-Process -FilePath $backendExe -WorkingDirectory $backendWorkDir -WindowStyle Normal -RedirectStandardError $backendLog -PassThru
     
     Write-Host "   - Spawning Frontend ($frontendExe)..." -ForegroundColor Cyan
-    $frontendProc = Start-Process -FilePath $frontendExe -WorkingDirectory (Join-Path $PSScriptRoot "frontend") -WindowStyle Normal -RedirectStandardError $frontendLog -PassThru
+    $frontendProc = Start-Process -FilePath $frontendExe -WorkingDirectory $frontendWorkDir -WindowStyle Normal -RedirectStandardError $frontendLog -PassThru
     
     Start-Sleep -Seconds 3
     

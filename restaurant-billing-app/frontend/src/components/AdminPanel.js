@@ -493,6 +493,9 @@ function SettingsEditor({ settings, onChange, clerk, isValidClerk }) {
       if (onChange) {
         onChange(res.data);
       }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("rbs-settings-updated", { detail: res.data }));
+      }
       toast.success("Settings updated");
       setSaveStatus("Settings updated");
       setSaveStatusColor("text-emerald-500");

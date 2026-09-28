@@ -31,8 +31,11 @@ console.log(`[RBS Frontend] Serving React build from: ${buildDir}`);
 
 app.use(express.static(buildDir));
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(buildDir, "index.html"));
+app.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") {
+    return res.sendFile(path.join(buildDir, "index.html"));
+  }
+  next();
 });
 
 const server = app.listen(PORT, () => {

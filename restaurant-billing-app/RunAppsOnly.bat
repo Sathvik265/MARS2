@@ -6,7 +6,15 @@ echo ==========================================================
 echo Starting Restaurant Billing System (Apps Only)...
 echo ==========================================================
 
-powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\run-apps-only.ps1
+if exist "%~dp0deploy\run-apps-only.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0deploy\run-apps-only.ps1"
+) else if exist "%~dp0run-apps-only.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run-apps-only.ps1"
+) else (
+    echo [ERROR] Could not find run-apps-only.ps1 script.
+    pause
+    exit /b 1
+)
 
 if %ERRORLEVEL% neq 0 (
     echo.

@@ -169,13 +169,34 @@ export default function Billing({
           setSgstPercentage(parseFloat(res.data.sgst_percentage) || 0);
           setCgstPercentage(parseFloat(res.data.cgst_percentage) || 0);
           setSettingsCache(res.data);
+          cachedSettingsRef.current = res.data;
         }
       } catch (err) {
         console.error("Failed to load settings for taxes:", err);
       }
     };
     fetchSettings();
-  }, [userInitials, activeShift]);
+
+    const handleSettingsUpdated = (e) => {
+      if (e.detail) {
+        setSgstPercentage(parseFloat(e.detail.sgst_percentage) || 0);
+        setCgstPercentage(parseFloat(e.detail.cgst_percentage) || 0);
+        setSettingsCache(e.detail);
+        cachedSettingsRef.current = e.detail;
+      } else {
+        fetchSettings();
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("rbs-settings-updated", handleSettingsUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("rbs-settings-updated", handleSettingsUpdated);
+      }
+    };
+  }, [userInitials, activeShift, activeTab]);
 
   const currentDraft = useMemo(() => {
     let sectionDefault = getSectionForTable(currentTable || "", settingsCache?.section);
@@ -293,7 +314,7 @@ export default function Billing({
 
     try {
       const pendingOrders = await getPendingOrdersByTableAndParty(tableNo, String(partyNo));
-      
+
       // Filter out stale orders that belong to previous days
       let filteredOrders = pendingOrders || [];
       if (billingDate) {
@@ -506,6 +527,76 @@ export default function Billing({
   };
 
   const handleTableQtyKeyDown = (e, index) => {
+    const val = e.target.value;
+    const num = parseFloat(val);
+    const isZeroOrEmpty = val === "" || isNaN(num) || num <= 0;
+
+    const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+    const isAlt = e.altKey;
+    const isPageDown = e.key === "PageDown" || (isCmdOrCtrl && e.key.toLowerCase() === "d") || (isAlt && e.key.toLowerCase() === "d");
+    const isEnd = e.key === "End" || e.key === "Home" || matchesShortcut(e, getCustomShortcuts().printBill);
+
+    if (isZeroOrEmpty && (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "Enter" || e.key === "Escape" || isPageDown || isEnd)) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      removeLine(index);
+
+      if (isEnd) {
+        setTimeout(() => {
+          handlePrintBill();
+        }, 50);
+        return;
+      }
+
+      if (e.key === "ArrowUp") {
+        setTimeout(() => {
+          if (index > 0 && itemQtyRefs.current[index - 1]) {
+            itemQtyRefs.current[index - 1].focus();
+            itemQtyRefs.current[index - 1].select();
+          } else if (qtyRef.current) {
+            qtyRef.current.focus();
+            qtyRef.current.select();
+          }
+        }, 50);
+      } else if (e.key === "ArrowDown" || e.key === "Enter") {
+        setTimeout(() => {
+          if (itemQtyRefs.current[index + 1]) {
+            itemQtyRefs.current[index + 1].focus();
+            itemQtyRefs.current[index + 1].select();
+          } else if (itemCodeRef.current) {
+            itemCodeRef.current.focus();
+            itemCodeRef.current.select();
+          }
+        }, 50);
+      } else if (isPageDown) {
+        setTimeout(() => {
+          if (itemQtyRefs.current[0]) {
+            itemQtyRefs.current[0].focus();
+            itemQtyRefs.current[0].select();
+          } else if (itemCodeRef.current) {
+            itemCodeRef.current.focus();
+            itemCodeRef.current.select();
+          }
+        }, 50);
+      } else if (e.key === "Escape") {
+        setTimeout(() => {
+          if (itemCodeRef.current) {
+            itemCodeRef.current.focus();
+            itemCodeRef.current.select();
+          }
+        }, 50);
+      }
+      return;
+    }
+
+    if (isEnd) {
+      e.preventDefault();
+      e.stopPropagation();
+      handlePrintBill();
+      return;
+    }
+
     if (e.key === "ArrowUp") {
       e.preventDefault();
       e.stopPropagation();
@@ -522,6 +613,16 @@ export default function Billing({
       if (index < safeArray(currentDraft.lines).length - 1) {
         itemQtyRefs.current[index + 1]?.focus();
         itemQtyRefs.current[index + 1]?.select();
+      }
+    } else if (isPageDown) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (itemQtyRefs.current[0]) {
+        itemQtyRefs.current[0].focus();
+        itemQtyRefs.current[0].select();
+      } else if (itemCodeRef.current) {
+        itemCodeRef.current.focus();
+        itemCodeRef.current.select();
       }
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
@@ -541,14 +642,19 @@ export default function Billing({
         currentVal = currentVal.slice(0, -1);
         updateQty(index, currentVal);
       }
-      if (itemQtyRefs.current[index]) {
-        itemQtyRefs.current[index].focus();
-        itemQtyRefs.current[index].select();
+      if (itemQtyRefs.current[index + 1]) {
+        itemQtyRefs.current[index + 1].focus();
+        itemQtyRefs.current[index + 1].select();
+      } else if (itemCodeRef.current) {
+        itemCodeRef.current.focus();
+        itemCodeRef.current.select();
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
-      // Switch back to Nav Mode (Focus Row)
-      itemRowRefs.current[index]?.focus();
+      if (itemCodeRef.current) {
+        itemCodeRef.current.focus();
+        itemCodeRef.current.select();
+      }
     }
   };
 
@@ -1291,203 +1397,241 @@ export default function Billing({
       }
 
       const billIdToPrint =
-      safeGet(currentDraft, "modified_from_bill_id") ||
-      safeGet(currentDraft, "header.bill_id");
+        safeGet(currentDraft, "modified_from_bill_id") ||
+        safeGet(currentDraft, "header.bill_id");
 
-    if (billIdToPrint) {
-      try {
-        setLoading(true);
-        const fullBillData = await getBillById(billIdToPrint);
+      if (billIdToPrint) {
+        try {
+          setLoading(true);
+          const fullBillData = await getBillById(billIdToPrint);
 
-        // --- SPLIT BILL GROUPING & PRINTING LOGIC ---
-        // 1. Category Sub-bills (Splits 1 through splitBillUpto):
-        //    The application loops through active split categories (c = 1 up to splitBillUpto).
-        //    All items matching item.split_category === c are gathered into a dedicated sub-bill.
-        //    The sub-bill title gets tagged with (Bill c). Subtotal, SGST, CGST, and Grand Total
-        //    are scaled and re-calculated specifically for those items.
-        // 2. Main / Remaining Items Bill:
-        //    Items with split_category === 0 (or split_category > splitBillUpto) remain together.
-        //    If any split sub-bills were generated, this remaining bill is tagged with (Main);
-        //    if no items were split off, it prints as the single standard bill.
-        //    Totals for remaining items are calculated independently.
-        // 3. Print Payload Bundling:
-        //    When splitBillUpto > 0 and splits exist, all generated sub-bills and main bill
-        //    are bundled into a single print array (printPayload.bills), triggering sequential printing.
-        let printPayload = fullBillData;
+          // --- SPLIT BILL GROUPING & PRINTING LOGIC ---
+          // 1. Category Sub-bills (Splits 1 through splitBillUpto):
+          //    The application loops through active split categories (c = 1 up to splitBillUpto).
+          //    All items matching item.split_category === c are gathered into a dedicated sub-bill.
+          //    The sub-bill title gets tagged with (Bill c). Subtotal, SGST, CGST, and Grand Total
+          //    are scaled and re-calculated specifically for those items.
+          // 2. Main / Remaining Items Bill:
+          //    Items with split_category === 0 (or split_category > splitBillUpto) remain together.
+          //    If any split sub-bills were generated, this remaining bill is tagged with (Main);
+          //    if no items were split off, it prints as the single standard bill.
+          //    Totals for remaining items are calculated independently.
+          // 3. Print Payload Bundling:
+          //    When splitBillUpto > 0 and splits exist, all generated sub-bills and main bill
+          //    are bundled into a single print array (printPayload.bills), triggering sequential printing.
+          let printPayload = fullBillData;
 
-        if (splitBillUpto > 0) {
-          const allItems = safeArray(
-            fullBillData.items_json || fullBillData.items,
-          );
-          const billsToPrint = [];
+          if (splitBillUpto > 0) {
+            const allItems = safeArray(
+              fullBillData.items_json || fullBillData.items,
+            );
+            const billsToPrint = [];
 
-          // 1. Gather all split bills for categories 1 to splitBillUpto
-          let hasAnySplits = false;
-          for (let c = 1; c <= splitBillUpto; c++) {
-            const catItems = allItems.filter((i) => (i.split_category || 0) === c);
-            if (catItems.length > 0) {
-              hasAnySplits = true;
-              const totals = computeSplitBillTotals(catItems, sgstPercentage, cgstPercentage);
+            // 1. Gather all split bills for categories 1 to splitBillUpto
+            let hasAnySplits = false;
+            for (let c = 1; c <= splitBillUpto; c++) {
+              const catItems = allItems.filter((i) => (i.split_category || 0) === c);
+              if (catItems.length > 0) {
+                hasAnySplits = true;
+                const totals = computeSplitBillTotals(catItems, sgstPercentage, cgstPercentage);
+                billsToPrint.push({
+                  ...fullBillData,
+                  split: false,
+                  bills: null,
+                  items: catItems,
+                  items_json: catItems,
+                  titleSuffix: `(Bill ${c})`,
+                  subtotal: totals.subtotal,
+                  grand_total: totals.grand_total,
+                  sgst: totals.sgst,
+                  cgst: totals.cgst,
+                });
+              }
+            }
+
+            // 2. Gather remaining items (category === 0 OR category > splitBillUpto)
+            const remainingItems = allItems.filter((i) => {
+              const cat = i.split_category || 0;
+              return cat === 0 || cat > splitBillUpto;
+            });
+
+            if (remainingItems.length > 0) {
+              const totals = computeSplitBillTotals(remainingItems, sgstPercentage, cgstPercentage);
               billsToPrint.push({
                 ...fullBillData,
                 split: false,
                 bills: null,
-                items: catItems,
-                items_json: catItems,
-                titleSuffix: `(Bill ${c})`,
+                items: remainingItems,
+                items_json: remainingItems,
+                titleSuffix: hasAnySplits ? "(Main)" : "",
                 subtotal: totals.subtotal,
                 grand_total: totals.grand_total,
                 sgst: totals.sgst,
                 cgst: totals.cgst,
               });
             }
-          }
 
-          // 2. Gather remaining items (category === 0 OR category > splitBillUpto)
-          const remainingItems = allItems.filter((i) => {
-            const cat = i.split_category || 0;
-            return cat === 0 || cat > splitBillUpto;
-          });
-
-          if (remainingItems.length > 0) {
-            const totals = computeSplitBillTotals(remainingItems, sgstPercentage, cgstPercentage);
-            billsToPrint.push({
-              ...fullBillData,
-              split: false,
-              bills: null,
-              items: remainingItems,
-              items_json: remainingItems,
-              titleSuffix: hasAnySplits ? "(Main)" : "",
-              subtotal: totals.subtotal,
-              grand_total: totals.grand_total,
-              sgst: totals.sgst,
-              cgst: totals.cgst,
-            });
-          }
-
-          if (billsToPrint.length > 0) {
-            printPayload = {
-              ...fullBillData,
-              split: true,
-              bills: billsToPrint,
-            };
-          }
-        }
-        // ---------------------------------
-
-        if (typeof window !== "undefined") {
-          window.printBillData = printPayload;
-        }
-        if (setPrintData) {
-          setPrintData(printPayload);
-        }
-
-        try {
-          const settings = cachedSettingsRef.current || {};
-          if (printPayload.split && printPayload.bills) {
-            const responses = await Promise.all(
-              printPayload.bills.map((b) => {
-                const rawText = generateAsciiReceipt(b, settings);
-                return api.post(`/printer/print`, { text: rawText });
-              })
-            );
-            const failed = responses.find((r) => r.data && r.data.success === false);
-            if (failed) {
-              toast.error(safeGet(failed, "data.error", "Print failed"));
-            } else {
-              toast.success("Bill sent directly to POS printer!");
+            if (billsToPrint.length > 0) {
+              printPayload = {
+                ...fullBillData,
+                split: true,
+                bills: billsToPrint,
+              };
             }
-          } else {
-            const res = await api.post(`/printer/print`, { text: generateAsciiReceipt(printPayload, settings) });
-            if (res.data && res.data.success === false) {
-              toast.error(safeGet(res, "data.error", "Print failed"));
+          }
+          // ---------------------------------
+
+          if (typeof window !== "undefined") {
+            window.printBillData = printPayload;
+          }
+          if (setPrintData) {
+            setPrintData(printPayload);
+          }
+
+          try {
+            const settings = cachedSettingsRef.current || {};
+            if (printPayload.split && printPayload.bills) {
+              const responses = await Promise.all(
+                printPayload.bills.map((b) => {
+                  const rawText = generateAsciiReceipt(b, settings);
+                  return api.post(`/printer/print`, { text: rawText });
+                })
+              );
+              const failed = responses.find((r) => r.data && r.data.success === false);
+              if (failed) {
+                toast.error(safeGet(failed, "data.error", "Print failed"));
+              } else {
+                toast.success("Bill sent directly to POS printer!");
+              }
             } else {
-              toast.success("Bill sent directly to POS printer!");
+              const res = await api.post(`/printer/print`, { text: generateAsciiReceipt(printPayload, settings) });
+              if (res.data && res.data.success === false) {
+                toast.error(safeGet(res, "data.error", "Print failed"));
+              } else {
+                toast.success("Bill sent directly to POS printer!");
+              }
+            }
+          } catch (err) {
+            console.error("Direct print failed:", err);
+            const errMsg = safeGet(err, "response.data.error") || safeGet(err, "response.data.detail") || err.message || "Printer error. Check if backend printer route is running.";
+            toast.error(errMsg);
+          }
+
+          if (tableNoRef.current) {
+            tableNoRef.current.focus();
+          }
+        } catch (e) {
+          console.error("Error fetching bill for reprint:", e);
+          toast.error("Failed to load bill for printing");
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      let rawLines = safeArray(currentDraft.lines);
+
+      // Separate lines into valid (qty > 0) and zero/invalid qty
+      const validLines = [];
+      const zeroQtyLines = [];
+
+      rawLines.forEach((l) => {
+        const q = parseFloat(l.quantity);
+        if (!isNaN(q) && q > 0) {
+          validLines.push(l);
+        } else {
+          zeroQtyLines.push(l);
+        }
+      });
+
+      // Asynchronously delete zero qty orders from backend DB & update local draft
+      if (zeroQtyLines.length > 0) {
+        zeroQtyLines.forEach((zLine) => {
+          if (zLine.id) {
+            deleteOrder(zLine.id).catch((e) =>
+              console.error("Failed to delete zero qty order", e)
+            );
+          }
+        });
+
+        if (setDrafts && draftKey) {
+          setDrafts((prev) => ({
+            ...safeObject(prev),
+            [draftKey]: {
+              ...currentDraft,
+              lines: validLines,
+            },
+          }));
+        }
+      }
+
+      let finalLines = validLines;
+
+      // If draft lines are empty but there might be pending orders in DB, load them
+      if (finalLines.length === 0 && currentTable) {
+        try {
+          const pendingOrders = await getPendingOrdersByTableAndParty(currentTable, String(currentParty));
+          if (pendingOrders && pendingOrders.length > 0) {
+            // Filter by billing date and valid quantity
+            let filteredOrders = pendingOrders;
+            if (billingDate) {
+              filteredOrders = pendingOrders.filter((order) => {
+                const q = parseFloat(order.quantity);
+                if (isNaN(q) || q <= 0) return false;
+                let rawDate = safeGet(order, "bill_date");
+                let orderDateStr = "";
+                if (rawDate) {
+                  const d = new Date(rawDate);
+                  try {
+                    orderDateStr = new Intl.DateTimeFormat('en-CA', {
+                      timeZone: 'Asia/Kolkata',
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit'
+                    }).format(d);
+                  } catch (e) {
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, "0");
+                    const day = String(d.getDate()).padStart(2, "0");
+                    orderDateStr = `${year}-${month}-${day}`;
+                  }
+                }
+                return orderDateStr === billingDate;
+              });
+            }
+            if (filteredOrders.length > 0) {
+              finalLines = filteredOrders.map((order) => ({
+                id: order.id,
+                code: order.item_code || order.numeric_item_code,
+                name: order.item_name,
+                quantity: order.quantity,
+                unit_price: order.unit_price,
+                line_total: order.line_total,
+                numeric_code: order.numeric_item_code,
+                alpha_code: order.item_code,
+                is_separate: !!order.is_separate,
+                split_category: order.split_category || 0,
+              }));
             }
           }
         } catch (err) {
-          console.error("Direct print failed:", err);
-          const errMsg = safeGet(err, "response.data.error") || safeGet(err, "response.data.detail") || err.message || "Printer error. Check if backend printer route is running.";
-          toast.error(errMsg);
+          console.error("Failed to load pending orders for print:", err);
         }
-
-        if (tableNoRef.current) {
-          tableNoRef.current.focus();
-        }
-      } catch (e) {
-        console.error("Error fetching bill for reprint:", e);
-        toast.error("Failed to load bill for printing");
-      } finally {
-        setLoading(false);
       }
-      return;
-    }
 
-    let finalLines = safeArray(currentDraft.lines);
-
-    // If draft lines are empty but there might be pending orders in DB, load them
-    if (finalLines.length === 0 && currentTable) {
-      try {
-        const pendingOrders = await getPendingOrdersByTableAndParty(currentTable, String(currentParty));
-        if (pendingOrders && pendingOrders.length > 0) {
-          // Filter by billing date
-          let filteredOrders = pendingOrders;
-          if (billingDate) {
-            filteredOrders = pendingOrders.filter((order) => {
-              let rawDate = safeGet(order, "bill_date");
-              let orderDateStr = "";
-              if (rawDate) {
-                const d = new Date(rawDate);
-                try {
-                  orderDateStr = new Intl.DateTimeFormat('en-CA', {
-                    timeZone: 'Asia/Kolkata',
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                  }).format(d);
-                } catch (e) {
-                  const year = d.getFullYear();
-                  const month = String(d.getMonth() + 1).padStart(2, "0");
-                  const day = String(d.getDate()).padStart(2, "0");
-                  orderDateStr = `${year}-${month}-${day}`;
-                }
-              }
-              return orderDateStr === billingDate;
-            });
-          }
-          if (filteredOrders.length > 0) {
-            finalLines = filteredOrders.map((order) => ({
-              id: order.id,
-              code: order.item_code || order.numeric_item_code,
-              name: order.item_name,
-              quantity: order.quantity,
-              unit_price: order.unit_price,
-              line_total: order.line_total,
-              numeric_code: order.numeric_item_code,
-              alpha_code: order.item_code,
-              is_separate: !!order.is_separate,
-              split_category: order.split_category || 0,
-            }));
-          }
+      if (document.activeElement === qtyRef.current && entryCode) {
+        const newItem = await addItem(false);
+        if (newItem) {
+          finalLines = [...finalLines, newItem];
+        } else {
+          return;
         }
-      } catch (err) {
-        console.error("Failed to load pending orders for print:", err);
       }
-    }
 
-    if (document.activeElement === qtyRef.current && entryCode) {
-      const newItem = await addItem(false);
-      if (newItem) {
-        finalLines = [...finalLines, newItem];
-      } else {
+      if (finalLines.length === 0) {
+        toast.error("Please add at least one item to the bill.");
         return;
       }
-    }
-
-    if (finalLines.length === 0) {
-      toast.error("Please add at least one item to the bill.");
-      return;
-    }
 
       await createBill(finalLines);
     } finally {
@@ -1778,10 +1922,10 @@ export default function Billing({
         const code =
           String(safeGet(selectedItem, "numeric_code", "")).trim() ||
           String(safeGet(selectedItem, "alpha_code", "")).trim();
-        
+
         // Load the item code in input
         setEntryCode(code);
-        
+
         setShowF4Popup(false);
         setSearchQuery("");
 
@@ -2027,11 +2171,10 @@ export default function Billing({
                                 const val = parseInt(e.target.value, 10) || 0;
                                 updateLineSplitCategory(idx, val);
                               }}
-                              className={`ml-2 px-1.5 py-0.5 text-xs font-bold rounded shadow-sm border transition-all cursor-pointer ${
-                                isSplitActive
+                              className={`ml-2 px-1.5 py-0.5 text-xs font-bold rounded shadow-sm border transition-all cursor-pointer ${isSplitActive
                                   ? "bg-green-100 text-green-700 border-green-500 font-bold"
                                   : "bg-gray-800 text-zinc-400 border-zinc-700 hover:bg-gray-700 font-normal"
-                              }`}
+                                }`}
                               style={{ outline: "none" }}
                             >
                               {Array.from({ length: splitBillUpto + 1 }, (_, opt) => (
@@ -2105,17 +2248,15 @@ export default function Billing({
             </button>
             <div className="f4-popup-tabs">
               <button
-                className={`f4-popup-tab-btn ${
-                  helpTab === "shortcuts" ? "active" : ""
-                }`}
+                className={`f4-popup-tab-btn ${helpTab === "shortcuts" ? "active" : ""
+                  }`}
                 onClick={() => setHelpTab("shortcuts")}
               >
                 SHORTCUTS
               </button>
               <button
-                className={`f4-popup-tab-btn ${
-                  helpTab === "active" ? "active" : ""
-                }`}
+                className={`f4-popup-tab-btn ${helpTab === "active" ? "active" : ""
+                  }`}
                 onClick={() => setHelpTab("active")}
               >
                 ACTIVE BILLS ({activeTables.length})
@@ -2142,7 +2283,7 @@ export default function Billing({
                         <Table>
                           <TableHeader>
                             <TableRow>
-                <TableHead>CODE</TableHead>
+                              <TableHead>CODE</TableHead>
                               <TableHead>NAME</TableHead>
                               <TableHead>PRICE</TableHead>
                             </TableRow>
@@ -2156,9 +2297,8 @@ export default function Billing({
                                     el.scrollIntoView({ block: "nearest" });
                                   }
                                 }}
-                                className={`cursor-pointer hover:bg-gray-800 ${
-                                  selectedHelpIndex === index ? "text-white" : ""
-                                }`}
+                                className={`cursor-pointer hover:bg-gray-800 ${selectedHelpIndex === index ? "text-white" : ""
+                                  }`}
                                 style={
                                   selectedHelpIndex === index
                                     ? { backgroundColor: "#1d4ed8", color: "#ffffff" }
