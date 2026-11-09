@@ -89,7 +89,8 @@ const ShiftModel = {
              start_time = COALESCE($3, CURRENT_TIMESTAMP),
              status = $4,
              end_time = NULL,
-             closed_by = NULL
+             closed_by = NULL,
+             is_locked = FALSE
          WHERE id = $5
          RETURNING *`,
         [clerk_initials, session_date, start_time, status, sessionId]
@@ -102,9 +103,9 @@ const ShiftModel = {
       // If no session exists, create a new one
       const result = await pool.query(
         `INSERT INTO sessions (
-          shift_name, clerk_initials, session_date, start_time, status
+          shift_name, clerk_initials, session_date, start_time, status, is_locked
         )
-        VALUES ($1, $2, $3, COALESCE($4, CURRENT_TIMESTAMP), $5)
+        VALUES ($1, $2, $3, COALESCE($4, CURRENT_TIMESTAMP), $5, FALSE)
         RETURNING *`,
         [shift_name, clerk_initials, session_date, start_time, status]
       );
@@ -379,6 +380,74 @@ const ShiftModel = {
       }
     }
     return results;
+  },
+
+  // Auto-open all 4 shifts for a new date and reset all bill counters to 0
+  async autoOpenAllShifts(targetDate) {
+    const shifts = ["`", "``", "RBS", "RBS1"];
+    const formattedDate = targetDate || new Date().toISOString().split("T")[0];
+
+    const results = [];
+    for (const shiftName of shifts) {
+      try {
+        const session = await this.createSession({
+          shift_name: shiftName,
+          clerk_initials: "SYS_AUTO",
+          session_date: formattedDate,
+          status: "OPEN",
+        });
+        results.push(session);
+      } catch (err) {
+        console.error(`Error opening shift ${shiftName}:`, err.message);
+      }
+    }
+
+    // Explicitly reset all track bill counters to 0 in running_bills
+    try {
+      await pool.query(
+        `UPDATE running_bills SET track_morning = 0, track_afternoon = 0, track_rbs1 = 0, track_rbs2 = 0 WHERE id = 1`
+      );
+    } catch (err) {
+      console.error("Error resetting running_bills counter:", err.message);
+    }
+
+    console.log(`🌅 Daily Reset Complete: All 4 shifts OPEN, bill counters set to 0 for date ${formattedDate}`);
+    return results;
+  },
+
+  // Check if session_date in DB is different from current date, and perform daily reset if needed
+  async checkAndPerformDailyReset(currentDate) {
+    try {
+      const getLocalToday = () => {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const dd = String(now.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const today = currentDate || getLocalToday();
+      const checkRes = await pool.query(
+        `SELECT session_date::text AS session_date FROM sessions LIMIT 1`
+      );
+
+      let needsReset = false;
+      if (checkRes.rows.length === 0) {
+        needsReset = true;
+      } else {
+        const dbDateStr = String(checkRes.rows[0].session_date).slice(0, 10);
+        if (dbDateStr !== today) {
+          console.log(`📅 Date change detected (DB: ${dbDateStr}, Today: ${today}). Running daily reset...`);
+          needsReset = true;
+        }
+      }
+
+      if (needsReset) {
+        await this.autoOpenAllShifts(today);
+      }
+    } catch (err) {
+      console.error("Daily reset check error:", err.message);
+    }
   },
 };
 

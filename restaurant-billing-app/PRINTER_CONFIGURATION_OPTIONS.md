@@ -61,17 +61,17 @@ Controls print head resolution, speed, and dot density.
 
 ---
 
-### 4. `ESC, 0x45` / `ESC, 0x47` — Text Darkness & Stroke Weight
+### 4. `ESC, 0x45` / `ESC, 0x47` — Text Darkness & Stroke Weight (`PRINTER_DARKNESS` 1 to 5)
 
-Controls character darkness, bolding, and dot pulse width.
+Controls character darkness, bolding, dot pulse width, and multi-pass printing density via `PRINTER_DARKNESS` setting in `.env`.
 
-| Command / Hex | ASCII | Description & Performance Profile |
-| :--- | :--- | :--- |
-| `0x1B, 0x45` | `ESC E` | **Emphasized Mode ON (Current)**: Fires printhead pins with wider micro-pulse width. Produces **DARK, bold, crisp characters in 1 single pass at FULL DRAFT SPEED**. |
-| `0x1B, 0x46` | `ESC F` | **Emphasized Mode OFF**: Restores standard draft line stroke weight. |
-| `0x1B, 0x47` | `ESC G` | **Double-Strike Mode ON**: Passes printhead twice per line with slight vertical offset. Produces dark text, but **cuts print speed in half (50% slower)**. |
-| `0x1B, 0x48` | `ESC H` | **Double-Strike Mode OFF**: Turns off double-strike mode. |
-| `0x1B, 0x45, 0x1B, 0x47` | `ESC E ESC G` | **Emphasized + Double-Strike**: Maximum possible ink/thermal darkness, but slowest speed. |
+| Darkness Level | Setting (`PRINTER_DARKNESS`) | Hardware ESC Commands Used | Description & Speed Profile |
+| :--- | :--- | :--- | :--- |
+| **Level 1** | `PRINTER_DARKNESS=1` | `ESC x 0` + `ESC F` + `ESC H` + `ESC U 0` | **Lightest / Ultra Fast**: Draft mode, Emphasized OFF, Double-Strike OFF, Bidirectional. Maximum speed, lowest ribbon/thermal load. |
+| **Level 2** | `PRINTER_DARKNESS=2` | `ESC x 0` + `ESC F` + `ESC H` + `ESC U 1` | **Light**: Draft mode, Emphasized OFF, Unidirectional ON for clean column alignment. |
+| **Level 3** | `PRINTER_DARKNESS=3` | `ESC x 0` + `ESC E 1` + `ESC H` + `ESC U 1` | **Medium / Standard Dark (Default)**: Draft mode, Emphasized ON in single pass. Crisp dark text without sacrificing speed. |
+| **Level 4** | `PRINTER_DARKNESS=4` | `ESC x 0` + `ESC E 1` + `ESC G` + `ESC U 1` | **Dark**: Emphasized ON + Double-Strike ON. Passes printhead twice for rich high-contrast dark text. |
+| **Level 5** | `PRINTER_DARKNESS=5` | `ESC x 1` + `ESC E 1` + `ESC G` + `ESC U 1` | **Maximum Darkness**: Near Letter Quality (NLQ) mode + Emphasized ON + Double-Strike ON. Maximum possible ink/dot density and blackness. |
 
 ---
 

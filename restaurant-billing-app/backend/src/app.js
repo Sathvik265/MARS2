@@ -7,7 +7,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const pool = require("./db");
 require("dotenv").config();
-require("./services/scheduler"); // Initialize shift scheduler (if still needed)
+//require("./services/scheduler"); // Initialize shift scheduler (if still needed)
 
 // Create app before using app.use(...)
 const app = express();
@@ -112,6 +112,9 @@ app.post("/api/auth/login", async (req, res) => {
         detail: "Initials, date, and track are required",
       });
     }
+
+    // Auto-open shifts & reset bill counters to 0 if a new date is passed on login
+    await ShiftModel.checkAndPerformDailyReset(date);
 
     let mode = "clerk";
 
@@ -613,7 +616,7 @@ app.get("/api/menu/lookup/:code", requireAuth, async (req, res) => {
     const { code } = req.params;
     const upperCode = code.toUpperCase();
     const numericVal = !isNaN(Number(code)) && code.trim() !== '' ? Number(code) : -1;
-    
+
     const result = await pool.query(
       `SELECT * FROM items 
              WHERE (id = $2 OR UPPER(alpha_code) = $1 OR UPPER(numeric_code) = $1 OR UPPER(name) = $1) LIMIT 1`,
@@ -728,6 +731,13 @@ const server = app.listen(PORT, () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`📊 API Base URL: http://127.0.0.1:${PORT}/api`);
   console.log(`📋 Schema: Updated with merged shift_sessions table`);
+
+  // Run morning boot-up shift reset check asynchronously on server startup
+  setImmediate(() => {
+    ShiftModel.checkAndPerformDailyReset().catch((err) => {
+      console.warn("Startup shift reset check failed:", err.message);
+    });
+  });
 
   // Run initial printer resolution & header check print asynchronously on app startup
   if (typeof printerRoutes.runStartupCheckAndPrint === "function") {

@@ -78,19 +78,10 @@ export function generateAsciiReceipt(data, settings) {
   const printClerkInitials = isSrihari ? "" : clerkInitials;
   const headerHotelTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
 
-  // Hotel Header at TOP (Hotel Name, Address, Phone, GST)
-  ascii += centerText(headerHotelTitle, LINE_WIDTH) + "\r\n";
-  if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
-  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
-  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
-  ascii += separator + "\r\n";
-
   // Meta Info
   const timeAndBill = `${printTime} #${billNumber}`;
   const dateStr = printDate;
   ascii += padRight(timeAndBill, LINE_WIDTH - dateStr.length) + dateStr + "\r\n";
-
-  ascii += separator + "\r\n";
 
   // Items header (24, 5, 11)
   ascii += padRight("Item", 24) + padLeft("Qty", 5) + padLeft("Total", 11) + "\r\n";
@@ -139,9 +130,16 @@ export function generateAsciiReceipt(data, settings) {
   const totalStr = `Rs. ${Math.round(Number(grandTotal)).toFixed(2)}`;
   ascii += padRight("TOTAL", LINE_WIDTH - totalStr.length) + totalStr + "\r\n";
 
-  ascii += separator + "\r\n";
+  // ascii += separator + "\r\n";
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\r\n";
-  ascii += separator + "\r\n";
+  // ascii += separator + "\r\n";
+
+  // Hotel Header at BOTTOM (Hotel Name, Address, Phone, GST) for NEXT bill
+  ascii += "---BOTTOM_HEADER---\r\n";
+  ascii += centerText(headerHotelTitle, LINE_WIDTH) + "\r\n";
+  if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
+  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
+  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
 
   return ascii;
 }

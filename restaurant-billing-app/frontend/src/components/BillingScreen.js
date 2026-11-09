@@ -482,9 +482,9 @@ export default function Billing({
       addItem();
     } else if (e.key === "PageDown" || (isCmdOrCtrl && e.key.toLowerCase() === "d") || (isAlt && e.key.toLowerCase() === "d")) {
       e.preventDefault();
-      if (itemQtyRefs.current[0]) {
-        itemQtyRefs.current[0].focus();
-        itemQtyRefs.current[0].select();
+      if (itemCodeRef.current) {
+        itemCodeRef.current.focus();
+        if (typeof itemCodeRef.current.select === "function") itemCodeRef.current.select();
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
@@ -571,12 +571,9 @@ export default function Billing({
         }, 50);
       } else if (isPageDown) {
         setTimeout(() => {
-          if (itemQtyRefs.current[0]) {
-            itemQtyRefs.current[0].focus();
-            itemQtyRefs.current[0].select();
-          } else if (itemCodeRef.current) {
+          if (itemCodeRef.current) {
             itemCodeRef.current.focus();
-            itemCodeRef.current.select();
+            if (typeof itemCodeRef.current.select === "function") itemCodeRef.current.select();
           }
         }, 50);
       } else if (e.key === "Escape") {
@@ -617,12 +614,9 @@ export default function Billing({
     } else if (isPageDown) {
       e.preventDefault();
       e.stopPropagation();
-      if (itemQtyRefs.current[0]) {
-        itemQtyRefs.current[0].focus();
-        itemQtyRefs.current[0].select();
-      } else if (itemCodeRef.current) {
+      if (itemCodeRef.current) {
         itemCodeRef.current.focus();
-        itemCodeRef.current.select();
+        if (typeof itemCodeRef.current.select === "function") itemCodeRef.current.select();
       }
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
@@ -1834,10 +1828,11 @@ export default function Billing({
       } else if (matchesShortcut(event, shortcuts.printBill)) {
         event.preventDefault();
         handlePrintBill();
-      } else if (matchesShortcut(event, shortcuts.focusItemCode)) {
+      } else if (matchesShortcut(event, shortcuts.focusItemCode) || event.key === "PageDown") {
         event.preventDefault();
         if (itemCodeRef.current) {
           itemCodeRef.current.focus();
+          if (typeof itemCodeRef.current.select === "function") itemCodeRef.current.select();
         }
       } else if (isCmdOrCtrl && (event.key === "f" || event.code === "KeyF")) {
         event.preventDefault();

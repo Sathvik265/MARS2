@@ -708,6 +708,134 @@ async function executePrintJob(printBuf, jobId) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper functions for ESC/P Darkness Levels (1 to 5)
+// ---------------------------------------------------------------------------
+function getPrinterDarknessLevel() {
+  const envVal = process.env.PRINTER_DARKNESS;
+  if (envVal !== undefined && envVal !== null && String(envVal).trim() !== "") {
+    const parsed = parseInt(envVal, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 5) {
+      return parsed;
+    }
+  }
+  // Fallback for legacy PRINTER_DARK_MODE if PRINTER_DARKNESS is not specified
+  const legacyDarkMode = (process.env.PRINTER_DARK_MODE || "").toLowerCase();
+  if (legacyDarkMode === "true" || legacyDarkMode === "1") {
+    return 3; // Standard Dark (Emphasized text)
+  } else if (legacyDarkMode === "false" || legacyDarkMode === "0") {
+    return 1; // Light (Fast Draft text)
+  }
+  return 3; // Default: Level 3 (Medium Darkness)
+}
+
+// ---------------------------------------------------------------------------
+// Helper functions for ESC/P Feed Lines (controllable via .env)
+// ---------------------------------------------------------------------------
+function getPrinterFeedLines() {
+  try {
+    const envPath = path.resolve(__dirname, "../../.env");
+    if (fsSyncCheck.existsSync(envPath)) {
+      const content = fsSyncCheck.readFileSync(envPath, "utf8");
+      const match = content.match(/^PRINTER_FEED_LINES\s*=\s*(\d+)/m);
+      if (match) {
+        return Math.max(0, parseInt(match[1], 10));
+      }
+    }
+  } catch (_) {}
+
+  const envVal = process.env.PRINTER_FEED_LINES;
+  if (envVal !== undefined && envVal !== null && String(envVal).trim() !== "") {
+    const parsed = parseInt(envVal, 10);
+    if (!isNaN(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+  return 4; // Default fallback
+}
+
+function buildPrinterControlPrefix() {
+  const ESC = 0x1B;
+  const level = getPrinterDarknessLevel();
+
+  const escPrefixBytes = [
+    0x0D, // CR — flush partial line
+  ];
+
+  switch (level) {
+    case 1:
+      // Level 1: Lightest / Ultra Fast (Draft mode, Emphasized OFF, Double-Strike OFF, Bidirectional)
+      escPrefixBytes.push(
+        ESC, 0x78, 0x00, // ESC x 0 — Draft quality mode
+        ESC, 0x46,       // ESC F   — Emphasized mode OFF
+        ESC, 0x48,       // ESC H   — Double-Strike mode OFF
+        ESC, 0x55, 0x00  // ESC U 0 — Bidirectional mode
+      );
+      break;
+    case 2:
+      // Level 2: Light (Draft mode, Emphasized OFF, Double-Strike OFF, Unidirectional ON)
+      escPrefixBytes.push(
+        ESC, 0x78, 0x00, // ESC x 0 — Draft quality mode
+        ESC, 0x46,       // ESC F   — Emphasized mode OFF
+        ESC, 0x48,       // ESC H   — Double-Strike mode OFF
+        ESC, 0x55, 0x01  // ESC U 1 — Unidirectional mode ON (Prevents line jitter)
+      );
+      break;
+    case 3:
+      // Level 3: Medium / Standard Dark (Draft mode, Emphasized ON, Double-Strike OFF, Unidirectional ON) [DEFAULT]
+      escPrefixBytes.push(
+        ESC, 0x78, 0x00, // ESC x 0 — Draft quality mode
+        ESC, 0x45, 0x01, // ESC E 1 — Emphasized mode ON (Single-pass crisp dark text)
+        ESC, 0x48,       // ESC H   — Double-Strike mode OFF
+        ESC, 0x55, 0x01  // ESC U 1 — Unidirectional mode ON
+      );
+      break;
+    case 4:
+      // Level 4: Dark (Draft mode, Emphasized ON, Double-Strike ON, Unidirectional ON)
+      escPrefixBytes.push(
+        ESC, 0x78, 0x00, // ESC x 0 — Draft quality mode
+        ESC, 0x45, 0x01, // ESC E 1 — Emphasized mode ON
+        ESC, 0x47,       // ESC G   — Double-Strike mode ON (Rich dark text)
+        ESC, 0x55, 0x01  // ESC U 1 — Unidirectional mode ON
+      );
+      break;
+    case 5:
+      // Level 5: Maximum Darkness (Near Letter Quality, Emphasized ON, Double-Strike ON, Unidirectional ON)
+      escPrefixBytes.push(
+        ESC, 0x78, 0x01, // ESC x 1 — Near Letter Quality (NLQ) mode
+        ESC, 0x45, 0x01, // ESC E 1 — Emphasized mode ON
+        ESC, 0x47,       // ESC G   — Double-Strike mode ON (Maximum pin density)
+        ESC, 0x55, 0x01  // ESC U 1 — Unidirectional mode ON
+      );
+      break;
+    default:
+      escPrefixBytes.push(
+        ESC, 0x78, 0x00,
+        ESC, 0x45, 0x01,
+        ESC, 0x48,
+        ESC, 0x55, 0x01
+      );
+      break;
+  }
+
+  escPrefixBytes.push(
+    ESC, 0x4D,       // ESC M   — 12 CPI (Elite pitch)
+    ESC, 0x31,       // ESC 2   — 1/8-inch line spacing
+    ESC, 0x6C, 0x00  // ESC l 0 — Left margin = 0
+  );
+
+  return Buffer.from(escPrefixBytes);
+}
+
+function buildPrinterControlCleanup() {
+  const ESC = 0x1B;
+  return Buffer.from([
+    ESC, 0x45, 0x00, // ESC E 0 — Emphasized mode OFF
+    ESC, 0x48,       // ESC H   — Double-Strike mode OFF
+    ESC, 0x55, 0x00, // ESC U 0 — Unidirectional mode OFF
+  ]);
+}
+
+// ---------------------------------------------------------------------------
 // POST /printer/print
 // ---------------------------------------------------------------------------
 router.post("/print", async (req, res) => {
@@ -722,28 +850,9 @@ router.post("/print", async (req, res) => {
 
   try {
     const ESC = 0x1B;
-    const isDarkMode = (process.env.PRINTER_DARK_MODE || "false").toLowerCase() === "true" || process.env.PRINTER_DARK_MODE === "1";
+    const escPrefix = buildPrinterControlPrefix();
 
-    const escPrefixBytes = [
-      0x0D,                     // CR — flush any partial line
-      // ESC, 0x40,                // ESC @   — Initialize printer
-      ESC, 0x78, 0x00,          // ESC x 0 — Draft mode (maximum speed)
-    ];
-
-    if (isDarkMode) {
-      escPrefixBytes.push(ESC, 0x45, 0x01); // ESC E 1 — Emphasized mode ON (DARK text in single pass, fast speed)
-    }
-
-    escPrefixBytes.push(
-      // ESC, 0x55, 0x00,          // ESC U 1 — Unidirectional printing ON (Fixes alternate dark/light lines)
-      ESC, 0x4D,                // ESC M   — 12 CPI (Elite pitch)
-      ESC, 0x32,                // ESC 2   — 1/6-inch line spacing
-      ESC, 0x6C, 0x00,          // ESC l 0 — Left margin = 0
-    );
-
-    const escPrefix = Buffer.from(escPrefixBytes);
-
-    const feedLines = Math.max(0, parseInt(process.env.PRINTER_FEED_LINES || "4", 10));
+    const feedLines = getPrinterFeedLines();
     let feedBuf = Buffer.alloc(0);
     if (feedLines > 0) {
       const escD = Buffer.from([ESC, 0x64, Math.min(feedLines, 255)]); // ESC d <n> — ESC/P hardware line feed
@@ -778,10 +887,7 @@ router.post("/print", async (req, res) => {
       }
     }
 
-    const escCleanup = Buffer.from([
-      ESC, 0x45, 0x00,          // ESC E 0 — Emphasized mode OFF
-      ESC, 0x55, 0x00,          // ESC U 0 — Unidirectional mode OFF
-    ]);
+    const escCleanup = buildPrinterControlCleanup();
 
     const mainBodyBuf = Buffer.from(mainBody, "utf8");
     const bottomHeaderBuf = Buffer.from(bottomHeader, "utf8");
@@ -858,32 +964,14 @@ router.post("/recheck", async (req, res) => {
 });
 
 async function runStartupCheckAndPrint() {
-  console.log("🖨️ [Startup Printer Check] Resolving printer and sending initial header check print...");
+  const darknessLevel = getPrinterDarknessLevel();
+  console.log(`🖨️ [Startup Printer Check] Resolving printer (Darkness level ${darknessLevel}/5)...`);
   try {
     const printerInfo = await resolvePrinter();
     console.log(`✅ [Startup Printer Check] Printer resolved: '${printerInfo.name}' (${printerInfo.driverName})`);
 
     const ESC = 0x1B;
-    const isDarkMode = (process.env.PRINTER_DARK_MODE || "false").toLowerCase() === "true" || process.env.PRINTER_DARK_MODE === "1";
-
-    const escPrefixBytes = [
-      0x0D,                     // CR — flush partial line
-      // ESC, 0x40,                // ESC @   — Initialize printer
-      ESC, 0x78, 0x00,          // ESC x 0 — Draft mode
-    ];
-
-    if (isDarkMode) {
-      escPrefixBytes.push(ESC, 0x45, 0x01); // ESC E 1 — Emphasized mode ON
-    }
-
-    escPrefixBytes.push(
-      // ESC, 0x55, 0x00,          // ESC U 0 — Unidirectional printing OFF
-      ESC, 0x4D,                // ESC M   — 12 CPI
-      ESC, 0x32,                // ESC 2   — 1/6-inch line spacing
-      ESC, 0x6C, 0x00,          // ESC l 0 — Left margin = 0
-    );
-
-    const escPrefix = Buffer.from(escPrefixBytes);
+    const escPrefix = buildPrinterControlPrefix();
 
     const testHeader =
       "========================================\r\n" +
@@ -892,7 +980,7 @@ async function runStartupCheckAndPrint() {
       "========================================\r\n";
 
     const textBuf = Buffer.from(testHeader, "utf8");
-    const feedLines = Math.max(0, parseInt(process.env.PRINTER_FEED_LINES || "4", 10));
+    const feedLines = getPrinterFeedLines();
     let feedBuf = Buffer.alloc(0);
     if (feedLines > 0) {
       const escD = Buffer.from([ESC, 0x64, Math.min(feedLines, 255)]); // ESC d <n>
@@ -900,10 +988,7 @@ async function runStartupCheckAndPrint() {
       feedBuf = Buffer.concat([crlfFeed, escD]);
     }
 
-    const escCleanup = Buffer.from([
-      ESC, 0x45, 0x00,
-      ESC, 0x55, 0x00,
-    ]);
+    const escCleanup = buildPrinterControlCleanup();
     const printBuf = Buffer.concat([escPrefix, textBuf, feedBuf, escCleanup]);
 
     const jobId = "startup_check_" + Date.now();

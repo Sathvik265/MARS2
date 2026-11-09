@@ -41,10 +41,9 @@ BEGIN
         v_bill_items := '[]'::jsonb;
     END IF;
 
-    -- 2. Update the bill items_json (and legacy items column to be safe)
+    -- 2. Update the bill items_json
     UPDATE bills 
-    SET items_json = v_bill_items,
-        items = v_bill_items
+    SET items_json = v_bill_items
     WHERE id = p_bill_id;
 
     -- 3. Delete the moved orders

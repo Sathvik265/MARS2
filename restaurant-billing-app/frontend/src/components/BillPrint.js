@@ -100,20 +100,13 @@ const BillContent = ({ data, settings, isLast = true }) => {
   const printClerkInitials = isSrihari ? "" : clerkInitials;
   const headerTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
 
-  // Hotel Header at TOP
-  ascii += centerText(headerTitle, LINE_WIDTH) + "\n";
-  if (address) ascii += centerText(address, LINE_WIDTH) + "\n";
-  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\n";
-  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\n";
-  ascii += separator + "\n";
-
   // Meta Info
   const timeAndBill = `${printTime} #${billNumber}`;
   // remaining spaces for date
   const dateStr = printDate;
   ascii += padRight(timeAndBill, LINE_WIDTH - dateStr.length) + dateStr + "\n";
 
-  ascii += separator + "\n";
+  // ascii += separator + "\n";
 
   // Items header
   // Let Item Width = 19, Qty = 5, Total = 11
@@ -163,9 +156,16 @@ const BillContent = ({ data, settings, isLast = true }) => {
   const totalStr = `Rs. ${Math.round(Number(grandTotal)).toFixed(2)}`;
   ascii += padRight("TOTAL", LINE_WIDTH - totalStr.length) + totalStr + "\n";
 
-  ascii += separator + "\n";
+  // ascii += separator + "\n";
   ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\n";
-  ascii += separator + "\n";
+  // ascii += separator + "\n";
+
+  // Hotel Header at BOTTOM (Hotel Name, Address, Phone, GST) for NEXT bill
+  ascii += "\n\n";
+  ascii += centerText(headerTitle, LINE_WIDTH) + "\n";
+  if (address) ascii += centerText(address, LINE_WIDTH) + "\n";
+  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\n";
+  if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\n";
 
   const displayAscii = ascii;
 

@@ -18,10 +18,12 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Get-Location
 
-Write-Host "== 1/5: Installing backend production dependencies ==" -ForegroundColor Cyan
+Write-Host "== 1/5: Checking backend production dependencies ==" -ForegroundColor Cyan
 Push-Location "$root\backend"
-npm install --omit=dev
-if (-not (Test-Path "node_modules\.bin\pkg.cmd")) {
+if (-not (Test-Path "node_modules")) {
+  npm install --omit=dev
+}
+if (-not (Test-Path "node_modules\.bin\pkg.cmd") -and -not (Test-Path "node_modules\.bin\pkg")) {
   npm install --save-dev @yao-pkg/pkg
 }
 Write-Host "== 2/5: Compiling backend to rbs-backend.exe & rawprint.exe ==" -ForegroundColor Cyan
@@ -31,7 +33,7 @@ if (-not (Test-Path $csc)) { $csc = Join-Path $env:SystemRoot "Microsoft.NET\Fra
 if (-not (Test-Path $csc)) { $csc = "csc.exe" }
 Write-Host "Compiling RawPrint.cs with $csc..." -ForegroundColor Gray
 & $csc /nologo /target:exe /out:rawprint.exe RawPrint.cs
-npx pkg . --targets node22-win-x64 --output dist\rbs-backend.exe
+npx pkg . --targets node22-win-x64 --public --no-bytecode --output dist\rbs-backend.exe
 Pop-Location
 
 Write-Host "== 3/5: Building frontend production bundle ==" -ForegroundColor Cyan
@@ -72,6 +74,17 @@ Copy-Item -Recurse -Force "$root\frontend\build" "$OutputDir\frontend\build"
 
 Copy-Item "$root\deploy\run-apps-only.ps1" "$OutputDir\"
 Copy-Item "$root\deploy\RunAppsOnly.bat" "$OutputDir\"
+
+# Generate shortcut
+try {
+    $ws = New-Object -ComObject WScript.Shell
+    $lnk = $ws.CreateShortcut("$OutputDir\RunAppsOnly.lnk")
+    $lnk.TargetPath = "$OutputDir\RunAppsOnly.bat"
+    $lnk.WorkingDirectory = "$OutputDir"
+    $lnk.Save()
+} catch {
+    Write-Host "Warning: Could not create shortcut (.lnk): $_" -ForegroundColor Yellow
+}
 
 if (Test-Path $OutputZip) { Remove-Item $OutputZip }
 Compress-Archive -Path "$OutputDir\*" -DestinationPath $OutputZip

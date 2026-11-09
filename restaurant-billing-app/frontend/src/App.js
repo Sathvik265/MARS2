@@ -116,7 +116,7 @@ function App() {
             setPrinterError("");
             failedCountRef.current = 0;
           }
-        } catch (_) {}
+        } catch (_) { }
       }
     } finally {
       isCheckingRef.current = false;
@@ -301,7 +301,7 @@ function App() {
         e.preventDefault();
         if (isAdmin) setActiveTab("admin");
       }
-      
+
       // Admin Main Sub-Tabs navigation
       else if (isCmdOrCtrl && e.altKey) {
         if (code === "Digit1" || e.key === "1") {
@@ -455,7 +455,10 @@ function App() {
   return (
     <div className={`min-h-screen bg-black text-white p-4 flex flex-col ${activeTab === "billing" ? "billing-tab-active" : ""}`}>
       <div className="max-w-7xl mx-auto w-full flex-1 flex flex-col">
-        <div className={`text-center ${activeTab === "billing" ? "mb-2" : "mb-6"}`}>
+        <div
+          className={`text-center ${activeTab === "billing" ? "mb-2" : "mb-6"}`}
+          style={{ position: "relative" }}
+        >
           {activeTab === "billing" ? (
             <h1 className="text-lg font-bold text-zinc-500 tracking-tight">
               New Udipi Anand Bhavan
@@ -468,7 +471,7 @@ function App() {
           {mode !== "none" && billingDate && (
             <div className={`${activeTab === "billing" ? "mt-1" : "mt-2"} text-sm text-gray-300`}>
               Date: {formatDateToDDMMYYYY(billingDate) || billingDate} | {track} | {String(userInitials || "").trim().toUpperCase() === "SRIHARI" ? "" : userInitials}
-              <span className="ml-4 inline-flex gap-2">
+              <span style={{ marginLeft: "12px", display: "inline-flex", verticalAlign: "middle" }}>
                 <Button
                   variant="outline"
                   size="sm"
@@ -476,14 +479,27 @@ function App() {
                 >
                   Logout
                 </Button>
-                <Button
-                  size="sm"
-                  onClick={handleCloseShiftAndLogout}
-                  style={{ background: "#7f1d1d", color: "#fecaca", border: "1px solid #991b1b" }}
-                >
-                  Close Shift & Log Out
-                </Button>
               </span>
+            </div>
+          )}
+          {mode !== "none" && billingDate && (
+            <div
+              style={{
+                position: "absolute",
+                right: "0.5rem",
+                top: "50%",
+                transform: "translateY(-50%)",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <Button
+                size="sm"
+                onClick={handleCloseShiftAndLogout}
+                style={{ background: "#7f1d1d", color: "#fecaca", border: "1px solid #991b1b" }}
+              >
+                Close Shift & Log Out
+              </Button>
             </div>
           )}
         </div>
