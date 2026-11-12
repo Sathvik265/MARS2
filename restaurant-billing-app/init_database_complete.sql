@@ -22,7 +22,7 @@
 --
 -- HOW TO RUN:
 --   Option A (Command line / PowerShell):
---       psql -U postgres -d restaurant_billing_db -f init_database_complete.sql
+--       psql -U postgres -d restaurant_billing_db -f ase_complete.sql
 --   Option B (pgAdmin 4):
 --       Open Query Tool on 'restaurant_billing_db' and execute this entire script.
 --   Option C (Batch launcher):
@@ -426,7 +426,7 @@ ORDER BY t.table_id;
 
 -- Default system settings
 INSERT INTO public.settings (hotel_name, address, phone, gstin, clerk_initials, sgst_percentage, cgst_percentage, allowed_clerks, section)
-VALUES ('Udupi Anand Bhavan', 'Main Road', '080-12345678', '29AAAAA0000A1Z5', 'CLK', 2.50, 2.50, 'CLK,V,P,B', 'L')
+VALUES ('NEW UDIPI ANAND BHAVAN', 'PATTERGATTY, CHARMINAR', '040-24417512 {L}', '36AAFFN0965J1Z2', '', 2.50, 2.50, 'CLK,V,P,B', '')
 ON CONFLICT (clerk_initials) DO UPDATE SET
     hotel_name = EXCLUDED.hotel_name,
     sgst_percentage = EXCLUDED.sgst_percentage,
@@ -509,7 +509,7 @@ INSERT INTO public.items (name, alpha_code, numeric_code, price_fixed, price_gen
  ('TEA+CUP', 'TEC', '135A', 31.0, 31.0, 31.0, '[{"name": "TE", "qty": 1}]'::jsonb, FALSE),
  ('BOURNVITA', 'BOU', '136', 35.0, 35.0, 35.0, '[{"name": "B VITA", "qty": 1}]'::jsonb, FALSE),
  ('EMPTY CUP', 'EMP', '137', 1.0, 1.0, 1.0, '[]'::jsonb, FALSE),
- ('SAMBARID.WADA', 'SAW', '138', 89.0, 89.0, 93.0, '[{"name": "ID", "qty": 2}, {"name": "WD", "qty": 2}]'::jsonb, FALSE),
+ ('SAMBARID.WADA', 'SAW', '138', 89.0, 89.0, 93.0, '[{"name": "ID", "qty": 2}, {"name": "WD", "qty": 1}]'::jsonb, FALSE),
  ('VEG F.RICE', 'VFR', '142', 65.0, 65.0, 67.0, '[{"name": "V RICE", "qty": 1}]'::jsonb, FALSE),
  ('SUGARLESS COFFE', 'SLC', '143', 35.0, 35.0, 35.0, '[{"name": "CF", "qty": 1}]'::jsonb, FALSE),
  ('JAMOON', 'JUJ', '151', 35.0, 35.0, 37.0, '[{"name": "JMOO", "qty": 1}]'::jsonb, FALSE),
