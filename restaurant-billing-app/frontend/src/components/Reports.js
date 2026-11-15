@@ -984,7 +984,13 @@ export function ItemReport({ sessionId }) {
       const res = await axios.get(`${API}/reports/by-item`, {
         params,
       });
-      setReport(safeArray(res.data));
+      const data = safeArray(res.data).sort((a, b) => {
+        const numA = parseInt(a.itemCode, 10);
+        const numB = parseInt(b.itemCode, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return (a.itemCode || "").localeCompare(b.itemCode || "");
+      });
+      setReport(data);
       toast.success("Item report generated successfully");
     } catch (e) {
       console.error("Failed to generate item report:", e);
@@ -1002,12 +1008,13 @@ export function ItemReport({ sessionId }) {
     sendToPosPrinter(
       `ITEM SALES REPORT (${formatDateToDDMMYYYY(filters.startDate)} to ${formatDateToDDMMYYYY(filters.endDate)})`,
       [
-        { header: "Item", accessor: (r) => r.itemName, width: 17 },
-        { header: "Qty", accessor: (r) => r.totalQuantity, width: 5 },
+        { header: "Code", accessor: (r) => r.itemCode || "-", width: 5 },
+        { header: "Item", accessor: (r) => r.itemName, width: 13 },
+        { header: "Qty", accessor: (r) => r.totalQuantity, width: 4 },
         {
           header: "Amount",
           accessor: (r) => Number(r.totalAmount).toFixed(2),
-          width: 10,
+          width: 7,
           align: "right",
         },
       ],
@@ -1130,6 +1137,7 @@ export function ItemReport({ sessionId }) {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Item Code</TableHead>
                     <TableHead>Item Name</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>
                     <TableHead className="text-right">Amount (Price)</TableHead>
@@ -1138,6 +1146,9 @@ export function ItemReport({ sessionId }) {
                 <TableBody>
                   {report.map((item, index) => (
                     <TableRow key={index}>
+                      <TableCell className="font-semibold text-gray-700">
+                        {item.itemCode || "-"}
+                      </TableCell>
                       <TableCell className="font-medium">
                         {item.itemName}
                       </TableCell>
@@ -1168,12 +1179,20 @@ export function CategoryReport({ sessionId }) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState([]);
   const [dropdownsLoaded, setDropdownsLoaded] = useState(false);
+  const [section, setSection] = useState("L");
   const [filters, setFilters] = useState({
     startDate: new Date().toISOString().split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
     category: "",
     shiftName: "",
   });
+
+  useEffect(() => {
+    fetchSettings().then((s) => {
+      const sec = safeGet(s, "section", "L");
+      setSection(sec === "P" || String(sec).toUpperCase() === "PARCEL" ? "P" : "L");
+    });
+  }, []);
 
   useEffect(() => {
     const fetchDropdownData = async () => {
@@ -1242,8 +1261,9 @@ export function CategoryReport({ sessionId }) {
       ];
 
     const shiftSuffix = filters.shiftName ? ` [Shift: ${filters.shiftName}]` : "";
+    const sectionLabel = section === "P" ? "[P]" : "[L]";
     sendToPosPrinter(
-      `CATEGORY SALES REPORT${shiftSuffix} (${formatDateToDDMMYYYY(filters.startDate)} to ${formatDateToDDMMYYYY(filters.endDate)})`,
+      `CATEGORY SALES REPORT ${sectionLabel}${shiftSuffix} (${formatDateToDDMMYYYY(filters.startDate)} to ${formatDateToDDMMYYYY(filters.endDate)})`,
       columns,
       report
     );
@@ -1269,7 +1289,12 @@ export function CategoryReport({ sessionId }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Category Sales Report</CardTitle>
+        <div className="flex items-center gap-3">
+          <CardTitle>Category Sales Report</CardTitle>
+          <span className="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-800 border border-blue-300">
+            {section === "P" ? "[P] Parcel System" : "[L] Line System"}
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

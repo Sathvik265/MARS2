@@ -55,10 +55,9 @@ const BillContent = ({ data, settings, isLast = true }) => {
   const trackLetter = getTrackLetter(trackVal);
   const section = safeGet(settings, "section") || safeGet(data, "section") || "L";
   const sectionChar = (section === "P" || section.toUpperCase() === "PARCEL") ? "P" : "L";
-  const hotelNameWithSection = `${hotelName} ${sectionChar}`;
 
   const titleSuffix = safeGet(data, "titleSuffix", "");
-  const hotelHeading = trackLetter ? `${hotelNameWithSection} ${trackLetter}` : hotelNameWithSection;
+  const hotelHeading = trackLetter ? `${hotelName} ${trackLetter}` : hotelName;
   const displayHotelName = titleSuffix ? `${hotelHeading} ${titleSuffix}` : hotelHeading;
 
   const createdAt = safeGet(data, "created_at", null);
@@ -98,7 +97,7 @@ const BillContent = ({ data, settings, isLast = true }) => {
   // Suppress SRIHARI from printed bills — leave it blank (only affects printing, not DB)
   const isSrihari = clerkInitials && String(clerkInitials).trim().toUpperCase() === "SRIHARI";
   const printClerkInitials = isSrihari ? "" : clerkInitials;
-  const headerTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
+  const headerTitle = displayHotelName;
 
   // Meta Info
   const timeAndBill = `${printTime} #${billNumber}`;
@@ -156,15 +155,21 @@ const BillContent = ({ data, settings, isLast = true }) => {
   const totalStr = `Rs. ${Math.round(Number(grandTotal)).toFixed(2)}`;
   ascii += padRight("TOTAL", LINE_WIDTH - totalStr.length) + totalStr + "\n";
 
-  // ascii += separator + "\n";
-  ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\n";
-  // ascii += separator + "\n";
+  // Clerk initials and Table/Party below TOTAL
+  const clText = printClerkInitials ? `CL: ${printClerkInitials}` : "";
+  const tablePartyText = `Table: ${tableNo} | Party: ${partyNo}`;
+  if (clText) {
+    ascii += padRight(clText, 10) + tablePartyText + "\n";
+  } else {
+    ascii += centerText(tablePartyText, LINE_WIDTH) + "\n";
+  }
 
   // Hotel Header at BOTTOM (Hotel Name, Address, Phone, GST) for NEXT bill
   ascii += "\n\n";
   ascii += centerText(headerTitle, LINE_WIDTH) + "\n";
   if (address) ascii += centerText(address, LINE_WIDTH) + "\n";
-  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\n";
+  const phoneText = phone ? `Ph: ${phone}   [${sectionChar}]` : `[${sectionChar}]`;
+  if (phoneText) ascii += centerText(phoneText, LINE_WIDTH) + "\n";
   if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\n";
 
   const displayAscii = ascii;

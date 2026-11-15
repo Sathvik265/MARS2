@@ -434,6 +434,7 @@ export default function Billing({
     } else if (e.key === "Escape") {
       e.preventDefault();
       setShowF4Popup(false);
+      setEntryCode("");
       if (setCurrentTable) setCurrentTable("1");
       setCurrentParty("1");
       setTimeout(() => {
@@ -1814,6 +1815,7 @@ export default function Billing({
         setShowF4Popup((prev) => !prev);
       } else if (event.key === "Escape") {
         event.preventDefault();
+        setEntryCode("");
         if (setCurrentTable) setCurrentTable("1");
         setCurrentParty("1");
         if (showF4Popup) {

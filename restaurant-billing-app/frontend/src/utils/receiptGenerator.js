@@ -67,16 +67,15 @@ export function generateAsciiReceipt(data, settings) {
   // Title Suffix support (for split bills)
   const section = safeGet(settings, "section") || safeGet(data, "section") || "L";
   const sectionChar = (section === "P" || section.toUpperCase() === "PARCEL") ? "P" : "L";
-  const hotelNameWithSection = `${hotelName} ${sectionChar}`;
 
   const titleSuffix = safeGet(data, "titleSuffix", "");
-  const hotelHeading = trackLetter ? `${hotelNameWithSection} ${trackLetter}` : hotelNameWithSection;
+  const hotelHeading = trackLetter ? `${hotelName} ${trackLetter}` : hotelName;
   const displayHotelName = titleSuffix ? `${hotelHeading} ${titleSuffix}` : hotelHeading;
 
   // Suppress SRIHARI from printed receipts — leave it blank (only affects printing, not DB)
   const isSrihari = clerkInitials && String(clerkInitials).trim().toUpperCase() === "SRIHARI";
   const printClerkInitials = isSrihari ? "" : clerkInitials;
-  const headerHotelTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${displayHotelName} (${printClerkInitials})` : displayHotelName;
+  const headerHotelTitle = displayHotelName;
 
   // Meta Info
   const timeAndBill = `${printTime} #${billNumber}`;
@@ -130,15 +129,21 @@ export function generateAsciiReceipt(data, settings) {
   const totalStr = `Rs. ${Math.round(Number(grandTotal)).toFixed(2)}`;
   ascii += padRight("TOTAL", LINE_WIDTH - totalStr.length) + totalStr + "\r\n";
 
-  // ascii += separator + "\r\n";
-  ascii += centerText(`Table: ${tableNo} | Party: ${partyNo}`, LINE_WIDTH) + "\r\n";
-  // ascii += separator + "\r\n";
+  // Clerk initials and Table/Party below TOTAL
+  const clText = printClerkInitials ? `CL: ${printClerkInitials}` : "";
+  const tablePartyText = `Table: ${tableNo} | Party: ${partyNo}`;
+  if (clText) {
+    ascii += padRight(clText, 10) + tablePartyText + "\r\n";
+  } else {
+    ascii += centerText(tablePartyText, LINE_WIDTH) + "\r\n";
+  }
 
   // Hotel Header at BOTTOM (Hotel Name, Address, Phone, GST) for NEXT bill
   ascii += "---BOTTOM_HEADER---\r\n";
   ascii += centerText(headerHotelTitle, LINE_WIDTH) + "\r\n";
   if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
-  if (phone) ascii += centerText(`Ph: ${phone}`, LINE_WIDTH) + "\r\n";
+  const phoneText = phone ? `Ph: ${phone}   [${sectionChar}]` : `[${sectionChar}]`;
+  if (phoneText) ascii += centerText(phoneText, LINE_WIDTH) + "\r\n";
   if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
 
   return ascii;

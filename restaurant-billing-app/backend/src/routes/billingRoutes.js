@@ -5,22 +5,22 @@ const { requireAdminFull } = require("../middleware/auth");
 
 // Bill routes
 router.get("/bills", billingController.getAllBills);
-router.get("/bills/:billId", billingController.getBillById);
+router.get("/bills/unpurged-summary", requireAdminFull, billingController.getUnpurgedBillsSummary);
+router.post("/bills/purge-all-unpurged", requireAdminFull, billingController.purgeAllUnpurgedBills);
+router.post("/bills/purge", requireAdminFull, billingController.purgeBills);
+router.post("/bills/purge-shift", requireAdminFull, billingController.purgeShiftBills);
 router.get(
   "/bills/number/:billNumber/date/:billDate",
   billingController.getBillByNumber,
 );
-router.get("/bills/:billId/items", billingController.getBillItems);
 router.get("/bills/last-number/:date", billingController.getLastBillNumber);
-router.post("/bills", billingController.createBill);
-
-router.post("/bills/purge", requireAdminFull, billingController.purgeBills);
-router.post("/bills/purge-shift", requireAdminFull, billingController.purgeShiftBills);
-
 router.get(
   "/bills/date-range/:startDate/:endDate",
   billingController.getBillsByDateRange,
 );
+router.get("/bills/:billId", billingController.getBillById);
+router.get("/bills/:billId/items", billingController.getBillItems);
+router.post("/bills", billingController.createBill);
 
 // Order routes
 router.get("/orders", billingController.getAllPendingOrders);

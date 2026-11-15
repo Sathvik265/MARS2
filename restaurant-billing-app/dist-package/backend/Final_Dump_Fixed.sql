@@ -467,7 +467,7 @@ INSERT INTO public.items (name, alpha_code, numeric_code, price_fixed, price_gen
  ('VEG.BERYANI', 'VEB', '118', 60.0, 60.0, 64.0, '[]'::jsonb, FALSE),
  ('PAPER DOSA', 'PAD', '119', 102.0, 102.0, 106.0, '[{"name": "dosa", "category_old": "dosa", "qty": 2}]'::jsonb, FALSE),
  ('DAHI WADA', 'DHW', '120', 55.0, 55.0, 59.0, '[{"name": "wada", "category_old": "wada", "qty": 2}]'::jsonb, FALSE),
- ('SET DOSA', 'SED', '121', 67.0, 67.0, 71.0, '[{"name": "dosa", "category_old": "dosa", "qty": 2}]'::jsonb, FALSE),
+ ('SET DOSA', 'SED', '121', 67.0, 67.0, 71.0, '[{"name": "dosa", "category_old": "dosa", "qty": 3}]'::jsonb, FALSE),
  ('MURKUL/MIXTURE', 'MUM', '122', 40.0, 40.0, 44.0, '[]'::jsonb, FALSE),
  ('MYSORE BAJJI', 'MYB', '123', 44.0, 44.0, 48.0, '[]'::jsonb, FALSE),
  ('ALU BONDA', 'ALU', '124', 33.0, 33.0, 37.0, '[]'::jsonb, FALSE),

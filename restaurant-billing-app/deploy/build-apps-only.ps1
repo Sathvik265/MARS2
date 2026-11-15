@@ -16,7 +16,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$root = Get-Location
+$root = (Get-Location).Path
+if (-not [System.IO.Path]::IsPathRooted($OutputDir)) {
+  $OutputDir = Join-Path $root $OutputDir
+}
+if (-not [System.IO.Path]::IsPathRooted($OutputZip)) {
+  $OutputZip = Join-Path $root $OutputZip
+}
 
 Write-Host "== 1/5: Checking backend production dependencies ==" -ForegroundColor Cyan
 Push-Location "$root\backend"

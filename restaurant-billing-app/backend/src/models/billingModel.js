@@ -484,6 +484,38 @@ const BillingModel = {
     );
     return result.rows;
   },
+
+  // Search all unpurged bills across all history grouped by date
+  async getUnpurgedBillsSummary() {
+    const result = await pool.query(
+      `SELECT 
+         to_char(bill_date, 'YYYY-MM-DD') AS bill_date,
+         COUNT(*)::int AS bill_count,
+         COALESCE(SUM(CAST(grand_total AS NUMERIC)), 0)::numeric AS total_amount
+       FROM bills
+       WHERE bill_number > 0
+       GROUP BY bill_date
+       ORDER BY bill_date DESC`
+    );
+    return result.rows;
+  },
+
+  // Purge all unpurged bills in database history
+  async purgeAllUnpurgedBills() {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM orders");
+      const result = await client.query("DELETE FROM bills WHERE bill_number > 0");
+      await client.query("COMMIT");
+      return result.rowCount;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
 };
 
 module.exports = BillingModel;

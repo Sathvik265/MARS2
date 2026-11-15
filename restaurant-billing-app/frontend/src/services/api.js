@@ -203,6 +203,18 @@ export const getBillsByDate = async (bill_date) => {
   return response.data;
 };
 
+export const getUnpurgedBillsSummary = async () => {
+  const response = await api.get("/billing/bills/unpurged-summary");
+  return response.data;
+};
+
+export const purgeAllUnpurgedBills = async (confirmPassword) => {
+  const response = await api.post("/billing/bills/purge-all-unpurged", {
+    confirmPassword,
+  });
+  return response.data;
+};
+
 export const getShiftStatus = async () => {
   // No date parameter
   const response = await api.get(`/shifts/sessions`); // Call route to get all sessions

@@ -1,34 +1,42 @@
 const pool = require("../db");
 
 function formatCategoryField(category) {
-  if (!category) return { qty: 1, name: "" };
+  if (!category) return [{ qty: 1, name: "" }];
   if (typeof category === "string") {
     const trimmed = category.trim();
     if (trimmed === "" || trimmed === "[object Object]" || trimmed === "null" || trimmed === "undefined") {
-      return { qty: 1, name: "" };
+      return [{ qty: 1, name: "" }];
     }
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
       try {
         const parsed = JSON.parse(trimmed);
         return formatCategoryField(parsed);
       } catch (e) {
-        return { qty: 1, name: trimmed };
+        return [{ qty: 1, name: trimmed }];
       }
     }
-    return { qty: 1, name: trimmed };
+    return [{ qty: 1, name: trimmed }];
+  }
+  if (Array.isArray(category)) {
+    const formatted = category.map(c => {
+      if (!c) return null;
+      if (typeof c === "string") return { qty: 1, name: c.trim() };
+      const catName = c.name || c.item_name || "";
+      if (catName === "[object Object]" || catName === "null" || catName === "undefined" || !String(catName).trim()) {
+        return null;
+      }
+      return { qty: parseFloat(c.qty || c.quantity) || 1, name: String(catName).trim() };
+    }).filter(Boolean);
+    return formatted.length > 0 ? formatted : [{ qty: 1, name: "" }];
   }
   if (typeof category === "object") {
-    if (Array.isArray(category)) {
-      if (category.length > 0) return formatCategoryField(category[0]);
-      return { qty: 1, name: "" };
-    }
     const catName = category.name || category.item_name || "";
-    if (catName === "[object Object]" || catName === "null" || catName === "undefined") {
-      return { qty: 1, name: "" };
+    if (catName === "[object Object]" || catName === "null" || catName === "undefined" || !String(catName).trim()) {
+      return [{ qty: 1, name: "" }];
     }
-    return { qty: category.qty || category.quantity || 1, name: String(catName).trim() };
+    return [{ qty: parseFloat(category.qty || category.quantity) || 1, name: String(catName).trim() }];
   }
-  return { qty: 1, name: "" };
+  return [{ qty: 1, name: "" }];
 }
 
 const ItemModel = {
@@ -67,7 +75,7 @@ const ItemModel = {
       split_category = 0,
     } = itemData;
 
-    const finalCategory = formatCategoryField(category);
+    const finalCategory = JSON.stringify(formatCategoryField(category));
     const finalIsSeparate = split_category > 0 || is_separate;
 
     const result = await pool.query(
@@ -75,7 +83,7 @@ const ItemModel = {
         name, alpha_code, numeric_code, price_fixed, 
         price_general, price_ac, category, is_separate, split_category
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)
       RETURNING *`,
       [
         name,
@@ -106,14 +114,14 @@ const ItemModel = {
       split_category = 0,
     } = itemData;
 
-    const finalCategory = formatCategoryField(category);
+    const finalCategory = JSON.stringify(formatCategoryField(category));
     const finalIsSeparate = split_category > 0 || is_separate;
 
     const result = await pool.query(
       `UPDATE items 
        SET name = $1, alpha_code = $2, numeric_code = $3,
            price_fixed = $4, price_general = $5, price_ac = $6,
-           category = $7, is_separate = $8, split_category = $9
+           category = $7::jsonb, is_separate = $8, split_category = $9
        WHERE id = $10
        RETURNING *`,
       [
@@ -218,20 +226,30 @@ const ItemModel = {
        WHERE category IS NOT NULL AND category::text != 'null'
        ORDER BY category`,
     );
-    // Extract category names from JSON if needed
-    const categories = result.rows.map((row) => {
+    // Extract category names from JSON
+    const categories = [];
+    result.rows.forEach((row) => {
       try {
         const parsed = JSON.parse(row.category);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].name) {
-          return parsed[0].name;
+        if (Array.isArray(parsed)) {
+          parsed.forEach((c) => {
+            if (c && c.name && typeof c.name === "string" && c.name.trim()) {
+              categories.push(c.name.trim());
+            }
+          });
+        } else if (parsed && parsed.name && typeof parsed.name === "string" && parsed.name.trim()) {
+          categories.push(parsed.name.trim());
+        } else if (typeof row.category === "string" && row.category.trim()) {
+          categories.push(row.category.trim());
         }
-        return row.category;
       } catch {
-        return row.category;
+        if (typeof row.category === "string" && row.category.trim()) {
+          categories.push(row.category.trim());
+        }
       }
     });
     // Return unique values
-    return [...new Set(categories)];
+    return [...new Set(categories)].sort();
   },
 };
 

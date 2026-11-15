@@ -139,7 +139,7 @@ exports.getShiftDetailedReport = async (req, res) => {
       ),
       FlatItems AS (
           SELECT 
-              item->>'item_code' as item_code,
+              COALESCE(item->>'item_code_numeric', item->>'numeric_item_code', item->>'item_code', item->>'numeric_code', '') as item_code,
               item->>'item_name' as item_name,
               item->>'category' as legacy_category,
               (item->>'quantity')::decimal as qty,
@@ -170,7 +170,7 @@ exports.getShiftDetailedReport = async (req, res) => {
         COALESCE(p.item_code, '') as item_code,
         p.item_name,
         p.category_name as category,
-        CEIL(SUM(p.qty)) as total_quantity,
+        ROUND(SUM(p.qty), 2) as total_quantity,
         CEIL(SUM(p.amount)) as base_amount,
         CEIL(SUM(p.amount) * (SELECT rate FROM GstRate)) as gst_amount,
         CEIL(SUM(p.amount) * (1 + (SELECT rate FROM GstRate))) as final_total
@@ -181,7 +181,12 @@ exports.getShiftDetailedReport = async (req, res) => {
       [date, shift_name],
     );
 
-    res.json(result.rows);
+    const formattedRows = result.rows.map(row => ({
+      ...row,
+      total_quantity: parseFloat(row.total_quantity || 0)
+    }));
+
+    res.json(formattedRows);
   } catch (error) {
     console.error("Shift detailed report error:", error);
     res
@@ -329,20 +334,22 @@ exports.getItemReport = async (req, res) => {
           FROM settings LIMIT 1
       )
       SELECT   
+        COALESCE(item->>'item_code_numeric', item->>'numeric_item_code', item->>'item_code', item->>'numeric_code', '') as item_code,
         item->>'item_name' as item_name,
-        CEIL(SUM((item->>'quantity')::decimal)) as total_quantity,
+        ROUND(SUM((item->>'quantity')::decimal), 2) as total_quantity,
         CEIL(SUM((item->>'line_total')::decimal) * (SELECT multiplier FROM GstRate)) as total_amount
       FROM bills b,
       jsonb_array_elements(b.items_json) as item
       WHERE ${whereClause}
-      GROUP BY item->>'item_name'
-      ORDER BY total_quantity DESC`,
+      GROUP BY COALESCE(item->>'item_code_numeric', item->>'numeric_item_code', item->>'item_code', item->>'numeric_code', ''), item->>'item_name'
+      ORDER BY (NULLIF(regexp_replace(COALESCE(item->>'item_code_numeric', item->>'numeric_item_code', item->>'item_code', item->>'numeric_code', ''), '[^0-9]', '', 'g'), '')::numeric) ASC NULLS LAST, item->>'item_name' ASC`,
       params,
     );
 
     const formattedResult = result.rows.map((row) => ({
+      itemCode: row.item_code || "",
       itemName: row.item_name,
-      totalQuantity: Math.ceil(parseFloat(row.total_quantity || 0)),
+      totalQuantity: parseFloat(row.total_quantity || 0),
       totalAmount: Math.ceil(parseFloat(row.total_amount || 0)),
     }));
 
@@ -814,7 +821,7 @@ exports.getCategoryReport = async (req, res) => {
       ...item,
       totalQuantity: Math.ceil(item.totalQuantity),
       totalAmount: Math.ceil(item.totalAmount)
-    })).sort((a, b) => b.totalQuantity - a.totalQuantity);
+    })).sort((a, b) => (a.categoryName || "").localeCompare(b.categoryName || ""));
 
     res.json(reportData);
   } catch (error) {

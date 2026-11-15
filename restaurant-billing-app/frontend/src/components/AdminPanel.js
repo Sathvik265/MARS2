@@ -24,7 +24,11 @@ import {
   TableHead,
   TableCell,
 } from "./ui/Table";
-import api from "../services/api";
+import api, {
+  getUnpurgedBillsSummary,
+  purgeAllUnpurgedBills,
+  getBillsByDate,
+} from "../services/api";
 import {
   TimeRangeReport,
   DateRangeReport,
@@ -32,7 +36,18 @@ import {
   ItemReport,
   CategoryReport,
 } from "./Reports";
-import { toast, safeGet, safeArray, safeObject, getFriendlyShiftName, getCustomShortcuts, saveCustomShortcuts, validateShortcut, getShortcutActionLabel, formatDateToDDMMYYYY } from "../utils/helpers";
+import {
+  toast,
+  safeGet,
+  safeArray,
+  safeObject,
+  getFriendlyShiftName,
+  getCustomShortcuts,
+  saveCustomShortcuts,
+  validateShortcut,
+  getShortcutActionLabel,
+  formatDateToDDMMYYYY,
+} from "../utils/helpers";
 import SplitBillSettings from "./Admin/SplitBillSettings";
 
 // ================== RECONCILIATION ==================
@@ -60,15 +75,19 @@ function EnhancedReconciliation({ sessionId, mode }) {
 
   const handleClearBill = async (tableNo, partyNo) => {
     const confirmClear = window.confirm(
-      `Are you sure you want to clear/delete the unreconciled bill for Table ${tableNo} (Party ${partyNo})?\n\nThis will remove all pending orders for this table and party.`
+      `Are you sure you want to clear/delete the unreconciled bill for Table ${tableNo} (Party ${partyNo})?\n\nThis will remove all pending orders for this table and party.`,
     );
     if (!confirmClear) return;
 
     const key = `${tableNo}-${partyNo}`;
     setClearingKey(key);
     try {
-      await api.delete(`/reconciliation/running/table/${tableNo}/party/${partyNo}`);
-      toast.success(`Bill for Table ${tableNo} (Party ${partyNo}) cleared successfully`);
+      await api.delete(
+        `/reconciliation/running/table/${tableNo}/party/${partyNo}`,
+      );
+      toast.success(
+        `Bill for Table ${tableNo} (Party ${partyNo}) cleared successfully`,
+      );
       if (expandedKey === key) {
         setExpandedKey(null);
       }
@@ -186,7 +205,9 @@ function EnhancedReconciliation({ sessionId, mode }) {
                           <Button
                             size="sm"
                             className="bg-red-600 hover:bg-red-700 text-white font-medium shadow-sm"
-                            onClick={() => handleClearBill(row.table_no, row.party_no)}
+                            onClick={() =>
+                              handleClearBill(row.table_no, row.party_no)
+                            }
                             disabled={clearingKey === key}
                           >
                             {clearingKey === key ? (
@@ -255,7 +276,11 @@ function EnhancedReconciliation({ sessionId, mode }) {
 function HourlySalesDashboard({ billingDate }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [summary, setSummary] = useState({ totalSales: 0, totalBills: 0, avgBill: 0 });
+  const [summary, setSummary] = useState({
+    totalSales: 0,
+    totalBills: 0,
+    avgBill: 0,
+  });
 
   const loadData = useCallback(async () => {
     if (!billingDate) return;
@@ -270,11 +295,11 @@ function HourlySalesDashboard({ billingDate }) {
       // Calculate summary stats
       let totalSales = 0;
       let totalBills = 0;
-      report.forEach(item => {
+      report.forEach((item) => {
         totalSales += parseFloat(item.total_amount || 0);
         totalBills += parseInt(item.bill_count || 0);
       });
-      const avgBill = totalBills > 0 ? (totalSales / totalBills) : 0;
+      const avgBill = totalBills > 0 ? totalSales / totalBills : 0;
       setSummary({ totalSales, totalBills, avgBill });
     } catch (e) {
       console.error("Failed to load time-wise report:", e);
@@ -297,11 +322,18 @@ function HourlySalesDashboard({ billingDate }) {
   const chartWidth = svgWidth - 2 * padding;
   const chartHeight = svgHeight - 2 * padding;
 
-  const maxVal = data.length > 0 ? Math.max(...data.map(d => parseFloat(d.total_amount || 0))) * 1.15 || 100 : 100;
+  const maxVal =
+    data.length > 0
+      ? Math.max(...data.map((d) => parseFloat(d.total_amount || 0))) * 1.15 ||
+        100
+      : 100;
 
   const points = data.map((d, index) => {
     const x = padding + (index / Math.max(1, data.length - 1)) * chartWidth;
-    const y = svgHeight - padding - (parseFloat(d.total_amount || 0) / maxVal) * chartHeight;
+    const y =
+      svgHeight -
+      padding -
+      (parseFloat(d.total_amount || 0) / maxVal) * chartHeight;
     return { x, y, data: d };
   });
 
@@ -309,9 +341,10 @@ function HourlySalesDashboard({ billingDate }) {
     return acc + `${i === 0 ? "M" : "L"} ${p.x} ${p.y} `;
   }, "");
 
-  const areaD = points.length > 0
-    ? `${pathD} L ${points[points.length - 1].x} ${svgHeight - padding} L ${points[0].x} ${svgHeight - padding} Z`
-    : "";
+  const areaD =
+    points.length > 0
+      ? `${pathD} L ${points[points.length - 1].x} ${svgHeight - padding} L ${points[0].x} ${svgHeight - padding} Z`
+      : "";
 
   return (
     <Card className="border border-zinc-800 bg-zinc-950 text-white rounded-xl shadow-lg">
@@ -319,18 +352,28 @@ function HourlySalesDashboard({ billingDate }) {
         <CardTitle className="text-lg font-bold text-zinc-100 flex items-center gap-2">
           <span>📊 Sales Trend (Hourly)</span>
         </CardTitle>
-        <span className="text-xs text-zinc-400">Date: {formatDateToDDMMYYYY(billingDate) || billingDate}</span>
+        <span className="text-xs text-zinc-400">
+          Date: {formatDateToDDMMYYYY(billingDate) || billingDate}
+        </span>
       </CardHeader>
       <CardContent className="p-6 space-y-6">
         {/* Metric Cards Row */}
         <div className="grid grid-cols-2 gap-4">
           <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-lg">
-            <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Total Bills</div>
-            <div className="text-xl font-extrabold text-indigo-400 mt-1">{summary.totalBills}</div>
+            <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+              Total Bills
+            </div>
+            <div className="text-xl font-extrabold text-indigo-400 mt-1">
+              {summary.totalBills}
+            </div>
           </div>
           <div className="p-3 bg-zinc-900/40 border border-zinc-850 rounded-lg">
-            <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Avg. Bill Value</div>
-            <div className="text-xl font-extrabold text-amber-400 mt-1">₹{summary.avgBill.toFixed(2)}</div>
+            <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+              Avg. Bill Value
+            </div>
+            <div className="text-xl font-extrabold text-amber-400 mt-1">
+              ₹{summary.avgBill.toFixed(2)}
+            </div>
           </div>
         </div>
 
@@ -345,7 +388,12 @@ function HourlySalesDashboard({ billingDate }) {
               No sales data captured yet for today
             </div>
           ) : (
-            <svg width="100%" height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="overflow-visible">
+            <svg
+              width="100%"
+              height={svgHeight}
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+              className="overflow-visible"
+            >
               <defs>
                 <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
@@ -354,30 +402,100 @@ function HourlySalesDashboard({ billingDate }) {
               </defs>
 
               {/* Grid Lines */}
-              <line x1={padding} y1={padding} x2={svgWidth - padding} y2={padding} stroke="#1f2937" strokeDasharray="3 3" />
-              <line x1={padding} y1={padding + chartHeight/2} x2={svgWidth - padding} y2={padding + chartHeight/2} stroke="#1f2937" strokeDasharray="3 3" />
-              <line x1={padding} y1={svgHeight - padding} x2={svgWidth - padding} y2={svgHeight - padding} stroke="#374151" />
+              <line
+                x1={padding}
+                y1={padding}
+                x2={svgWidth - padding}
+                y2={padding}
+                stroke="#1f2937"
+                strokeDasharray="3 3"
+              />
+              <line
+                x1={padding}
+                y1={padding + chartHeight / 2}
+                x2={svgWidth - padding}
+                y2={padding + chartHeight / 2}
+                stroke="#1f2937"
+                strokeDasharray="3 3"
+              />
+              <line
+                x1={padding}
+                y1={svgHeight - padding}
+                x2={svgWidth - padding}
+                y2={svgHeight - padding}
+                stroke="#374151"
+              />
 
               {/* Y Axis Labels */}
-              <text x={padding - 5} y={padding + 4} fill="#6b7280" fontSize="8" textAnchor="end">₹{maxVal.toFixed(0)}</text>
-              <text x={padding - 5} y={padding + chartHeight/2 + 4} fill="#6b7280" fontSize="8" textAnchor="end">₹{(maxVal/2).toFixed(0)}</text>
-              <text x={padding - 5} y={svgHeight - padding + 4} fill="#6b7280" fontSize="8" textAnchor="end">₹0</text>
+              <text
+                x={padding - 5}
+                y={padding + 4}
+                fill="#6b7280"
+                fontSize="8"
+                textAnchor="end"
+              >
+                ₹{maxVal.toFixed(0)}
+              </text>
+              <text
+                x={padding - 5}
+                y={padding + chartHeight / 2 + 4}
+                fill="#6b7280"
+                fontSize="8"
+                textAnchor="end"
+              >
+                ₹{(maxVal / 2).toFixed(0)}
+              </text>
+              <text
+                x={padding - 5}
+                y={svgHeight - padding + 4}
+                fill="#6b7280"
+                fontSize="8"
+                textAnchor="end"
+              >
+                ₹0
+              </text>
 
               {/* Area path */}
               {areaD && <path d={areaD} fill="url(#chartGrad)" />}
 
               {/* Line path */}
-              {pathD && <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />}
+              {pathD && (
+                <path
+                  d={pathD}
+                  fill="none"
+                  stroke="#6366f1"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+              )}
 
               {/* Data points */}
               {points.map((p, i) => (
                 <g key={i} className="group cursor-pointer">
-                  <circle cx={p.x} cy={p.y} r="4" fill="#818cf8" stroke="#1e1b4b" strokeWidth="1.5" className="transition hover:scale-150" />
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r="4"
+                    fill="#818cf8"
+                    stroke="#1e1b4b"
+                    strokeWidth="1.5"
+                    className="transition hover:scale-150"
+                  />
                   <title>{`${p.data.time_slot} - ₹${parseFloat(p.data.total_amount).toFixed(2)} (${p.data.bill_count} bills)`}</title>
-                  
+
                   {/* X Axis labels */}
-                  { (i === 0 || i === points.length - 1 || i % Math.max(2, Math.floor(points.length / 4)) === 0) && (
-                    <text x={p.x} y={svgHeight - 12} fill="#6b7280" fontSize="8" textAnchor="middle">{p.data.time_slot}</text>
+                  {(i === 0 ||
+                    i === points.length - 1 ||
+                    i % Math.max(2, Math.floor(points.length / 4)) === 0) && (
+                    <text
+                      x={p.x}
+                      y={svgHeight - 12}
+                      fill="#6b7280"
+                      fontSize="8"
+                      textAnchor="middle"
+                    >
+                      {p.data.time_slot}
+                    </text>
                   )}
                 </g>
               ))}
@@ -415,7 +533,10 @@ function TopItemsDashboard({ sessionId, billingDate }) {
     return () => clearInterval(interval);
   }, [loadTopItems]);
 
-  const maxQty = topItems.length > 0 ? Math.max(...topItems.map(item => parseInt(item.total_quantity || 0))) : 1;
+  const maxQty =
+    topItems.length > 0
+      ? Math.max(...topItems.map((item) => parseInt(item.total_quantity || 0)))
+      : 1;
 
   return (
     <Card className="border border-zinc-800 bg-zinc-950 text-white rounded-xl shadow-lg">
@@ -427,7 +548,10 @@ function TopItemsDashboard({ sessionId, billingDate }) {
       <CardContent className="p-6">
         {loading ? (
           <div className="text-center py-8">
-            <Loader2 size={24} className="mb-2 animate-spin text-zinc-500 mx-auto" />
+            <Loader2
+              size={24}
+              className="mb-2 animate-spin text-zinc-500 mx-auto"
+            />
             <p className="text-zinc-500 text-sm">Loading items...</p>
           </div>
         ) : topItems.length > 0 ? (
@@ -438,12 +562,14 @@ function TopItemsDashboard({ sessionId, billingDate }) {
               return (
                 <div key={index} className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="font-semibold text-zinc-200">{index + 1}. {item.item_name}</span>
+                    <span className="font-semibold text-zinc-200">
+                      {index + 1}. {item.item_name}
+                    </span>
                     <span className="font-bold text-zinc-400">{qty} items</span>
                   </div>
                   {/* Custom Progress Bar */}
                   <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800/60">
-                    <div 
+                    <div
                       className="h-full bg-gradient-to-r from-indigo-600 to-violet-500 rounded-full transition-all duration-500 ease-out"
                       style={{ width: `${percentage}%` }}
                     />
@@ -461,7 +587,6 @@ function TopItemsDashboard({ sessionId, billingDate }) {
     </Card>
   );
 }
-
 
 // ================== SETTINGS EDITOR ==================
 
@@ -486,24 +611,31 @@ function SettingsEditor({ settings, onChange, clerk, isValidClerk }) {
     setLoading(true);
     setSaveStatus("");
     try {
-      const res = await api.put(
-        `/settings?clerk=${clerk || "CLK"}`,
-        form,
-      );
+      const res = await api.put(`/settings?clerk=${clerk || "CLK"}`, form);
       if (onChange) {
         onChange(res.data);
       }
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("rbs-settings-updated", { detail: res.data }));
+        window.dispatchEvent(
+          new CustomEvent("rbs-settings-updated", { detail: res.data }),
+        );
       }
       toast.success("Settings updated");
       setSaveStatus("Settings updated");
       setSaveStatusColor("text-emerald-500");
     } catch (e) {
       console.error("Settings save error:", e);
-      const errDetail = safeGet(e, "response.data.detail", "Failed to save settings");
+      const errDetail = safeGet(
+        e,
+        "response.data.detail",
+        "Failed to save settings",
+      );
       toast.error(errDetail);
-      setSaveStatus(errDetail === "This isn't a valid clerk name" ? "This isn't a valid clerk name" : "Failed to save settings");
+      setSaveStatus(
+        errDetail === "This isn't a valid clerk name"
+          ? "This isn't a valid clerk name"
+          : "Failed to save settings",
+      );
       setSaveStatusColor("text-rose-500");
     } finally {
       setLoading(false);
@@ -594,11 +726,19 @@ function SettingsEditor({ settings, onChange, clerk, isValidClerk }) {
           </TableBody>
         </Table>
         <div className="mt-4 flex flex-col gap-2">
-          <Button onClick={save} disabled={loading || !isValidClerk} className="w-full">
+          <Button
+            onClick={save}
+            disabled={loading || !isValidClerk}
+            className="w-full"
+          >
             {loading ? <Loader2 size={16} className="mr-2" /> : "Save Settings"}
           </Button>
           {saveStatus && (
-            <p className={`text-sm font-semibold text-center mt-1 ${saveStatusColor}`}>{saveStatus}</p>
+            <p
+              className={`text-sm font-semibold text-center mt-1 ${saveStatusColor}`}
+            >
+              {saveStatus}
+            </p>
           )}
         </div>
       </CardContent>
@@ -620,7 +760,7 @@ function PrinterConfigCard() {
     try {
       const [listRes, statusRes] = await Promise.all([
         api.get("/printer/list"),
-        api.get("/printer/status")
+        api.get("/printer/status"),
       ]);
       const list = safeArray(listRes.data?.printers);
       setPrinters(list);
@@ -660,13 +800,24 @@ function PrinterConfigCard() {
         <CardTitle className="text-lg font-bold text-zinc-100 flex items-center gap-2">
           <span>🖨️ POS Hardware Printer Setup</span>
         </CardTitle>
-        <Button size="sm" variant="outline" onClick={fetchPrinters} disabled={loading}>
-          {loading ? <Loader2 size={14} className="animate-spin" /> : "Refresh Printers"}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={fetchPrinters}
+          disabled={loading}
+        >
+          {loading ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            "Refresh Printers"
+          )}
         </Button>
       </CardHeader>
       <CardContent className="p-6 space-y-4">
         <div className="flex flex-col gap-2">
-          <Label className="text-sm font-semibold text-zinc-300">Select POS Receipt Printer</Label>
+          <Label className="text-sm font-semibold text-zinc-300">
+            Select POS Receipt Printer
+          </Label>
           <select
             className="w-full p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             value={selectedPrinter}
@@ -675,12 +826,14 @@ function PrinterConfigCard() {
             <option value="">-- Use OS Default Printer (Auto-Detect) --</option>
             {printers.map((p, idx) => (
               <option key={idx} value={p.name}>
-                {p.name} {p.isDefault ? "(OS Default)" : ""} {!p.isOnline ? "[OFFLINE]" : "[ONLINE]"}
+                {p.name} {p.isDefault ? "(OS Default)" : ""}{" "}
+                {!p.isOnline ? "[OFFLINE]" : "[ONLINE]"}
               </option>
             ))}
           </select>
           <p className="text-xs text-zinc-400">
-            Selecting "Use OS Default Printer" will automatically send receipts to whichever printer is set as active default in Windows.
+            Selecting "Use OS Default Printer" will automatically send receipts
+            to whichever printer is set as active default in Windows.
           </p>
         </div>
 
@@ -688,19 +841,33 @@ function PrinterConfigCard() {
           <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-lg text-xs space-y-1">
             <div className="flex justify-between">
               <span className="text-zinc-400">Connected Printer:</span>
-              <span className="font-bold text-emerald-400">{currentStatus.printer || "None"}</span>
+              <span className="font-bold text-emerald-400">
+                {currentStatus.printer || "None"}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-zinc-400">Status:</span>
-              <span className={`font-bold ${currentStatus.connected ? "text-emerald-400" : "text-rose-400"}`}>
-                {currentStatus.connected ? "✓ Connected & Ready" : `✗ Offline: ${currentStatus.reason || ""}`}
+              <span
+                className={`font-bold ${currentStatus.connected ? "text-emerald-400" : "text-rose-400"}`}
+              >
+                {currentStatus.connected
+                  ? "✓ Connected & Ready"
+                  : `✗ Offline: ${currentStatus.reason || ""}`}
               </span>
             </div>
           </div>
         )}
 
-        <Button onClick={savePrinterConfig} disabled={saving} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-          {saving ? <Loader2 size={16} className="animate-spin mr-2" /> : "Save Selected Printer"}
+        <Button
+          onClick={savePrinterConfig}
+          disabled={saving}
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+        >
+          {saving ? (
+            <Loader2 size={16} className="animate-spin mr-2" />
+          ) : (
+            "Save Selected Printer"
+          )}
         </Button>
       </CardContent>
     </Card>
@@ -709,7 +876,12 @@ function PrinterConfigCard() {
 
 // ================== ENHANCED ADMIN PANEL ==================
 
-export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billingDate }) {
+export default function EnhancedAdminPanel({
+  mode,
+  sessionId,
+  jumpTarget,
+  billingDate,
+}) {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(false);
   const [adminActiveTab, setAdminActiveTab] = useState("dashboard");
@@ -733,7 +905,7 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
     try {
       const res = await api.get(`/settings?clerk=${settingsClerk}`);
       setSettings(safeObject(res.data));
-      
+
       const clerksRes = await api.get("/settings/clerks");
       setClerksList(safeArray(clerksRes.data));
     } catch (e) {
@@ -793,11 +965,17 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
                   <HourlySalesDashboard billingDate={billingDate} />
                 </div>
                 <div className="lg:col-span-1">
-                  <TopItemsDashboard sessionId={sessionId} billingDate={billingDate} />
+                  <TopItemsDashboard
+                    sessionId={sessionId}
+                    billingDate={billingDate}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-6">
-                <ClerkStatsDashboard sessionId={sessionId} billingDate={billingDate} />
+                <ClerkStatsDashboard
+                  sessionId={sessionId}
+                  billingDate={billingDate}
+                />
               </div>
             </div>
           </TabsContent>
@@ -811,7 +989,9 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
                 <TabsTrigger value="date-range">Date Range</TabsTrigger>
                 <TabsTrigger value="shift-report">Shift Report</TabsTrigger>
                 <TabsTrigger value="item-report">Item Report</TabsTrigger>
-                <TabsTrigger value="category-report">Category Report</TabsTrigger>
+                <TabsTrigger value="category-report">
+                  Category Report
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="time-range">
@@ -855,20 +1035,26 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
                 <Label>Settings for Clerk:</Label>
                 <Input
                   value={settingsClerk}
-                  onChange={(e) => setSettingsClerk(e.target.value.toUpperCase())}
+                  onChange={(e) =>
+                    setSettingsClerk(e.target.value.toUpperCase())
+                  }
                   maxLength={10}
                   className="w-36"
                   placeholder="CLK"
                 />
               </div>
               <div className="text-xs min-h-[16px] pl-2">
-                {settingsClerk && (
-                  (settingsClerk === "CLK" || clerksList.some(c => c.clerk_initials === settingsClerk)) ? (
-                    <span className="text-emerald-500 font-medium">✓ Valid clerk initials</span>
+                {settingsClerk &&
+                  (settingsClerk === "CLK" ||
+                  clerksList.some((c) => c.clerk_initials === settingsClerk) ? (
+                    <span className="text-emerald-500 font-medium">
+                      ✓ Valid clerk initials
+                    </span>
                   ) : (
-                    <span className="text-rose-500 font-medium">✗ This isn't a valid clerk name</span>
-                  )
-                )}
+                    <span className="text-rose-500 font-medium">
+                      ✗ This isn't a valid clerk name
+                    </span>
+                  ))}
               </div>
             </div>
             {loading ? (
@@ -883,10 +1069,13 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
                 settings={settings}
                 onChange={setSettings}
                 clerk={settingsClerk}
-                isValidClerk={settingsClerk === "CLK" || clerksList.some(c => c.clerk_initials === settingsClerk)}
+                isValidClerk={
+                  settingsClerk === "CLK" ||
+                  clerksList.some((c) => c.clerk_initials === settingsClerk)
+                }
               />
             )}
-            
+
             {/* Customizable Keyboard Shortcuts Section */}
             <KeyboardShortcutsSettings />
 
@@ -898,8 +1087,6 @@ export default function EnhancedAdminPanel({ mode, sessionId, jumpTarget, billin
         <TabsContent value="split-bill">
           <SplitBillSettings />
         </TabsContent>
-
-
       </Tabs>
     </div>
   );
@@ -930,8 +1117,6 @@ function ClerkStatsDashboard({ sessionId, billingDate }) {
 
   const { sales = [], history = [] } = stats;
 
-
-
   return (
     <Card className="border border-zinc-800 bg-zinc-950 text-white rounded-xl shadow-lg">
       <CardHeader className="border-b border-zinc-900 pb-4">
@@ -942,7 +1127,10 @@ function ClerkStatsDashboard({ sessionId, billingDate }) {
       <CardContent className="p-6">
         {loading && !history.length ? (
           <div className="text-center py-8">
-            <Loader2 size={24} className="mb-2 animate-spin text-zinc-500 mx-auto" />
+            <Loader2
+              size={24}
+              className="mb-2 animate-spin text-zinc-500 mx-auto"
+            />
             <p className="text-zinc-500 text-sm">Loading stats...</p>
           </div>
         ) : (
@@ -959,22 +1147,39 @@ function ClerkStatsDashboard({ sessionId, billingDate }) {
                     <div key={i} className="flex gap-3 text-xs">
                       {/* Timeline Node */}
                       <div className="flex flex-col items-center">
-                        <div className={`w-2.5 h-2.5 rounded-full ${isSessionActive ? "bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse" : "bg-zinc-700"}`} />
-                        {i < history.length - 1 && <div className="w-0.5 flex-1 bg-zinc-900 my-1" />}
+                        <div
+                          className={`w-2.5 h-2.5 rounded-full ${isSessionActive ? "bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse" : "bg-zinc-700"}`}
+                        />
+                        {i < history.length - 1 && (
+                          <div className="w-0.5 flex-1 bg-zinc-900 my-1" />
+                        )}
                       </div>
                       <div className="flex-1 pb-2">
                         <div className="flex justify-between items-center">
                           <span className="font-semibold text-zinc-200">
-                            Clerk <span className="text-indigo-400 font-bold">{h.clerk_initials}</span> @ {displayTrack}
+                            Clerk{" "}
+                            <span className="text-indigo-400 font-bold">
+                              {h.clerk_initials}
+                            </span>{" "}
+                            @ {displayTrack}
                           </span>
-                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isSessionActive ? "bg-emerald-950 text-emerald-400" : "bg-zinc-900 text-zinc-500"}`}>
+                          <span
+                            className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isSessionActive ? "bg-emerald-950 text-emerald-400" : "bg-zinc-900 text-zinc-500"}`}
+                          >
                             {isSessionActive ? "Active" : "Finished"}
                           </span>
                         </div>
                         <p className="text-zinc-500 mt-0.5">
-                          {new Date(h.login_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{" "}
+                          {new Date(h.login_time).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}{" "}
+                          -{" "}
                           {h.logout_time
-                            ? new Date(h.logout_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            ? new Date(h.logout_time).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
                             : "Now"}
                         </p>
                       </div>
@@ -983,7 +1188,9 @@ function ClerkStatsDashboard({ sessionId, billingDate }) {
                 })}
               </div>
             ) : (
-              <div className="text-sm text-zinc-500 py-4">No session logins recorded yet today.</div>
+              <div className="text-sm text-zinc-500 py-4">
+                No session logins recorded yet today.
+              </div>
             )}
           </div>
         )}
@@ -1010,6 +1217,148 @@ function PurgeBillsSection() {
   const [shiftName, setShiftName] = useState("");
   const [purgePassword, setPurgePassword] = useState("");
   const [shiftPurgePassword, setShiftPurgePassword] = useState("");
+
+  // Anomaly / Unpurged Bills Search State
+  const [unpurgedDates, setUnpurgedDates] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [expandedDates, setExpandedDates] = useState({});
+  const [billsByDate, setBillsByDate] = useState({});
+  const [loadingDate, setLoadingDate] = useState("");
+  const [expandedBillId, setExpandedBillId] = useState(null);
+  const [purgeAnomalyPassword, setPurgeAnomalyPassword] = useState("");
+  const [purgingAnomaly, setPurgingAnomaly] = useState(false);
+
+  const normalizeBillData = (raw) => {
+    if (!raw) return raw;
+    let items = [];
+    if (Array.isArray(raw.items) && raw.items.length > 0) {
+      items = raw.items;
+    } else if (raw.items_json) {
+      try {
+        items =
+          typeof raw.items_json === "string"
+            ? JSON.parse(raw.items_json)
+            : raw.items_json;
+      } catch {
+        items = [];
+      }
+    }
+    const mapped = (items || []).map((it) => {
+      const q = it.quantity || it.qty;
+      const finalQty =
+        q && typeof q === "object" ? q.qty || q.quantity || 1 : q || 1;
+      const n = it.item_name || it.name || "";
+      const finalName =
+        n && typeof n === "object" ? n.name || n.item_name || "" : n || "";
+      return {
+        code:
+          it.item_code_numeric ||
+          it.numeric_item_code ||
+          it.numeric_code ||
+          it.item_code ||
+          "",
+        name: finalName,
+        quantity: finalQty,
+        unit_price:
+          it.unit_price || it.fixed_price || it.actual_price || it.price || 0,
+        line_total:
+          it.line_total ||
+          Number((finalQty || 1) * (it.unit_price || it.fixed_price || 0)),
+      };
+    });
+    return {
+      ...raw,
+      items: mapped,
+      grand_total: raw.grand_total || raw.total || 0,
+    };
+  };
+
+  const handleScanUnpurged = async () => {
+    setScanning(true);
+    try {
+      const summary = await getUnpurgedBillsSummary();
+      setUnpurgedDates(summary || []);
+      if (!summary || summary.length === 0) {
+        toast.success("Database is completely clean! No unpurged bills found.");
+      } else {
+        const totalBills = summary.reduce(
+          (acc, s) => acc + (parseInt(s.bill_count, 10) || 0),
+          0,
+        );
+        toast.info(
+          `Found ${summary.length} dates with ${totalBills} unpurged bills.`,
+        );
+      }
+    } catch (err) {
+      console.error("Scan error:", err);
+      toast.error(
+        safeGet(
+          err,
+          "response.data.error",
+          "Failed to scan database for unpurged bills",
+        ),
+      );
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const toggleDate = async (date) => {
+    const isExpanded = !!expandedDates[date];
+    if (isExpanded) {
+      setExpandedDates((prev) => ({ ...prev, [date]: false }));
+      return;
+    }
+
+    setExpandedDates((prev) => ({ ...prev, [date]: true }));
+    if (!billsByDate[date]) {
+      setLoadingDate(date);
+      try {
+        const rawBills = await getBillsByDate(date);
+        const normalized = (rawBills || []).map((b) => normalizeBillData(b));
+        setBillsByDate((prev) => ({ ...prev, [date]: normalized }));
+      } catch (err) {
+        console.error("Failed to load bills for date:", date, err);
+        toast.error(`Failed to load bills for ${formatDateToDDMMYYYY(date)}`);
+      } finally {
+        setLoadingDate("");
+      }
+    }
+  };
+
+  const handlePurgeAllAnomaly = async () => {
+    if (!purgeAnomalyPassword) {
+      toast.error("Please enter admin password to purge all unpurged bills.");
+      return;
+    }
+    const totalCount = (unpurgedDates || []).reduce(
+      (acc, s) => acc + (parseInt(s.bill_count, 10) || 0),
+      0,
+    );
+    if (
+      !window.confirm(
+        `DANGER: Are you sure you want to PURGE ALL ${totalCount} unpurged bills across all ${unpurgedDates.length} historical dates?\n\nThis cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setPurgingAnomaly(true);
+    try {
+      const res = await purgeAllUnpurgedBills(purgeAnomalyPassword);
+      toast.success(res.message || "All unpurged bills successfully purged!");
+      setPurgeAnomalyPassword("");
+      setUnpurgedDates([]);
+      setBillsByDate({});
+      setExpandedDates({});
+    } catch (err) {
+      console.error("Purge all anomaly error:", err);
+      toast.error(
+        safeGet(err, "response.data.error", "Failed to purge unpurged bills"),
+      );
+    } finally {
+      setPurgingAnomaly(false);
+    }
+  };
 
   const handlePurge = async () => {
     if (!purgePassword) {
@@ -1081,9 +1430,836 @@ function PurgeBillsSection() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-red-200 bg-red-50 mt-8">
+      {/* ================= UNPURGED BILLS ANOMALY DETECTION ================= */}
+      <Card
+        className="mt-8"
+        style={{
+          background: "#18181b",
+          border: "1px solid #27272a",
+          borderRadius: "0.85rem",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+        }}
+      >
+        <CardHeader
+          style={{
+            borderBottom: "1px solid #27272a",
+            padding: "1.25rem 1.5rem",
+          }}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div
+                style={{
+                  color: "#ffffff",
+                  fontSize: "1.2rem",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span>🔍</span> Unpurged Bills Search & History Anomalies
+              </div>
+              <p
+                style={{
+                  color: "#a1a1aa",
+                  fontSize: "0.85rem",
+                  marginTop: "0.35rem",
+                  lineHeight: "1.4",
+                }}
+              >
+                Scans the entire database history for any bills that have not
+                been purged. Useful for detecting bills created under backdated
+                system dates.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleScanUnpurged}
+              disabled={scanning}
+              style={{
+                backgroundColor: scanning ? "#1d4ed8" : "#2563eb",
+                color: "#ffffff",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                padding: "0.65rem 1.4rem",
+                borderRadius: "0.5rem",
+                border: "1px solid #3b82f6",
+                cursor: scanning ? "not-allowed" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                whiteSpace: "nowrap",
+                boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {scanning ? (
+                <Loader2 className="animate-spin mr-2" size={16} />
+              ) : null}
+              {scanning ? "Searching Database..." : "Search Unpurged Bills"}
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent style={{ padding: "1.5rem" }}>
+          {unpurgedDates === null ? (
+            <div
+              style={{
+                color: "#71717a",
+                padding: "1.5rem 0",
+                textAlign: "center",
+                fontSize: "0.9rem",
+              }}
+            >
+              Click "Search Unpurged Bills" above to query all unpurged records
+              across database history.
+            </div>
+          ) : unpurgedDates.length === 0 ? (
+            <div
+              style={{
+                color: "#34d399",
+                background: "#064e3b",
+                border: "1px solid #059669",
+                padding: "1rem",
+                borderRadius: "0.5rem",
+                textAlign: "center",
+                fontWeight: 600,
+                fontSize: "0.95rem",
+              }}
+            >
+              ✓ Database is clean! No unpurged bills found in history.
+            </div>
+          ) : (
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+            >
+              {/* Summary Banner */}
+              <div
+                style={{
+                  padding: "1rem 1.25rem",
+                  background: "#1e1b4b",
+                  border: "1px solid #4338ca",
+                  borderRadius: "0.65rem",
+                  display: "flex",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.75rem",
+                }}
+              >
+                <span style={{ color: "#e0e7ff", fontSize: "0.95rem" }}>
+                  Found{" "}
+                  <strong style={{ color: "#93c5fd", fontWeight: 700 }}>
+                    {unpurgedDates.length} dates
+                  </strong>{" "}
+                  containing{" "}
+                  <strong style={{ color: "#fde047", fontWeight: 700 }}>
+                    {unpurgedDates.reduce(
+                      (acc, d) => acc + (parseInt(d.bill_count, 10) || 0),
+                      0,
+                    )}{" "}
+                    bills
+                  </strong>{" "}
+                  totaling{" "}
+                  <strong
+                    style={{
+                      color: "#34d399",
+                      fontWeight: 700,
+                      fontSize: "1.05rem",
+                    }}
+                  >
+                    ₹
+                    {unpurgedDates
+                      .reduce(
+                        (acc, d) => acc + (parseFloat(d.total_amount) || 0),
+                        0,
+                      )
+                      .toFixed(2)}
+                  </strong>
+                  .
+                </span>
+                {/* <span
+                  style={{
+                    fontSize: "0.75rem",
+                    background: "#312e81",
+                    color: "#c7d2fe",
+                    padding: "0.3rem 0.75rem",
+                    borderRadius: "9999px",
+                    fontWeight: 700,
+                    border: "1px solid #6366f1",
+                    letterSpacing: "0.02em",
+                  }}
+                ></span> */}
+              </div>
+
+              {/* Collapsible List of Dates */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.6rem",
+                }}
+              >
+                {unpurgedDates.map((d) => {
+                  const dateStr = d.bill_date;
+                  const isExpanded = !!expandedDates[dateStr];
+                  const isLoadingThisDate = loadingDate === dateStr;
+                  const bills = billsByDate[dateStr] || [];
+
+                  return (
+                    <div
+                      key={dateStr}
+                      style={{
+                        background: isExpanded ? "#222227" : "#1a1a1e",
+                        border: isExpanded
+                          ? "1px solid #3b82f6"
+                          : "1px solid #2e2e34",
+                        borderRadius: "0.65rem",
+                        overflow: "hidden",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleDate(dateStr)}
+                        style={{
+                          width: "100%",
+                          padding: "0.9rem 1.25rem",
+                          background: isExpanded ? "#272730" : "#1f1f24",
+                          color: "#ffffff",
+                          border: "none",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "background 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "#2a2a32";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = isExpanded
+                            ? "#272730"
+                            : "#1f1f24";
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.75rem",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            style={{
+                              color: isExpanded ? "#60a5fa" : "#a1a1aa",
+                              fontSize: "0.95rem",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            {isExpanded ? "▼" : "▶"}
+                          </span>
+                          <span
+                            style={{
+                              color: "#ffffff",
+                              fontWeight: 700,
+                              fontSize: "1rem",
+                            }}
+                          >
+                            {formatDateToDDMMYYYY(dateStr)}
+                          </span>
+                          <span
+                            style={{ color: "#71717a", fontSize: "0.85rem" }}
+                          >
+                            ({dateStr})
+                          </span>
+                          <span
+                            style={{
+                              background: "#1e3a8a",
+                              color: "#bfdbfe",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              padding: "0.2rem 0.6rem",
+                              borderRadius: "0.35rem",
+                              border: "1px solid #3b82f6",
+                            }}
+                          >
+                            {d.bill_count}{" "}
+                            {parseInt(d.bill_count, 10) === 1
+                              ? "bill"
+                              : "bills"}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            color: "#34d399",
+                            fontWeight: 700,
+                            fontSize: "1.05rem",
+                          }}
+                        >
+                          Total: ₹{parseFloat(d.total_amount || 0).toFixed(2)}
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div
+                          style={{
+                            padding: "1.25rem",
+                            borderTop: "1px solid #2e2e34",
+                            background: "#131316",
+                          }}
+                        >
+                          {isLoadingThisDate ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "1.5rem",
+                                color: "#a1a1aa",
+                              }}
+                            >
+                              <Loader2
+                                className="animate-spin mr-2"
+                                size={18}
+                              />
+                              Loading bill details for{" "}
+                              {formatDateToDDMMYYYY(dateStr)}...
+                            </div>
+                          ) : bills.length === 0 ? (
+                            <div
+                              style={{
+                                textAlign: "center",
+                                padding: "1rem",
+                                color: "#71717a",
+                                fontSize: "0.875rem",
+                              }}
+                            >
+                              No bills retrieved for this date.
+                            </div>
+                          ) : (
+                            <div style={{ overflowX: "auto" }}>
+                              <table
+                                style={{
+                                  width: "100%",
+                                  borderCollapse: "collapse",
+                                  fontSize: "0.85rem",
+                                }}
+                              >
+                                <thead>
+                                  <tr
+                                    style={{
+                                      borderBottom: "1px solid #2e2e36",
+                                      background: "#1b1b20",
+                                      color: "#a1a1aa",
+                                    }}
+                                  >
+                                    <th
+                                      style={{
+                                        padding: "0.65rem 0.75rem",
+                                        textAlign: "left",
+                                        width: "80px",
+                                      }}
+                                    >
+                                      Bill #
+                                    </th>
+                                    <th
+                                      style={{
+                                        padding: "0.65rem 0.75rem",
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Time
+                                    </th>
+                                    <th
+                                      style={{
+                                        padding: "0.65rem 0.75rem",
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Table
+                                    </th>
+                                    <th
+                                      style={{
+                                        padding: "0.65rem 0.75rem",
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Party
+                                    </th>
+                                    <th
+                                      style={{
+                                        padding: "0.65rem 0.75rem",
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Track
+                                    </th>
+                                    <th
+                                      style={{
+                                        padding: "0.65rem 0.75rem",
+                                        textAlign: "left",
+                                      }}
+                                    >
+                                      Clerk
+                                    </th>
+                                    <th
+                                      style={{
+                                        padding: "0.65rem 0.75rem",
+                                        textAlign: "right",
+                                      }}
+                                    >
+                                      Grand Total
+                                    </th>
+                                    <th
+                                      style={{
+                                        padding: "0.65rem 0.75rem",
+                                        textAlign: "center",
+                                        width: "120px",
+                                      }}
+                                    >
+                                      Items
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {bills.map((bill) => {
+                                    const isBillItemsExpanded =
+                                      expandedBillId === bill.id;
+                                    const billTime = bill.created_at
+                                      ? new Date(
+                                          bill.created_at,
+                                        ).toLocaleTimeString("en-IN", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                          hour12: true,
+                                        })
+                                      : "-";
+
+                                    return (
+                                      <React.Fragment key={bill.id}>
+                                        <tr
+                                          style={{
+                                            borderBottom: "1px solid #222228",
+                                            background: isBillItemsExpanded
+                                              ? "#202028"
+                                              : "transparent",
+                                          }}
+                                        >
+                                          <td
+                                            style={{
+                                              padding: "0.65rem 0.75rem",
+                                              color: "#60a5fa",
+                                              fontWeight: 700,
+                                            }}
+                                          >
+                                            #{bill.bill_number}
+                                          </td>
+                                          <td
+                                            style={{
+                                              padding: "0.65rem 0.75rem",
+                                              color: "#d4d4d8",
+                                            }}
+                                          >
+                                            {billTime}
+                                          </td>
+                                          <td
+                                            style={{
+                                              padding: "0.65rem 0.75rem",
+                                              color: "#ffffff",
+                                              fontWeight: 600,
+                                            }}
+                                          >
+                                            {bill.table_no || "-"}
+                                          </td>
+                                          <td
+                                            style={{
+                                              padding: "0.65rem 0.75rem",
+                                              color: "#d4d4d8",
+                                            }}
+                                          >
+                                            {bill.party_no || "1"}
+                                          </td>
+                                          <td
+                                            style={{
+                                              padding: "0.65rem 0.75rem",
+                                            }}
+                                          >
+                                            <span
+                                              style={{
+                                                padding: "0.2rem 0.55rem",
+                                                borderRadius: "0.3rem",
+                                                fontSize: "0.75rem",
+                                                fontWeight: 600,
+                                                background: "#27272a",
+                                                color: "#e4e4e7",
+                                                border: "1px solid #3f3f46",
+                                              }}
+                                            >
+                                              {bill.track || "Default"}
+                                            </span>
+                                          </td>
+                                          <td
+                                            style={{
+                                              padding: "0.65rem 0.75rem",
+                                              color: "#d4d4d8",
+                                              fontWeight: 600,
+                                            }}
+                                          >
+                                            {bill.clerk_initials || "-"}
+                                          </td>
+                                          <td
+                                            style={{
+                                              padding: "0.65rem 0.75rem",
+                                              textAlign: "right",
+                                              color: "#34d399",
+                                              fontWeight: 700,
+                                            }}
+                                          >
+                                            ₹
+                                            {Number(
+                                              bill.grand_total || 0,
+                                            ).toFixed(2)}
+                                          </td>
+                                          <td
+                                            style={{
+                                              padding: "0.65rem 0.75rem",
+                                              textAlign: "center",
+                                            }}
+                                          >
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setExpandedBillId(
+                                                  isBillItemsExpanded
+                                                    ? null
+                                                    : bill.id,
+                                                )
+                                              }
+                                              style={{
+                                                padding: "0.3rem 0.7rem",
+                                                fontSize: "0.75rem",
+                                                fontWeight: 600,
+                                                background: isBillItemsExpanded
+                                                  ? "#2563eb"
+                                                  : "#27272a",
+                                                color: "#ffffff",
+                                                border: "1px solid #3f3f46",
+                                                borderRadius: "0.35rem",
+                                                cursor: "pointer",
+                                                transition: "all 0.15s ease",
+                                              }}
+                                            >
+                                              {isBillItemsExpanded
+                                                ? "Hide"
+                                                : `View (${bill.items?.length || 0})`}
+                                            </button>
+                                          </td>
+                                        </tr>
+
+                                        {/* Sub-table for items */}
+                                        {isBillItemsExpanded && (
+                                          <tr style={{ background: "#1a1a22" }}>
+                                            <td
+                                              colSpan={8}
+                                              style={{
+                                                padding: "0.85rem 1rem",
+                                              }}
+                                            >
+                                              <div
+                                                style={{
+                                                  background: "#121216",
+                                                  borderRadius: "0.55rem",
+                                                  border: "1px solid #2e2e38",
+                                                  padding: "0.85rem",
+                                                }}
+                                              >
+                                                <div
+                                                  style={{
+                                                    fontSize: "0.75rem",
+                                                    fontWeight: 700,
+                                                    color: "#93c5fd",
+                                                    textTransform: "uppercase",
+                                                    letterSpacing: "0.05em",
+                                                    marginBottom: "0.6rem",
+                                                  }}
+                                                >
+                                                  Bill #{bill.bill_number} Line
+                                                  Items
+                                                </div>
+                                                {!bill.items ||
+                                                bill.items.length === 0 ? (
+                                                  <div
+                                                    style={{
+                                                      fontSize: "0.75rem",
+                                                      color: "#71717a",
+                                                    }}
+                                                  >
+                                                    No item details stored in
+                                                    JSON.
+                                                  </div>
+                                                ) : (
+                                                  <table
+                                                    style={{
+                                                      width: "100%",
+                                                      fontSize: "0.8rem",
+                                                      borderCollapse:
+                                                        "collapse",
+                                                    }}
+                                                  >
+                                                    <thead>
+                                                      <tr
+                                                        style={{
+                                                          borderBottom:
+                                                            "1px solid #2a2a34",
+                                                          color: "#a1a1aa",
+                                                        }}
+                                                      >
+                                                        <th
+                                                          style={{
+                                                            textAlign: "left",
+                                                            paddingBottom:
+                                                              "0.4rem",
+                                                          }}
+                                                        >
+                                                          Code
+                                                        </th>
+                                                        <th
+                                                          style={{
+                                                            textAlign: "left",
+                                                            paddingBottom:
+                                                              "0.4rem",
+                                                          }}
+                                                        >
+                                                          Item Name
+                                                        </th>
+                                                        <th
+                                                          style={{
+                                                            textAlign: "right",
+                                                            paddingBottom:
+                                                              "0.4rem",
+                                                          }}
+                                                        >
+                                                          Qty
+                                                        </th>
+                                                        <th
+                                                          style={{
+                                                            textAlign: "right",
+                                                            paddingBottom:
+                                                              "0.4rem",
+                                                          }}
+                                                        >
+                                                          Price
+                                                        </th>
+                                                        <th
+                                                          style={{
+                                                            textAlign: "right",
+                                                            paddingBottom:
+                                                              "0.4rem",
+                                                          }}
+                                                        >
+                                                          Line Total
+                                                        </th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                      {bill.items.map(
+                                                        (it, iIdx) => (
+                                                          <tr
+                                                            key={iIdx}
+                                                            style={{
+                                                              borderBottom:
+                                                                "1px solid #1f1f26",
+                                                            }}
+                                                          >
+                                                            <td
+                                                              style={{
+                                                                padding:
+                                                                  "0.4rem 0",
+                                                                color:
+                                                                  "#a1a1aa",
+                                                                fontFamily:
+                                                                  "monospace",
+                                                              }}
+                                                            >
+                                                              {it.code || "-"}
+                                                            </td>
+                                                            <td
+                                                              style={{
+                                                                padding:
+                                                                  "0.4rem 0",
+                                                                color:
+                                                                  "#f4f4f5",
+                                                                fontWeight: 500,
+                                                              }}
+                                                            >
+                                                              {it.name}
+                                                            </td>
+                                                            <td
+                                                              style={{
+                                                                padding:
+                                                                  "0.4rem 0",
+                                                                textAlign:
+                                                                  "right",
+                                                                color:
+                                                                  "#fde047",
+                                                                fontWeight: 700,
+                                                              }}
+                                                            >
+                                                              {it.quantity}
+                                                            </td>
+                                                            <td
+                                                              style={{
+                                                                padding:
+                                                                  "0.4rem 0",
+                                                                textAlign:
+                                                                  "right",
+                                                                color:
+                                                                  "#d4d4d8",
+                                                              }}
+                                                            >
+                                                              ₹
+                                                              {Number(
+                                                                it.unit_price ||
+                                                                  0,
+                                                              ).toFixed(2)}
+                                                            </td>
+                                                            <td
+                                                              style={{
+                                                                padding:
+                                                                  "0.4rem 0",
+                                                                textAlign:
+                                                                  "right",
+                                                                color:
+                                                                  "#34d399",
+                                                                fontWeight: 700,
+                                                              }}
+                                                            >
+                                                              ₹
+                                                              {Number(
+                                                                it.line_total ||
+                                                                  0,
+                                                              ).toFixed(2)}
+                                                            </td>
+                                                          </tr>
+                                                        ),
+                                                      )}
+                                                    </tbody>
+                                                  </table>
+                                                )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        )}
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Action to purge all found unpurged bills */}
+              <div
+                style={{
+                  marginTop: "1.25rem",
+                  padding: "1.25rem",
+                  background: "#241215",
+                  border: "1px solid #7f1d1d",
+                  borderRadius: "0.65rem",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    color: "#f87171",
+                    marginBottom: "0.25rem",
+                  }}
+                >
+                  Purge All Identified Anomalous / Unpurged Bills
+                </div>
+                <p
+                  style={{
+                    fontSize: "0.8rem",
+                    color: "#fca5a5",
+                    marginBottom: "0.85rem",
+                    lineHeight: "1.4",
+                  }}
+                >
+                  This will permanently delete all{" "}
+                  {unpurgedDates.reduce(
+                    (acc, d) => acc + (parseInt(d.bill_count, 10) || 0),
+                    0,
+                  )}{" "}
+                  identified bills across all {unpurgedDates.length} historical
+                  dates. Requires admin authorization.
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <input
+                    type="password"
+                    placeholder="Admin Password"
+                    value={purgeAnomalyPassword}
+                    onChange={(e) => setPurgeAnomalyPassword(e.target.value)}
+                    style={{
+                      width: "12rem",
+                      background: "#18181b",
+                      color: "#ffffff",
+                      border: "1px solid #7f1d1d",
+                      borderRadius: "0.5rem",
+                      padding: "0.55rem 0.85rem",
+                      fontSize: "0.875rem",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handlePurgeAllAnomaly}
+                    disabled={purgingAnomaly}
+                    style={{
+                      backgroundColor: "#dc2626",
+                      color: "#ffffff",
+                      fontWeight: 600,
+                      padding: "0.6rem 1.25rem",
+                      borderRadius: "0.5rem",
+                      border: "1px solid #b91c1c",
+                      cursor: purgingAnomaly ? "not-allowed" : "pointer",
+                      opacity: purgingAnomaly ? 0.7 : 1,
+                      display: "inline-flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    {purgingAnomaly ? (
+                      <Loader2 className="animate-spin mr-2" size={16} />
+                    ) : null}
+                    Purge All Identified Bills ({unpurgedDates.length} Dates)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-red-200 bg-red-50">
         <CardHeader>
-          <CardTitle className="text-red-800">Danger Zone: Purge All Bills</CardTitle>
+          <CardTitle className="text-red-800">
+            Danger Zone: Purge All Bills
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -1126,7 +2302,11 @@ function PurgeBillsSection() {
                 variant="destructive"
                 onClick={handlePurge}
                 disabled={loading}
-                style={{ backgroundColor: "#dc2626", color: "#ffffff", border: "1px solid #b91c1c" }}
+                style={{
+                  backgroundColor: "#dc2626",
+                  color: "#ffffff",
+                  border: "1px solid #b91c1c",
+                }}
               >
                 {loading ? (
                   <Loader2 className="animate-spin mr-2" size={16} />
@@ -1145,8 +2325,8 @@ function PurgeBillsSection() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-orange-600">
-              Delete bills for a <strong>specific shift only</strong> within a date range.
-              Bills from other shifts will NOT be affected.
+              Delete bills for a <strong>specific shift only</strong> within a
+              date range. Bills from other shifts will NOT be affected.
             </p>
 
             <div className="flex gap-4 items-end flex-wrap">
@@ -1193,7 +2373,11 @@ function PurgeBillsSection() {
                 variant="destructive"
                 onClick={handleShiftPurge}
                 disabled={shiftPurgeLoading || !shiftName.trim()}
-                style={{ backgroundColor: "#dc2626", color: "#ffffff", border: "1px solid #b91c1c" }}
+                style={{
+                  backgroundColor: "#dc2626",
+                  color: "#ffffff",
+                  border: "1px solid #b91c1c",
+                }}
               >
                 {shiftPurgeLoading ? (
                   <Loader2 className="animate-spin mr-2" size={16} />
@@ -1270,7 +2454,9 @@ function KeyboardShortcutsSettings() {
       const updated = { ...shortcuts, [recordingAction]: combo };
       setShortcuts(updated);
       saveCustomShortcuts(updated);
-      toast.success(`Shortcut for '${getShortcutActionLabel(recordingAction)}' updated to '${combo}'`);
+      toast.success(
+        `Shortcut for '${getShortcutActionLabel(recordingAction)}' updated to '${combo}'`,
+      );
     };
 
     window.addEventListener("keydown", handleKeydown, true);
@@ -1289,7 +2475,7 @@ function KeyboardShortcutsSettings() {
       itemsSearch: "f4",
       printBill: "end",
       focusItemCode: "pagedown",
-      toggleSplit: "f3"
+      toggleSplit: "f3",
     };
     setShortcuts(defaults);
     saveCustomShortcuts(defaults);
@@ -1308,24 +2494,35 @@ function KeyboardShortcutsSettings() {
       <CardContent className="p-6">
         <div className="space-y-4">
           <p className="text-sm text-zinc-400">
-            Click "Record" next to any action, then press your desired key combination.
-            System keys (like F1, Alt+Tab, etc.) are restricted.
+            Click "Record" next to any action, then press your desired key
+            combination. System keys (like F1, Alt+Tab, etc.) are restricted.
           </p>
 
           <div className="border border-zinc-900 rounded-lg overflow-hidden divide-y divide-zinc-900">
             {shortcutKeys.map((actionKey) => (
-              <div key={actionKey} className="flex justify-between items-center p-3 text-sm hover:bg-zinc-900/20">
+              <div
+                key={actionKey}
+                className="flex justify-between items-center p-3 text-sm hover:bg-zinc-900/20"
+              >
                 <div>
-                  <div className="font-semibold text-zinc-200">{getShortcutActionLabel(actionKey)}</div>
-                  <div className="text-xs text-zinc-550 text-zinc-500">Default key binding is standard</div>
+                  <div className="font-semibold text-zinc-200">
+                    {getShortcutActionLabel(actionKey)}
+                  </div>
+                  <div className="text-xs text-zinc-550 text-zinc-500">
+                    Default key binding is standard
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded font-mono font-bold text-indigo-400">
-                    {recordingAction === actionKey ? "Press any key combo..." : shortcuts[actionKey]}
+                    {recordingAction === actionKey
+                      ? "Press any key combo..."
+                      : shortcuts[actionKey]}
                   </div>
                   <Button
                     size="sm"
-                    variant={recordingAction === actionKey ? "destructive" : "outline"}
+                    variant={
+                      recordingAction === actionKey ? "destructive" : "outline"
+                    }
                     onClick={() => handleRecord(actionKey)}
                   >
                     {recordingAction === actionKey ? "Cancel" : "Record"}

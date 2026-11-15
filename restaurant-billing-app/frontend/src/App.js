@@ -65,6 +65,23 @@ function App() {
   const [activeShift, setActiveShift] = useState(null);
   const [isShiftLoading, setIsShiftLoading] = useState(true);
   const [printData, setPrintData] = useState(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime12Hour = (date) => {
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+  };
 
   // ── Printer detection gate ──────────────────────────────────────────────
   const [printerConnected, setPrinterConnected] = useState(true); // optimistic start
@@ -459,6 +476,27 @@ function App() {
           className={`text-center ${activeTab === "billing" ? "mb-2" : "mb-6"}`}
           style={{ position: "relative" }}
         >
+          <div
+            style={{
+              position: "absolute",
+              left: "0.5rem",
+              top: "50%",
+              transform: "translateY(-50%)",
+              display: "flex",
+              alignItems: "center",
+              fontSize: "0.95rem",
+              fontWeight: "600",
+              color: "#e2e8f0",
+              letterSpacing: "0.05em",
+              fontFamily: "monospace",
+              background: "rgba(255, 255, 255, 0.08)",
+              padding: "4px 8px",
+              borderRadius: "4px",
+              border: "1px solid rgba(255, 255, 255, 0.15)"
+            }}
+          >
+            {formatTime12Hour(currentTime)}
+          </div>
           {activeTab === "billing" ? (
             <h1 className="text-lg font-bold text-zinc-500 tracking-tight">
               New Udipi Anand Bhavan

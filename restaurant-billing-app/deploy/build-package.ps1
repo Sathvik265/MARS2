@@ -1,4 +1,4 @@
-<#
+﻿<#
 build-package.ps1
 
 Builds a fully self-contained deploy package for the Restaurant Billing App.
@@ -20,7 +20,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$root = Get-Location
+$root = (Get-Location).Path
+if (-not [System.IO.Path]::IsPathRooted($OutputDir)) {
+  $OutputDir = Join-Path $root $OutputDir
+}
+if (-not [System.IO.Path]::IsPathRooted($OutputZip)) {
+  $OutputZip = Join-Path $root $OutputZip
+}
 
 Write-Host "== 1/5: Installing backend production dependencies ==" -ForegroundColor Cyan
 Push-Location "$root\backend"
@@ -97,11 +103,17 @@ Copy-Item "$root\Final.sql" "$OutputDir\" -ErrorAction SilentlyContinue
 Copy-Item "$root\Final_Dump_Fixed.sql" "$OutputDir\" -ErrorAction SilentlyContinue
 
 # Generate shortcut
-$ws = New-Object -ComObject WScript.Shell
-$lnk = $ws.CreateShortcut("$OutputDir\RunAppsOnly.lnk")
-$lnk.TargetPath = "$OutputDir\RunAppsOnly.bat"
-$lnk.WorkingDirectory = "$OutputDir"
-$lnk.Save()
+try {
+    $ws = New-Object -ComObject WScript.Shell
+    $shortcutPath = Join-Path $OutputDir "RunAppsOnly.lnk"
+    $targetPath = Join-Path $OutputDir "RunAppsOnly.bat"
+    $lnk = $ws.CreateShortcut($shortcutPath)
+    $lnk.TargetPath = $targetPath
+    $lnk.WorkingDirectory = $OutputDir
+    $lnk.Save()
+} catch {
+    Write-Host "Warning: Could not create shortcut (.lnk): $_" -ForegroundColor Yellow
+}
 
 Copy-Item "$root\deploy\DEPLOY_PACKAGE_README.md" "$OutputDir\README.md" -ErrorAction SilentlyContinue
 

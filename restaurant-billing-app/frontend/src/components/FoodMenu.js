@@ -20,8 +20,48 @@ import {
   TableCell,
 } from "./ui/Table";
 import { updateMenuItem, bulkUpdateMenuItems } from "../services/api";
-import { API, toast, safeGet, safeArray, getCategoryName } from "../utils/helpers";
+import { API, toast, safeGet, safeArray } from "../utils/helpers";
 import * as XLSX from "xlsx";
+
+export function parseCategories(catData) {
+  if (!catData) return [{ qty: 1, name: "" }];
+  let parsed = catData;
+  if (typeof catData === "string") {
+    try {
+      parsed = JSON.parse(catData);
+    } catch {
+      return [{ qty: 1, name: catData.trim() }];
+    }
+  }
+  if (Array.isArray(parsed)) {
+    if (parsed.length > 0 && Array.isArray(parsed[0])) {
+      parsed = parsed[0];
+    }
+    const list = parsed.map((c) => {
+      if (!c) return null;
+      if (typeof c === "string") return { qty: 1, name: c.trim() };
+      return {
+        qty: parseFloat(c.qty || c.quantity) || 1,
+        name: String(c.name || c.item_name || "").trim(),
+      };
+    }).filter((c) => c && c.name);
+    return list.length > 0 ? list : [{ qty: 1, name: "" }];
+  }
+  if (typeof parsed === "object") {
+    const name = String(parsed.name || parsed.item_name || "").trim();
+    if (name) {
+      return [{ qty: parseFloat(parsed.qty || parsed.quantity) || 1, name }];
+    }
+  }
+  return [{ qty: 1, name: "" }];
+}
+
+export function formatCategoriesDisplay(raw) {
+  const cats = parseCategories(raw);
+  const valid = cats.filter((c) => c && c.name);
+  if (valid.length === 0) return "-";
+  return valid.map((c) => `${c.name}${c.qty > 1 ? ` (${c.qty})` : ""}`).join(", ");
+}
 
 function CategorySelector({ value, onChange, existingCategories }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -107,12 +147,14 @@ export default function FoodMenu({ mode }) {
   const existingCategories = React.useMemo(() => {
     const cats = new Set();
     items.forEach((item) => {
-      const catName = getCategoryName(safeGet(item, "category"));
-      if (catName) {
-        cats.add(catName);
-      }
+      const parsed = parseCategories(safeGet(item, "category"));
+      parsed.forEach((c) => {
+        if (c && c.name) {
+          cats.add(c.name);
+        }
+      });
     });
-    return Array.from(cats);
+    return Array.from(cats).sort();
   }, [items]);
   const [newItem, setNewItem] = useState({
     name: "",
@@ -168,9 +210,12 @@ export default function FoodMenu({ mode }) {
   const saveEditedItem = async () => {
     if (!editingItem) return;
     try {
-      const cleanCatName = typeof editingItem.category === "string"
-        ? (editingItem.category === "[object Object]" ? "" : editingItem.category.trim())
-        : getCategoryName(editingItem.category);
+      const validCategories = (editingItem.categories || [])
+        .map((c) => ({
+          qty: parseFloat(c.qty) > 0 ? parseFloat(c.qty) : 1,
+          name: String(c.name || "").trim(),
+        }))
+        .filter((c) => c.name);
 
       const payload = {
         name: editingItem.name,
@@ -179,7 +224,7 @@ export default function FoodMenu({ mode }) {
         price_fixed: editingItem.price_fixed,
         price_general: editingItem.price_general,
         price_ac: editingItem.price_ac,
-        category: { qty: 1, name: cleanCatName || "" },
+        category: validCategories.length > 0 ? validCategories : [{ qty: 1, name: "" }],
         is_separate: editingItem.is_separate || false,
       };
       await updateMenuItem(editingItem.id, payload);
@@ -324,15 +369,78 @@ export default function FoodMenu({ mode }) {
                 />
                 <Label htmlFor="edit_is_separate">Is Separate?</Label>
               </div>
-              <div>
-                <Label>Category</Label>
-                <CategorySelector
-                  value={getCategoryName(editingItem.category)}
-                  onChange={(val) =>
-                    setEditingItem({ ...editingItem, category: val || "" })
-                  }
-                  existingCategories={existingCategories}
-                />
+              <div className="space-y-2">
+                <div className="flex justify-between items-center mb-1">
+                  <Label>Categories & Quantities</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-800"
+                    onClick={() => {
+                      setEditingItem((prev) => ({
+                        ...prev,
+                        categories: [...(prev.categories || []), { qty: 1, name: "" }],
+                      }));
+                    }}
+                  >
+                    + Add Category
+                  </Button>
+                </div>
+                {(editingItem.categories || []).map((cat, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div className="w-20 flex-shrink-0">
+                      <Input
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        value={cat.qty}
+                        placeholder="Qty"
+                        className="text-center font-bold"
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 1;
+                          setEditingItem((prev) => {
+                            const newCats = [...(prev.categories || [])];
+                            newCats[idx] = { ...newCats[idx], qty: val };
+                            return { ...prev, categories: newCats };
+                          });
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <CategorySelector
+                        value={cat.name}
+                        onChange={(val) => {
+                          setEditingItem((prev) => {
+                            const newCats = [...(prev.categories || [])];
+                            newCats[idx] = { ...newCats[idx], name: val || "" };
+                            return { ...prev, categories: newCats };
+                          });
+                        }}
+                        existingCategories={existingCategories}
+                      />
+                    </div>
+                    {(editingItem.categories || []).length > 1 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-500 hover:text-red-700 h-9 px-2 font-bold"
+                        onClick={() => {
+                          setEditingItem((prev) => {
+                            const newCats = (prev.categories || []).filter((_, i) => i !== idx);
+                            return {
+                              ...prev,
+                              categories: newCats.length > 0 ? newCats : [{ qty: 1, name: "" }],
+                            };
+                          });
+                        }}
+                      >
+                        ✕
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <Button onClick={saveEditedItem}>Save</Button>
@@ -506,6 +614,28 @@ export default function FoodMenu({ mode }) {
     } catch (e) {
       console.error("Delete item error:", e);
       toast.error(safeGet(e, "response.data.detail", "Failed to delete item"));
+    }
+  };
+
+  const handleExportMenu = () => {
+    try {
+      const exportData = items.map((item) => ({
+        "Numeric Code": item.numeric_code || "",
+        "Alpha Code": item.alpha_code || "",
+        "Item Name": item.name || "",
+        "Fixed Price": parseFloat(item.price_fixed) || 0,
+        "General Price": parseFloat(item.price_general) || 0,
+        "AC Price": parseFloat(item.price_ac) || 0,
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Food Menu");
+      XLSX.writeFile(workbook, "Food_Menu.xlsx");
+      toast.success("Food menu exported successfully!");
+    } catch (err) {
+      console.error("Export error:", err);
+      toast.error("Failed to export food menu: " + err.message);
     }
   };
 
@@ -708,6 +838,13 @@ export default function FoodMenu({ mode }) {
               />
               {mode === "admin-full" && (
                 <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleExportMenu}
+                    variant="outline"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white border-none font-semibold transition-all h-10 px-4 flex items-center gap-2"
+                  >
+                    📤 Export Menu (Excel)
+                  </Button>
                   <Button
                     onClick={() => document.getElementById("bulk-update-file-input").click()}
                     variant="outline"
@@ -928,7 +1065,7 @@ export default function FoodMenu({ mode }) {
                       {Number(safeGet(item, "price_ac", 0)).toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      {getCategoryName(safeGet(item, "category")) || "-"}
+                      {formatCategoriesDisplay(safeGet(item, "category"))}
                     </TableCell>
                     {mode === "admin-full" && (
                       <TableCell>
@@ -949,7 +1086,7 @@ export default function FoodMenu({ mode }) {
                                   0,
                                 ),
                                 price_ac: safeGet(item, "price_ac", 0),
-                                category: getCategoryName(safeGet(item, "category")),
+                                categories: parseCategories(safeGet(item, "category")),
                                 is_separate: safeGet(
                                   item,
                                   "is_separate",

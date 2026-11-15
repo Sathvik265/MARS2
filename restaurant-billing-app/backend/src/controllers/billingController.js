@@ -564,6 +564,36 @@ const billingController = {
     }
   },
 
+  // Get summary of all unpurged bills across all history
+  async getUnpurgedBillsSummary(req, res) {
+    try {
+      const summary = await BillingModel.getUnpurgedBillsSummary();
+      res.status(200).json(summary);
+    } catch (error) {
+      console.error("Error fetching unpurged bills summary:", error);
+      res.status(500).json({ error: "Failed to fetch unpurged bills summary", details: error.message });
+    }
+  },
+
+  // Purge all unpurged bills across history
+  async purgeAllUnpurgedBills(req, res) {
+    try {
+      const { confirmPassword } = req.body;
+      if (confirmPassword !== ADMIN_FULL_PASSWORD) {
+        return res.status(403).json({ error: "Invalid admin password" });
+      }
+
+      const count = await BillingModel.purgeAllUnpurgedBills();
+      res.status(200).json({
+        message: `Successfully purged all ${count} unpurged bills from history`,
+        count,
+      });
+    } catch (error) {
+      console.error("Purge all unpurged error:", error);
+      res.status(500).json({ error: "Failed to purge all unpurged bills", details: error.message });
+    }
+  },
+
   // Move order to another table
   async moveOrder(req, res) {
     try {
