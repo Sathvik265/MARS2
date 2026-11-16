@@ -37,14 +37,16 @@ export function parseCategories(catData) {
     if (parsed.length > 0 && Array.isArray(parsed[0])) {
       parsed = parsed[0];
     }
-    const list = parsed.map((c) => {
-      if (!c) return null;
-      if (typeof c === "string") return { qty: 1, name: c.trim() };
-      return {
-        qty: parseFloat(c.qty || c.quantity) || 1,
-        name: String(c.name || c.item_name || "").trim(),
-      };
-    }).filter((c) => c && c.name);
+    const list = parsed
+      .map((c) => {
+        if (!c) return null;
+        if (typeof c === "string") return { qty: 1, name: c.trim() };
+        return {
+          qty: parseFloat(c.qty || c.quantity) || 1,
+          name: String(c.name || c.item_name || "").trim(),
+        };
+      })
+      .filter((c) => c && c.name);
     return list.length > 0 ? list : [{ qty: 1, name: "" }];
   }
   if (typeof parsed === "object") {
@@ -60,7 +62,9 @@ export function formatCategoriesDisplay(raw) {
   const cats = parseCategories(raw);
   const valid = cats.filter((c) => c && c.name);
   if (valid.length === 0) return "-";
-  return valid.map((c) => `${c.name}${c.qty > 1 ? ` (${c.qty})` : ""}`).join(", ");
+  return valid
+    .map((c) => `${c.name}${c.qty > 1 ? ` (${c.qty})` : ""}`)
+    .join(", ");
 }
 
 function CategorySelector({ value, onChange, existingCategories }) {
@@ -83,12 +87,14 @@ function CategorySelector({ value, onChange, existingCategories }) {
   }, []);
 
   const filtered = existingCategories.filter((cat) =>
-    cat.toLowerCase().includes(search.toLowerCase())
+    cat.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const showCreateOption = search.trim() !== "" && !existingCategories.some(
-    (cat) => cat.toLowerCase() === search.trim().toLowerCase()
-  );
+  const showCreateOption =
+    search.trim() !== "" &&
+    !existingCategories.some(
+      (cat) => cat.toLowerCase() === search.trim().toLowerCase(),
+    );
 
   return (
     <div ref={wrapperRef} className="relative w-full">
@@ -105,7 +111,7 @@ function CategorySelector({ value, onChange, existingCategories }) {
         className="w-full text-black"
       />
       {isOpen && (filtered.length > 0 || showCreateOption) && (
-        <div 
+        <div
           className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg divide-y divide-gray-100"
           style={{ zIndex: 99999999 }}
         >
@@ -224,7 +230,8 @@ export default function FoodMenu({ mode }) {
         price_fixed: editingItem.price_fixed,
         price_general: editingItem.price_general,
         price_ac: editingItem.price_ac,
-        category: validCategories.length > 0 ? validCategories : [{ qty: 1, name: "" }],
+        category:
+          validCategories.length > 0 ? validCategories : [{ qty: 1, name: "" }],
         is_separate: editingItem.is_separate || false,
       };
       await updateMenuItem(editingItem.id, payload);
@@ -380,7 +387,10 @@ export default function FoodMenu({ mode }) {
                     onClick={() => {
                       setEditingItem((prev) => ({
                         ...prev,
-                        categories: [...(prev.categories || []), { qty: 1, name: "" }],
+                        categories: [
+                          ...(prev.categories || []),
+                          { qty: 1, name: "" },
+                        ],
                       }));
                     }}
                   >
@@ -398,7 +408,10 @@ export default function FoodMenu({ mode }) {
                         placeholder="Qty"
                         className="text-center font-bold"
                         onChange={(e) => {
-                          const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 1;
+                          const val =
+                            e.target.value === ""
+                              ? ""
+                              : parseFloat(e.target.value) || 1;
                           setEditingItem((prev) => {
                             const newCats = [...(prev.categories || [])];
                             newCats[idx] = { ...newCats[idx], qty: val };
@@ -428,10 +441,15 @@ export default function FoodMenu({ mode }) {
                         className="text-red-500 hover:text-red-700 h-9 px-2 font-bold"
                         onClick={() => {
                           setEditingItem((prev) => {
-                            const newCats = (prev.categories || []).filter((_, i) => i !== idx);
+                            const newCats = (prev.categories || []).filter(
+                              (_, i) => i !== idx,
+                            );
                             return {
                               ...prev,
-                              categories: newCats.length > 0 ? newCats : [{ qty: 1, name: "" }],
+                              categories:
+                                newCats.length > 0
+                                  ? newCats
+                                  : [{ qty: 1, name: "" }],
                             };
                           });
                         }}
@@ -643,7 +661,11 @@ export default function FoodMenu({ mode }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!window.confirm(`Are you sure you want to perform bulk update using "${file.name}"?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to perform bulk update using "${file.name}"?`,
+      )
+    ) {
       e.target.value = "";
       return;
     }
@@ -659,7 +681,7 @@ export default function FoodMenu({ mode }) {
         const workbook = XLSX.read(data, { type: "binary" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        
+
         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         if (rows.length < 2) {
           throw new Error("The selected file is empty or missing data rows.");
@@ -667,36 +689,71 @@ export default function FoodMenu({ mode }) {
 
         setBulkUpdateStatus("Parsing spreadsheet rows...");
 
-        const headers = rows[0].map(h => String(h || "").trim());
-        const nameIdx = headers.findIndex(h => h.toLowerCase() === "item name" || h.toLowerCase() === "name");
-        const alphaIdx = headers.findIndex(h => h.toLowerCase() === "alpha code" || h.toLowerCase() === "code");
-        const numericIdx = headers.findIndex(h => h.toLowerCase() === "numeric code");
-        const priceFixedIdx = headers.findIndex(h => h.toLowerCase() === "fixed price");
-        const priceGenIdx = headers.findIndex(h => h.toLowerCase() === "general price");
-        const priceAcIdx = headers.findIndex(h => h.toLowerCase() === "ac price");
+        const headers = rows[0].map((h) => String(h || "").trim());
+        const nameIdx = headers.findIndex(
+          (h) => h.toLowerCase() === "item name" || h.toLowerCase() === "name",
+        );
+        const alphaIdx = headers.findIndex(
+          (h) => h.toLowerCase() === "alpha code" || h.toLowerCase() === "code",
+        );
+        const numericIdx = headers.findIndex(
+          (h) => h.toLowerCase() === "numeric code",
+        );
+        const priceFixedIdx = headers.findIndex(
+          (h) => h.toLowerCase() === "fixed price",
+        );
+        const priceGenIdx = headers.findIndex(
+          (h) => h.toLowerCase() === "general price",
+        );
+        const priceAcIdx = headers.findIndex(
+          (h) => h.toLowerCase() === "ac price",
+        );
 
         if (nameIdx === -1 || (alphaIdx === -1 && numericIdx === -1)) {
-          throw new Error("Excel must contain 'Item Name' and at least one code column ('Alpha Code' or 'Numeric Code')");
+          throw new Error(
+            "Excel must contain 'Item Name' and at least one code column ('Alpha Code' or 'Numeric Code')",
+          );
         }
 
         const parsedItems = [];
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i];
-          if (!row || row.length === 0 || row.every(cell => cell === null || cell === undefined || cell === "")) {
+          if (
+            !row ||
+            row.length === 0 ||
+            row.every(
+              (cell) => cell === null || cell === undefined || cell === "",
+            )
+          ) {
             continue;
           }
 
           const name = row[nameIdx] ? String(row[nameIdx]).trim() : "";
           if (!name) continue;
 
-          const alphaCode = alphaIdx !== -1 && row[alphaIdx] ? String(row[alphaIdx]).trim().toUpperCase() : null;
-          const numericCode = numericIdx !== -1 && row[numericIdx] ? String(row[numericIdx]).trim() : null;
+          const alphaCode =
+            alphaIdx !== -1 && row[alphaIdx]
+              ? String(row[alphaIdx]).trim().toUpperCase()
+              : null;
+          const numericCode =
+            numericIdx !== -1 && row[numericIdx]
+              ? String(row[numericIdx]).trim()
+              : null;
 
           if (!alphaCode && !numericCode) continue;
 
-          const priceFixed = priceFixedIdx !== -1 && row[priceFixedIdx] ? parseFloat(row[priceFixedIdx]) : 0;
-          const priceGeneral = priceGenIdx !== -1 && row[priceGenIdx] ? parseFloat(row[priceGenIdx]) : 0;
-          const priceAc = priceAcIdx !== -1 && row[priceAcIdx] ? parseFloat(row[priceAcIdx]) : 0;
+          const priceFixed =
+            priceFixedIdx !== -1 && row[priceFixedIdx]
+              ? parseFloat(row[priceFixedIdx])
+              : 0;
+          const priceGeneral =
+            priceGenIdx !== -1 && row[priceGenIdx]
+              ? parseFloat(row[priceGenIdx])
+              : 0;
+          const priceAc =
+            priceAcIdx !== -1 && row[priceAcIdx]
+              ? parseFloat(row[priceAcIdx])
+              : 0;
 
           parsedItems.push({
             name,
@@ -704,7 +761,7 @@ export default function FoodMenu({ mode }) {
             numeric_code: numericCode,
             price_fixed: isNaN(priceFixed) ? 0 : priceFixed,
             price_general: isNaN(priceGeneral) ? 0 : priceGeneral,
-            price_ac: isNaN(priceAc) ? 0 : priceAc
+            price_ac: isNaN(priceAc) ? 0 : priceAc,
           });
         }
 
@@ -712,11 +769,15 @@ export default function FoodMenu({ mode }) {
           throw new Error("No valid items found in the file.");
         }
 
-        setBulkUpdateStatus(`Uploading ${parsedItems.length} items to database...`);
+        setBulkUpdateStatus(
+          `Uploading ${parsedItems.length} items to database...`,
+        );
         const res = await bulkUpdateMenuItems(parsedItems);
-        
+
         setBulkUpdateStatus("SUCCESS");
-        toast.success(res.message || `Successfully processed ${res.count} items!`);
+        toast.success(
+          res.message || `Successfully processed ${res.count} items!`,
+        );
         load();
         setTimeout(() => {
           setBulkUpdating(false);
@@ -724,7 +785,11 @@ export default function FoodMenu({ mode }) {
       } catch (err) {
         console.error("Bulk update parsing error:", err);
         setBulkUpdateStatus("FAILED");
-        const errMsg = err?.response?.data?.detail || err?.response?.data?.error || err.message || "Unknown error";
+        const errMsg =
+          err?.response?.data?.detail ||
+          err?.response?.data?.error ||
+          err.message ||
+          "Unknown error";
         setBulkUpdateErrorMsg(errMsg);
         alert("Bulk Update Failed: " + errMsg);
       } finally {
@@ -761,33 +826,51 @@ export default function FoodMenu({ mode }) {
       padding: 24,
       textAlign: "center",
       boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-      color: "white"
+      color: "white",
     };
 
     const modal = (
       <div style={overlayStyle}>
         <div style={modalStyle} className="space-y-4">
-          <h3 className="text-xl font-bold text-white mb-2">📥 Bulk Updating Menu</h3>
+          <h3 className="text-xl font-bold text-white mb-2">
+            📥 Bulk Updating Menu
+          </h3>
           <div className="flex flex-col items-center justify-center space-y-4">
             {bulkUpdateStatus !== "SUCCESS" && bulkUpdateStatus !== "FAILED" ? (
               <>
                 <div className="animate-spin text-blue-500 text-3xl">↻</div>
-                <p className="text-gray-300 font-semibold">{bulkUpdateStatus}</p>
+                <p className="text-gray-300 font-semibold">
+                  {bulkUpdateStatus}
+                </p>
                 <div className="w-full bg-gray-800 h-2 rounded-full overflow-hidden mt-2">
-                  <div className="bg-blue-600 h-full animate-pulse" style={{ width: "80%" }} />
+                  <div
+                    className="bg-blue-600 h-full animate-pulse"
+                    style={{ width: "80%" }}
+                  />
                 </div>
               </>
             ) : bulkUpdateStatus === "SUCCESS" ? (
               <>
                 <div className="text-green-500 text-4xl font-bold">✓</div>
-                <p className="text-green-400 font-bold text-lg">Bulk Update Successful!</p>
+                <p className="text-green-400 font-bold text-lg">
+                  Bulk Update Successful!
+                </p>
               </>
             ) : (
               <>
-                <div className="text-red-500 text-4xl font-bold text-center">✗</div>
-                <p className="text-red-400 font-bold text-lg">Bulk Update Failed</p>
-                <p className="text-sm text-gray-400 max-h-32 overflow-y-auto w-full text-left bg-gray-900 p-2 rounded">{bulkUpdateErrorMsg}</p>
-                <Button onClick={() => setBulkUpdating(false)} className="mt-4 bg-red-600 hover:bg-red-700 text-white border-none font-semibold w-full">
+                <div className="text-red-500 text-4xl font-bold text-center">
+                  ✗
+                </div>
+                <p className="text-red-400 font-bold text-lg">
+                  Bulk Update Failed
+                </p>
+                <p className="text-sm text-gray-400 max-h-32 overflow-y-auto w-full text-left bg-gray-900 p-2 rounded">
+                  {bulkUpdateErrorMsg}
+                </p>
+                <Button
+                  onClick={() => setBulkUpdating(false)}
+                  className="mt-4 bg-red-600 hover:bg-red-700 text-white border-none font-semibold w-full"
+                >
                   Close
                 </Button>
               </>
@@ -841,12 +924,14 @@ export default function FoodMenu({ mode }) {
                   <Button
                     onClick={handleExportMenu}
                     variant="outline"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white border-none font-semibold transition-all h-10 px-4 flex items-center gap-2"
+                    className="bg-blue-600 hover:bg-blue-700 text-white border-none font-semibold transition-all h-10 px-4 flex items-center gap-2"
                   >
                     📤 Export Menu (Excel)
                   </Button>
                   <Button
-                    onClick={() => document.getElementById("bulk-update-file-input").click()}
+                    onClick={() =>
+                      document.getElementById("bulk-update-file-input").click()
+                    }
                     variant="outline"
                     className="bg-blue-600 hover:bg-blue-700 text-white border-none font-semibold transition-all h-10 px-4 flex items-center gap-2"
                   >
@@ -1086,7 +1171,9 @@ export default function FoodMenu({ mode }) {
                                   0,
                                 ),
                                 price_ac: safeGet(item, "price_ac", 0),
-                                categories: parseCategories(safeGet(item, "category")),
+                                categories: parseCategories(
+                                  safeGet(item, "category"),
+                                ),
                                 is_separate: safeGet(
                                   item,
                                   "is_separate",

@@ -1,4 +1,4 @@
-﻿<#
+<#
 build-package.ps1
 
 Builds a fully self-contained deploy package for the Restaurant Billing App.

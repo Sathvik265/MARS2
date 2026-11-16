@@ -1970,6 +1970,17 @@ export default function Billing({
                         if (setCurrentTable) setCurrentTable(val);
                         // Trigger section update IMMEDIATELY on change
                         setSectionByTable(val);
+
+                        // If 2 digits have been entered, automatically move to party number
+                        if (val.length >= 2) {
+                          setCurrentParty("1");
+                          setTimeout(() => {
+                            if (partyNoRef.current) {
+                              partyNoRef.current.focus();
+                              partyNoRef.current.select();
+                            }
+                          }, 0);
+                        }
                       } else {
                         // Optional: Show toast or just ignore invalid input
                         // toast.error("Table number must be between 1 and 30");

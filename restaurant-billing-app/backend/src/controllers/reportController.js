@@ -181,9 +181,9 @@ exports.getShiftDetailedReport = async (req, res) => {
       [date, shift_name],
     );
 
-    const formattedRows = result.rows.map(row => ({
+    const formattedRows = result.rows.map((row) => ({
       ...row,
-      total_quantity: parseFloat(row.total_quantity || 0)
+      total_quantity: parseFloat(row.total_quantity || 0),
     }));
 
     res.json(formattedRows);
@@ -475,17 +475,14 @@ exports.updateSettings = async (req, res) => {
     // Check if the targetClerk is 'CLK' or exists in the database settings table
     const checkExists = await pool.query(
       "SELECT 1 FROM settings WHERE clerk_initials = $1",
-      [targetClerk]
+      [targetClerk],
     );
 
     if (targetClerk !== "CLK" && checkExists.rows.length === 0) {
       return res.status(404).json({ detail: "This isn't a valid clerk name" });
     }
 
-    const settings = await SettingsModel.updateSettings(
-      targetClerk,
-      req.body,
-    );
+    const settings = await SettingsModel.updateSettings(targetClerk, req.body);
     res.json(settings);
   } catch (err) {
     console.error("Update settings error:", err);
@@ -663,26 +660,31 @@ exports.getCategoryTotals = async (req, res) => {
     const [result, gstRes] = await Promise.all([
       pool.query(
         `SELECT items_json FROM bills WHERE bill_date = $1 AND bill_number > 0`,
-        [date]
+        [date],
       ),
       pool.query(
-        `SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 + 1.0 as multiplier FROM settings LIMIT 1`
-      )
+        `SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 + 1.0 as multiplier FROM settings LIMIT 1`,
+      ),
     ]);
 
     const gstMultiplier = parseFloat(gstRes.rows[0]?.multiplier) || 1.05;
     const catMap = {};
 
-    result.rows.forEach(row => {
+    result.rows.forEach((row) => {
       const items = row.items_json || [];
       if (Array.isArray(items)) {
-        items.forEach(item => {
+        items.forEach((item) => {
           let cats = [];
           if (item.categories) {
-            cats = Array.isArray(item.categories) ? item.categories : [item.categories];
+            cats = Array.isArray(item.categories)
+              ? item.categories
+              : [item.categories];
           } else if (item.category) {
             try {
-              const parsed = typeof item.category === 'string' ? JSON.parse(item.category) : item.category;
+              const parsed =
+                typeof item.category === "string"
+                  ? JSON.parse(item.category)
+                  : item.category;
               cats = Array.isArray(parsed) ? parsed : [parsed];
             } catch (e) {
               cats = [];
@@ -690,17 +692,22 @@ exports.getCategoryTotals = async (req, res) => {
           }
           if (cats.length > 0 && Array.isArray(cats[0])) cats = cats[0];
 
-          cats.forEach(cat => {
+          cats.forEach((cat) => {
             if (cat && cat.name) {
               const catName = String(cat.name).trim();
               const catQtyMultiplier = parseFloat(cat.qty || cat.quantity) || 1;
               const itemQty = parseFloat(item.quantity || item.qty) || 0;
-              const itemBaseAmount = parseFloat(item.line_total || item.amount) || 0;
+              const itemBaseAmount =
+                parseFloat(item.line_total || item.amount) || 0;
               const itemAmountWithGst = itemBaseAmount * gstMultiplier;
               const resolvedQty = itemQty * catQtyMultiplier;
 
               if (!catMap[catName]) {
-                catMap[catName] = { category_name: catName, total_quantity: 0, total_amount: 0 };
+                catMap[catName] = {
+                  category_name: catName,
+                  total_quantity: 0,
+                  total_amount: 0,
+                };
               }
               catMap[catName].total_quantity += resolvedQty;
               catMap[catName].total_amount += itemAmountWithGst;
@@ -710,10 +717,10 @@ exports.getCategoryTotals = async (req, res) => {
       }
     });
 
-    const rows = Object.values(catMap).map(c => ({
+    const rows = Object.values(catMap).map((c) => ({
       ...c,
       total_quantity: Math.ceil(c.total_quantity),
-      total_amount: Math.ceil(c.total_amount)
+      total_amount: Math.ceil(c.total_amount),
     }));
 
     res.json(rows);
@@ -728,7 +735,9 @@ exports.getCategoryReport = async (req, res) => {
   try {
     const { startDate, endDate, category, shift_name, shift } = req.query;
     if (!startDate || !endDate) {
-      return res.status(400).json({ detail: "startDate and endDate are required" });
+      return res
+        .status(400)
+        .json({ detail: "startDate and endDate are required" });
     }
 
     const shiftFilter = shift_name || shift;
@@ -745,23 +754,28 @@ exports.getCategoryReport = async (req, res) => {
       pool.query(`
         SELECT (COALESCE(sgst_percentage, 2.50) + COALESCE(cgst_percentage, 2.50)) / 100.0 + 1.0 as multiplier
         FROM settings LIMIT 1
-      `)
+      `),
     ]);
 
     const gstMultiplier = parseFloat(gstRes.rows[0]?.multiplier) || 1.05;
 
     const itemAggregation = {}; // key: item_name::category_name
 
-    result.rows.forEach(row => {
+    result.rows.forEach((row) => {
       const items = row.items_json || [];
       if (Array.isArray(items)) {
-        items.forEach(item => {
+        items.forEach((item) => {
           let cats = [];
           if (item.categories) {
-            cats = Array.isArray(item.categories) ? item.categories : [item.categories];
+            cats = Array.isArray(item.categories)
+              ? item.categories
+              : [item.categories];
           } else if (item.category) {
             try {
-              const parsed = typeof item.category === 'string' ? JSON.parse(item.category) : item.category;
+              const parsed =
+                typeof item.category === "string"
+                  ? JSON.parse(item.category)
+                  : item.category;
               cats = Array.isArray(parsed) ? parsed : [parsed];
             } catch (e) {
               cats = [];
@@ -771,12 +785,13 @@ exports.getCategoryReport = async (req, res) => {
             cats = cats[0];
           }
 
-          cats.forEach(cat => {
+          cats.forEach((cat) => {
             if (cat && cat.name) {
               const catName = String(cat.name).trim();
               const catQtyMultiplier = parseFloat(cat.qty || cat.quantity) || 1;
               const itemQty = parseFloat(item.quantity || item.qty) || 0;
-              const itemBaseAmount = parseFloat(item.line_total || item.amount) || 0;
+              const itemBaseAmount =
+                parseFloat(item.line_total || item.amount) || 0;
               const itemAmountWithGst = itemBaseAmount * gstMultiplier;
 
               if (!category) {
@@ -788,7 +803,7 @@ exports.getCategoryReport = async (req, res) => {
                   itemAggregation[key] = {
                     categoryName: catName,
                     totalQuantity: 0,
-                    totalAmount: 0
+                    totalAmount: 0,
                   };
                 }
                 itemAggregation[key].totalQuantity += resolvedQty;
@@ -804,7 +819,7 @@ exports.getCategoryReport = async (req, res) => {
                       itemName: item.item_name || item.name,
                       categoryName: catName,
                       totalQuantity: 0,
-                      totalAmount: 0
+                      totalAmount: 0,
                     };
                   }
                   itemAggregation[key].totalQuantity += resolvedQty;
@@ -817,11 +832,15 @@ exports.getCategoryReport = async (req, res) => {
       }
     });
 
-    const reportData = Object.values(itemAggregation).map(item => ({
-      ...item,
-      totalQuantity: Math.ceil(item.totalQuantity),
-      totalAmount: Math.ceil(item.totalAmount)
-    })).sort((a, b) => (a.categoryName || "").localeCompare(b.categoryName || ""));
+    const reportData = Object.values(itemAggregation)
+      .map((item) => ({
+        ...item,
+        totalQuantity: Math.ceil(item.totalQuantity),
+        totalAmount: Math.round(item.totalAmount),
+      }))
+      .sort((a, b) =>
+        (a.categoryName || "").localeCompare(b.categoryName || ""),
+      );
 
     res.json(reportData);
   } catch (error) {
