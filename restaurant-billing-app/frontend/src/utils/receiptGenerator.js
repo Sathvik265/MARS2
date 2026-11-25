@@ -66,7 +66,8 @@ export function generateAsciiReceipt(data, settings) {
 
   // Title Suffix support (for split bills)
   const section = safeGet(settings, "section") || safeGet(data, "section") || "L";
-  const sectionChar = (section === "P" || section.toUpperCase() === "PARCEL") ? "P" : "L";
+  const isParcel = section === "P" || section === "PA" || String(section).toUpperCase() === "PARCEL";
+  const sectionCode = isParcel ? "PA" : "SE";
 
   const titleSuffix = safeGet(data, "titleSuffix", "");
   const hotelHeading = trackLetter ? `${hotelName} ${trackLetter}` : hotelName;
@@ -142,7 +143,7 @@ export function generateAsciiReceipt(data, settings) {
   ascii += "---BOTTOM_HEADER---\r\n";
   ascii += centerText(headerHotelTitle, LINE_WIDTH) + "\r\n";
   if (address) ascii += centerText(address, LINE_WIDTH) + "\r\n";
-  const phoneText = phone ? `Ph: ${phone}   [${sectionChar}]` : `[${sectionChar}]`;
+  const phoneText = phone ? `Ph: ${phone}   [${sectionCode}]` : `[${sectionCode}]`;
   if (phoneText) ascii += centerText(phoneText, LINE_WIDTH) + "\r\n";
   if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\r\n";
 
@@ -183,7 +184,12 @@ export function generateAsciiReport(title, columns, data, settings) {
   // Suppress SRIHARI from printed reports — leave it blank (only affects printing, not DB)
   const isSrihari = clerkInitials && String(clerkInitials).trim().toUpperCase() === "SRIHARI";
   const printClerkInitials = isSrihari ? "" : clerkInitials;
-  const reportHotelTitle = printClerkInitials && printClerkInitials !== "CLK" ? `${hotelName} (${printClerkInitials})` : hotelName;
+  const section = safeGet(mergedData, "section", "L");
+  const isParcel = section === "P" || section === "PA" || String(section).toUpperCase() === "PARCEL";
+  const sectionCode = isParcel ? "PA" : "SE";
+  const reportHotelTitle = printClerkInitials && printClerkInitials !== "CLK"
+    ? `${hotelName} (${printClerkInitials}) [${sectionCode}]`
+    : `${hotelName} [${sectionCode}]`;
   ascii += centerText(reportHotelTitle, LINE_WIDTH) + "\r\n";
 
   // Wrap very long report titles onto two lines perfectly

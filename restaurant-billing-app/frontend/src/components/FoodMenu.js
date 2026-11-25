@@ -647,10 +647,17 @@ export default function FoodMenu({ mode }) {
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Food Menu");
-      XLSX.writeFile(workbook, "Food_Menu.xlsx");
-      toast.success("Food menu exported successfully!");
+      const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
+      const blob = new Blob([csvOutput], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "Food_Menu.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Food menu exported successfully as CSV!");
     } catch (err) {
       console.error("Export error:", err);
       toast.error("Failed to export food menu: " + err.message);
@@ -671,14 +678,14 @@ export default function FoodMenu({ mode }) {
     }
 
     setBulkUpdating(true);
-    setBulkUpdateStatus("Reading file...");
+    setBulkUpdateStatus("Reading CSV file...");
     setBulkUpdateErrorMsg("");
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const data = evt.target.result;
-        const workbook = XLSX.read(data, { type: "binary" });
+        const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
 
@@ -687,7 +694,7 @@ export default function FoodMenu({ mode }) {
           throw new Error("The selected file is empty or missing data rows.");
         }
 
-        setBulkUpdateStatus("Parsing spreadsheet rows...");
+        setBulkUpdateStatus("Parsing CSV rows...");
 
         const headers = rows[0].map((h) => String(h || "").trim());
         const nameIdx = headers.findIndex(
@@ -711,7 +718,7 @@ export default function FoodMenu({ mode }) {
 
         if (nameIdx === -1 || (alphaIdx === -1 && numericIdx === -1)) {
           throw new Error(
-            "Excel must contain 'Item Name' and at least one code column ('Alpha Code' or 'Numeric Code')",
+            "CSV file must contain 'Item Name' and at least one code column ('Alpha Code' or 'Numeric Code')",
           );
         }
 
@@ -797,7 +804,7 @@ export default function FoodMenu({ mode }) {
       }
     };
 
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const renderBulkUpdateModal = () => {
@@ -926,7 +933,7 @@ export default function FoodMenu({ mode }) {
                     variant="outline"
                     className="bg-blue-600 hover:bg-blue-700 text-white border-none font-semibold transition-all h-10 px-4 flex items-center gap-2"
                   >
-                    📤 Export Menu (Excel)
+                    📤 Export Menu (CSV)
                   </Button>
                   <Button
                     onClick={() =>
@@ -935,12 +942,12 @@ export default function FoodMenu({ mode }) {
                     variant="outline"
                     className="bg-blue-600 hover:bg-blue-700 text-white border-none font-semibold transition-all h-10 px-4 flex items-center gap-2"
                   >
-                    📥 Bulk Update (Excel)
+                    📥 Import Menu (CSV)
                   </Button>
                   <input
                     type="file"
                     id="bulk-update-file-input"
-                    accept=".xlsx, .xls, .csv"
+                    accept=".csv"
                     onChange={handleBulkUpdate}
                     style={{ display: "none" }}
                   />

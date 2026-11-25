@@ -54,7 +54,8 @@ const BillContent = ({ data, settings, isLast = true }) => {
   };
   const trackLetter = getTrackLetter(trackVal);
   const section = safeGet(settings, "section") || safeGet(data, "section") || "L";
-  const sectionChar = (section === "P" || section.toUpperCase() === "PARCEL") ? "P" : "L";
+  const isParcel = section === "P" || section === "PA" || String(section).toUpperCase() === "PARCEL";
+  const sectionCode = isParcel ? "PA" : "SE";
 
   const titleSuffix = safeGet(data, "titleSuffix", "");
   const hotelHeading = trackLetter ? `${hotelName} ${trackLetter}` : hotelName;
@@ -168,7 +169,7 @@ const BillContent = ({ data, settings, isLast = true }) => {
   ascii += "\n\n";
   ascii += centerText(headerTitle, LINE_WIDTH) + "\n";
   if (address) ascii += centerText(address, LINE_WIDTH) + "\n";
-  const phoneText = phone ? `Ph: ${phone}   [${sectionChar}]` : `[${sectionChar}]`;
+  const phoneText = phone ? `Ph: ${phone}   [${sectionCode}]` : `[${sectionCode}]`;
   if (phoneText) ascii += centerText(phoneText, LINE_WIDTH) + "\n";
   if (gstin) ascii += centerText(`GST: ${gstin}`, LINE_WIDTH) + "\n";
 

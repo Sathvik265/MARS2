@@ -32,7 +32,7 @@ export default function ShiftTab({ mode, sessionId, currentShift, currentDate, o
     try {
       await api.put("/settings/section", { section: sec });
       setSection(sec);
-      toast.success(`Section updated to ${sec === "L" ? "Line" : "Parcel"}`);
+      toast.success(`Section updated to ${sec === "P" || sec === "PA" ? "Parcel (PA)" : "Line (SE)"}`);
     } catch (e) {
       toast.error("Failed to update section");
       console.error(e);
@@ -48,22 +48,22 @@ export default function ShiftTab({ mode, sessionId, currentShift, currentDate, o
       </CardHeader>
       <CardContent className="p-6 space-y-4">
         <p className="text-sm text-zinc-400">
-          Set section where the system is currently being used: Line (L) or Parcel (P).
+          Set section where the system is currently being used: Line (SE) or Parcel (PA).
         </p>
         <div className="flex gap-4">
           <Button
-            variant={section === "L" ? "primary" : "outline"}
+            variant={section === "L" || section === "SE" ? "primary" : "outline"}
             className="flex-1 py-2 font-bold"
             onClick={() => handleUpdateSection("L")}
           >
-            Line (L)
+            Line (SE)
           </Button>
           <Button
-            variant={section === "P" ? "primary" : "outline"}
+            variant={section === "P" || section === "PA" ? "primary" : "outline"}
             className="flex-1 py-2 font-bold"
             onClick={() => handleUpdateSection("P")}
           >
-            Parcel (P)
+            Parcel (PA)
           </Button>
         </div>
       </CardContent>

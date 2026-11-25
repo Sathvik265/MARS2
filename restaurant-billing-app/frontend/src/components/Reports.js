@@ -33,6 +33,10 @@ const fetchSettings = async () => {
   }
 };
 
+export const getSectionDisplayCode = (sec) => {
+  return sec === "P" || sec === "PA" || String(sec).toUpperCase() === "PARCEL" ? "PA" : "SE";
+};
+
 const sendToPosPrinter = async (title, columns, data) => {
   try {
     const settings = await fetchSettings();
@@ -53,11 +57,18 @@ const sendToPosPrinter = async (title, columns, data) => {
 export function TimeRangeReport({ sessionId }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [section, setSection] = useState("SE");
   const [filters, setFilters] = useState({
     date: new Date().toISOString().split("T")[0],
     startTime: "09:00",
     endTime: "21:00",
   });
+
+  useEffect(() => {
+    fetchSettings().then((s) => {
+      setSection(getSectionDisplayCode(safeGet(s, "section", "L")));
+    });
+  }, []);
 
   const generateReport = async () => {
     setLoading(true);
@@ -117,12 +128,17 @@ export function TimeRangeReport({ sessionId }) {
     };
     window.addEventListener("keydown", handleCtrlP);
     return () => window.removeEventListener("keydown", handleCtrlP);
-  }, [report]);
+  }, [report, section]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Time Range Report</CardTitle>
+        <div className="flex items-center gap-3">
+          <CardTitle>Time Range Report</CardTitle>
+          <span className="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-800 border border-blue-300">
+            {section === "PA" ? "[PA] Parcel System" : "[SE] Line System"}
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -213,10 +229,17 @@ export function TimeRangeReport({ sessionId }) {
 export function DateRangeReport({ sessionId }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [section, setSection] = useState("SE");
   const [filters, setFilters] = useState({
     startDate: new Date().toISOString().split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
   });
+
+  useEffect(() => {
+    fetchSettings().then((s) => {
+      setSection(getSectionDisplayCode(safeGet(s, "section", "L")));
+    });
+  }, []);
 
   const generateReport = async () => {
     setLoading(true);
@@ -274,12 +297,17 @@ export function DateRangeReport({ sessionId }) {
     };
     window.addEventListener("keydown", handleCtrlP);
     return () => window.removeEventListener("keydown", handleCtrlP);
-  }, [report]);
+  }, [report, section]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Date Range Report</CardTitle>
+        <div className="flex items-center gap-3">
+          <CardTitle>Date Range Report</CardTitle>
+          <span className="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-800 border border-blue-300">
+            {section === "PA" ? "[PA] Parcel System" : "[SE] Line System"}
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -367,11 +395,15 @@ export function ShiftReport({ sessionId }) {
   const [summaryReport, setSummaryReport] = useState(null);
   const [detailedReport, setDetailedReport] = useState(null);
   const [settings, setSettings] = useState({});
+  const [section, setSection] = useState("SE");
   const [asciiPreview, setAsciiPreview] = useState("");
   const [shiftOnlyReport, setShiftOnlyReport] = useState(null);
 
   useEffect(() => {
-    fetchSettings().then((data) => setSettings(data || {}));
+    fetchSettings().then((data) => {
+      setSettings(data || {});
+      setSection(getSectionDisplayCode(safeGet(data, "section", "L")));
+    });
   }, []);
 
   const generateReport = async () => {
@@ -385,6 +417,10 @@ export function ShiftReport({ sessionId }) {
       });
       setReport(res.data);
       setActiveReportType("list");
+
+      const currentSettings = settings && settings.section ? settings : await fetchSettings();
+      const shiftSection = getSectionDisplayCode(currentSettings?.section);
+      setSection(shiftSection);
 
       const rawText = generateAsciiReport(
         `Shift Bills (${formatDateToDDMMYYYY(filters.date)} - ${filters.shiftName})`,
@@ -405,7 +441,7 @@ export function ShiftReport({ sessionId }) {
           },
         ],
         res.data,
-        settings
+        currentSettings
       );
       setAsciiPreview(rawText.replace(/\.\r?\n/g, ""));
       toast.success("Shift report generated successfully");
@@ -545,6 +581,10 @@ export function ShiftReport({ sessionId }) {
       setSummaryReport(summaryData);
       setActiveReportType("summary");
 
+      const currentSettings = settings && settings.section ? settings : await fetchSettings();
+      const shiftSection = getSectionDisplayCode(currentSettings?.section);
+      setSection(shiftSection);
+
       const rawText = generateAsciiReport(
         `Shift Summary (${formatDateToDDMMYYYY(filters.date)})`,
         [
@@ -563,7 +603,7 @@ export function ShiftReport({ sessionId }) {
           },
         ],
         summaryData,
-        settings
+        currentSettings
       );
       setAsciiPreview(rawText.replace(/\.\r?\n/g, ""));
     } catch (e) {
@@ -611,6 +651,10 @@ export function ShiftReport({ sessionId }) {
       setDetailedReport(detailedData);
       setActiveReportType("detailed");
 
+      const currentSettings = settings && settings.section ? settings : await fetchSettings();
+      const shiftSection = getSectionDisplayCode(currentSettings?.section);
+      setSection(shiftSection);
+
       const rawText = generateAsciiReport(
         `Detailed Shift Rpt (${filters.shiftName})`,
         [
@@ -624,7 +668,7 @@ export function ShiftReport({ sessionId }) {
           },
         ],
         detailedData,
-        settings
+        currentSettings
       );
       setAsciiPreview(rawText.replace(/\.\r?\n/g, ""));
     } catch (e) {
@@ -663,6 +707,10 @@ export function ShiftReport({ sessionId }) {
         { label: "GST Amount", value: `Rs. ${Number(data.gst_amount || 0).toFixed(2)}` },
       ];
 
+      const currentSettings = settings && settings.section ? settings : await fetchSettings();
+      const shiftSection = getSectionDisplayCode(currentSettings?.section);
+      setSection(shiftSection);
+
       const rawText = generateAsciiReport(
         `Shift Only (${filters.shiftName} - ${formatDateToDDMMYYYY(filters.date)})`,
         [
@@ -675,7 +723,7 @@ export function ShiftReport({ sessionId }) {
           },
         ],
         shiftOnlyData,
-        settings
+        currentSettings
       );
       setAsciiPreview(rawText.replace(/\.\r?\n/g, ""));
     } catch (e) {
@@ -687,11 +735,17 @@ export function ShiftReport({ sessionId }) {
   };
 
   const isShiftNameEntered = filters.shiftName && filters.shiftName.trim() !== "";
+  const shiftSection = section || getSectionDisplayCode(settings?.section);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Shift Report</CardTitle>
+        <div className="flex items-center gap-3">
+          <CardTitle>Shift Report</CardTitle>
+          <span className="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-800 border border-blue-300">
+            {shiftSection === "PA" ? "[PA] Parcel System" : "[SE] Line System"}
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -778,7 +832,7 @@ export function ShiftReport({ sessionId }) {
               <div className="lg:col-span-7 space-y-4">
                 {activeReportType === "list" && report && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-gray-800">Shift Bills</h3>
+                    <h3 className="text-lg font-bold text-gray-800">Shift Bills [{section}]</h3>
                     {report.length > 0 ? (
                       <Table>
                         <TableHeader>
@@ -814,7 +868,7 @@ export function ShiftReport({ sessionId }) {
 
                 {activeReportType === "summary" && summaryReport && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-gray-800">Shift Summary Report</h3>
+                    <h3 className="text-lg font-bold text-gray-800">Shift Summary Report [{section}]</h3>
                     {summaryReport.length > 0 ? (
                       <Table>
                         <TableHeader>
@@ -851,7 +905,7 @@ export function ShiftReport({ sessionId }) {
 
                 {activeReportType === "detailed" && detailedReport && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-gray-800">Detailed Shift Report ({filters.shiftName})</h3>
+                    <h3 className="text-lg font-bold text-gray-800">Detailed Shift Report [{section}] ({filters.shiftName})</h3>
                     {detailedReport.length > 0 ? (
                       <Table>
                         <TableHeader>
@@ -888,7 +942,7 @@ export function ShiftReport({ sessionId }) {
 
                 {activeReportType === "shift-only" && shiftOnlyReport && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-gray-800">Shift Only Report ({filters.shiftName})</h3>
+                    <h3 className="text-lg font-bold text-gray-800">Shift Only Report [{section}] ({filters.shiftName})</h3>
                     <div className="bg-white border rounded-lg p-6 space-y-3">
                       <div className="flex justify-between items-center py-2 border-b">
                         <span className="text-gray-600 font-medium">Shift Name</span>
@@ -946,12 +1000,19 @@ export function ItemReport({ sessionId }) {
   const [itemNames, setItemNames] = useState([]);
   const [categories, setCategories] = useState([]);
   const [dropdownsLoaded, setDropdownsLoaded] = useState(false);
+  const [section, setSection] = useState("SE");
   const [filters, setFilters] = useState({
     startDate: new Date().toISOString().split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
     item_name: "",
     category: "",
   });
+
+  useEffect(() => {
+    fetchSettings().then((s) => {
+      setSection(getSectionDisplayCode(safeGet(s, "section", "L")));
+    });
+  }, []);
 
   useEffect(() => {
     const fetchDropdownData = async () => {
@@ -1033,12 +1094,17 @@ export function ItemReport({ sessionId }) {
     };
     window.addEventListener("keydown", handleCtrlP);
     return () => window.removeEventListener("keydown", handleCtrlP);
-  }, [report]);
+  }, [report, section]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Item Sales Report</CardTitle>
+        <div className="flex items-center gap-3">
+          <CardTitle>Item Sales Report</CardTitle>
+          <span className="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-800 border border-blue-300">
+            {section === "PA" ? "[PA] Parcel System" : "[SE] Line System"}
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -1179,7 +1245,7 @@ export function CategoryReport({ sessionId }) {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState([]);
   const [dropdownsLoaded, setDropdownsLoaded] = useState(false);
-  const [section, setSection] = useState("L");
+  const [section, setSection] = useState("SE");
   const [filters, setFilters] = useState({
     startDate: new Date().toISOString().split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
@@ -1189,8 +1255,7 @@ export function CategoryReport({ sessionId }) {
 
   useEffect(() => {
     fetchSettings().then((s) => {
-      const sec = safeGet(s, "section", "L");
-      setSection(sec === "P" || String(sec).toUpperCase() === "PARCEL" ? "P" : "L");
+      setSection(getSectionDisplayCode(safeGet(s, "section", "L")));
     });
   }, []);
 
@@ -1261,9 +1326,8 @@ export function CategoryReport({ sessionId }) {
       ];
 
     const shiftSuffix = filters.shiftName ? ` [Shift: ${filters.shiftName}]` : "";
-    const sectionLabel = section === "P" ? "[P]" : "[L]";
     sendToPosPrinter(
-      `CATEGORY SALES REPORT ${sectionLabel}${shiftSuffix} (${formatDateToDDMMYYYY(filters.startDate)} to ${formatDateToDDMMYYYY(filters.endDate)})`,
+      `CATEGORY SALES REPORT${shiftSuffix} (${formatDateToDDMMYYYY(filters.startDate)} to ${formatDateToDDMMYYYY(filters.endDate)})`,
       columns,
       report
     );
@@ -1280,7 +1344,7 @@ export function CategoryReport({ sessionId }) {
     };
     window.addEventListener("keydown", handleCtrlP);
     return () => window.removeEventListener("keydown", handleCtrlP);
-  }, [report]);
+  }, [report, section]);
 
   const totalCategorySum = report.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
   const totalCategorySumDisplay = Number.isInteger(totalCategorySum) ? totalCategorySum : parseFloat(totalCategorySum.toFixed(2));
@@ -1292,7 +1356,7 @@ export function CategoryReport({ sessionId }) {
         <div className="flex items-center gap-3">
           <CardTitle>Category Sales Report</CardTitle>
           <span className="px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-800 border border-blue-300">
-            {section === "P" ? "[P] Parcel System" : "[L] Line System"}
+            {section === "PA" ? "[PA] Parcel System" : "[SE] Line System"}
           </span>
         </div>
       </CardHeader>
